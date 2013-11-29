@@ -21,19 +21,21 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from posttroll.publisher import Publisher, get_own_ip
-from posttroll.subscriber import Subscriber
-from posttroll.message import Message
-from multiprocessing import Pool
+from posttroll.publisher import get_own_ip
 from multiprocessing import Pipe
-from collections import deque
 from mpop.utils import debug_on
 debug_on()
-#from multiprocessing import Process
+from xml_read import read_product_file
+from mpop.satellites import GenericFactory
+from ConfigParser import ConfigParser
 
-from threading import Thread as Process
 
-import time
+from threading import Thread
+import os
+from listener import Listener
+import logging
+
+logger = logging.getLogger(__name__)
 
 OWN_PORT = 9000
 OWN_ADDRESS = str(get_own_ip())
@@ -43,100 +45,95 @@ JOONAS_PORT = 9000
 JOONAS_ADDRESS = "10.240.23.37"
 
 
-class Listener(object):
+def get_prerequisites(obj, product_list):
+    """Get the required channels from scene *obj* according to *product_list*.
+    """
+    prereqs = set()
+    for products in product_list.values():
+        for prod in products:
+            prereqs |= getattr(obj, prod).prerequisites
+    return prereqs
 
-    '''PyTroll listener class for reading messages and adding them to
-    deque
-    '''
 
-    def __init__(self, ip=None, port=None, processes=2, pipe=None):
-        '''
-        '''
-        self.address_list = []
-        self.type_list = []
-        self.add_address(ip, port)
-        self.deque = deque()
-        self.pipe = pipe
-        self.create_subscriber()
+MAIN_CONFIG_FILE = "./main.cfg"
+MAIN_CONFIG = ConfigParser()
+MAIN_CONFIG.read(MAIN_CONFIG_FILE)
+
+class FileMissingError(Exception):
+    """Exception when a file is missing.
+    """
+    pass
+
+
+def get_productlist_filename(satellite, number, instrument, variant):
+    proddir = MAIN_CONFIG.get("default", "productlist_dir")
+    specific_file = os.path.join(proddir,
+                                 variant + satellite + number + "_products.xml")
+    generic_file = os.path.join(proddir,
+                                instrument + "_products.xml")
+    if os.path.exists(specific_file):
+        return specific_file
+    elif os.path.exists(generic_file):
+        return generic_file
+    else:
+        raise FileMissingError(generic_file + " is missing !")
+    
+
+def generate_composites(global_data, area, prodlist):
+    """Generate the composites from *global_data* listed in *prodlist* for
+    *area*.
+    """
+    print "Working hard!", area
+    local_data = global_data.project(area)
+    #local_data = global_data
+    for prod, filenames in prodlist.items():
+        img = getattr(local_data.image, prod)()
+        for filename, options in filenames:
+            logger.debug("saving " + local_data.time_slot.strftime(filename))
+            img.save(local_data.time_slot.strftime(filename), **options)
         
-    def add_address(self, ip, port):
-        '''
-        '''
-        if ip is not None and port is not None:
-            self.address_list.append('tcp://'+ip+':%05d' % port)
-
-    def add_address_list(self, address_list):
-        '''
-        '''
-        for address in address_list:
-            self.address_list.append(address)
-
-    def create_subscriber(self):
-        '''
-        '''
-        if len(self.address_list) > 0:
-            self.subscriber = Subscriber(self.address_list, 
-                                         self.type_list)
-
-    def send_to_pipe(self, msg):
-        '''
-        '''
-        self.pipe.send(msg)
-
-    def start(self):
-        '''
-        '''
-
-        print "start"
 
 
-        for msg in self.subscriber.recv():
-            print "new msg"
-            if self.pipe is None:
-                self.deque.append(msg)
-            else:
-                while len(self.deque) > 0:
-                    self.send_to_pipe(self.deque.popleft())
-            self.send_to_pipe(msg)
-
-        #i = 0
-        #while True:
-        #    self.send_to_pipe(i)
-        #    i += 1
-        #    time.sleep(2)
-
-def printer(msg):
-    print msg
-
-def do_processing(msg):
-    from xml_read import read_product_file
-    pl, mda = read_product_file('/local_disk/usr/src/mpop-smhi.old/etc/noaa15_products.xml')
-
-    prods = pl["euron1"]
-
+    
+def triage(msg, worker_nb=None):
+    """Determine what to do with *msg*.
+    """
     info = msg.data
 
-    from mpop.satellites import GenericFactory
-    from datetime import datetime
-    g = GenericFactory.create_scene(str(info["satellite"]), str(info["number"]), str(info["instrument"]), datetime.utcnow(), None)
+    filename = get_productlist_filename(info["satellite"],
+                                        info["number"],
+                                        info["instrument"],
+                                        info.get("variant", ""))
+    
+    pl, mda = read_product_file(filename)
+    logger.debug("Read product list: " + str(mda))
+    global_data = GenericFactory.create_scene(str(info["satellite"]),
+                                              str(info["number"]),
+                                              str(info["instrument"]),
+                                              info["start_time"],
+                                              "%05d"%info["orbit"])
+    
+    channels = get_prerequisites(global_data.image, pl)
+    
+    global_data.load(channels)
 
-    g.load(get_prerequisites(g.image, prods.keys()))
-    for prod, files in prods.items():
-        img = getattr(g.image, prod)()
-        print "saving", img, "to", files
-
-def get_prerequisites(obj, products):
-    prereqs = set()
-    for prod in products:
-        prereqs |= getattr(obj, prod).prerequisites
-    return prereqs
+    for area, products in pl.items():
+        # FIXME: Number of simultaneous threads should be configurable
+        # Fork bomb, fork bomb, I'm a fork bomb ! (Tom Jones)
+        thr = Thread(target=generate_composites, args=(global_data,
+                                                       area,
+                                                       products))
+        thr.start()
+        logger.info("Started thread to process " + info["satellite"] +
+                    info["number"] + " on " + area)
+        thr.join()
 
 
 if __name__ == "__main__":
 
     parent_conn, child_conn = Pipe()
 
-    listener = Listener(pipe=child_conn)
+    listener = Listener(child_pipe=child_conn)
     print "subscribing to ", OWN_ADDRESS, OWN_PORT
     listener.add_address(OWN_ADDRESS, OWN_PORT)
     #print "subscribing to ", JOONAS_ADDRESS, JOONAS_PORT
@@ -146,15 +143,14 @@ if __name__ == "__main__":
     #listener.type_list = []
     listener.create_subscriber()
 
-    proc = Process(target=listener.start)
+    proc = Thread(target=listener.start)
+    proc.setDaemon(True)
     proc.start()
 
-    pool = Pool(processes=2)
     while True:
         msg = parent_conn.recv()
         #pool.apply_async(do_processing, args=(msg,))
-        pool.apply_async(printer, args=(msg,))
-        do_processing(msg)
+        triage(msg)
 
         # Send reply that the message was received
         #publisher.send_ack(msg)
