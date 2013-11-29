@@ -90,7 +90,7 @@ class EventHandler(ProcessEvent):
                          "number": "19",
                          "instrument": "avhrr",
                          "start_time": datetime(2010, 2, 24, 11, 29),
-                         "orbit": 5402}
+                         "orbit_number": 5402}
             self.identify_filetype()
             if self.filetype != '':
                 message = self.create_message()            

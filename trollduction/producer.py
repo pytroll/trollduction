@@ -111,7 +111,7 @@ def triage(msg, worker_nb=None):
                                               str(info["number"]),
                                               str(info["instrument"]),
                                               info["start_time"],
-                                              "%05d"%info["orbit"])
+                                              "%05d"%info["orbit_number"])
     
     channels = get_prerequisites(global_data.image, pl)
     
