@@ -30,7 +30,7 @@ from mpop.satellites import GenericFactory
 from ConfigParser import ConfigParser
 
 
-from threading import Thread
+from threading import Thread, activeCount, Semaphore
 import os
 from listener import Listener
 import logging
@@ -79,10 +79,12 @@ def get_productlist_filename(satellite, number, instrument, variant):
         raise FileMissingError(generic_file + " is missing !")
     
 
-def generate_composites(global_data, area, prodlist):
+def generate_composites(global_data, area, prodlist, sem):
     """Generate the composites from *global_data* listed in *prodlist* for
     *area*.
     """
+    print "Waiting for a free slot", area
+    sem.acquire()
     print "Working hard!", area
     local_data = global_data.project(area)
     #local_data = global_data
@@ -95,11 +97,12 @@ def generate_composites(global_data, area, prodlist):
             if "overlay" in options:
                 img.add_overlay()
             img.save(new_filename, **options)
-        
+
+    sem.release()
 
 
     
-def triage(msg, worker_nb=None):
+def triage(msg, max_num_threads=1):
     """Determine what to do with *msg*.
     """
     info = msg.data
@@ -121,16 +124,18 @@ def triage(msg, worker_nb=None):
     
     global_data.load(channels)
 
+    sem = Semaphore(max_num_threads)
+
     for area, products in pl.items():
         # FIXME: Number of simultaneous threads should be configurable
         # Fork bomb, fork bomb, I'm a fork bomb ! (Tom Jones)
         thr = Thread(target=generate_composites, args=(global_data,
                                                        area,
-                                                       products))
+                                                       products,
+                                                       sem))
         thr.start()
         logger.info("Started thread to process " + info["satellite"] +
                     info["number"] + " on " + area)
-        thr.join()
 
 
 if __name__ == "__main__":
@@ -162,43 +167,3 @@ if __name__ == "__main__":
 #        time.sleep(1)
 
 
-
-"""
-from posttroll.publisher import Publish
-from posttroll.message import Message
-import time
-
-try:
-    with Publish("my_module", ["hmf"], 9000) as pub:
-        counter = 0
-        while True:
-            counter += 1
-            message = Message("/NewFileArrived/", "hmf", str(counter))
-            print "publishing", message
-            pub.send(str(message))
-            time.sleep(3)
-except KeyboardInterrupt:
-    print "terminating publisher..."
-
-
-
-from posttroll.publisher import Publisher, get_own_ip
-from posttroll.message import Message
-import time
-
-PUB_ADDRESS = "tcp://" + str(get_own_ip()) + ":9000"
-PUB = Publisher(PUB_ADDRESS)
-
-try:
-    counter = 0
-    while True:
-        counter += 1
-        print "publishing " + str(counter)
-        message = Message("/NewFileArrived/", "hmf", str(counter))
-        PUB.send(str(message))
-        time.sleep(3)
-except KeyboardInterrupt:
-    print "terminating publisher..."
-    PUB.stop()
-    
-"""
