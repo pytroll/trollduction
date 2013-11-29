@@ -20,13 +20,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""Looking at directories and sending messages.
+
+Example message:
+pytroll://oper/polar/direct_readout/norrköping file safuser@lxserv263.smhi.se 2013-11-29T01:25:16.803170 v1.01 application/json {"satellite": "NOAA 19", "format": "HRPT", "start_time": "2013-11-29T01:09:18", "level": "0", "orbit_number": 24775, "uri": "ssh://nimbus.smhi.se/archive/hrpt/20131129010918_NOAA_19.hmf", "filename": "20131129010918_NOAA_19.hmf", "instrument": ["avhrr/3", "mhs", "amsu"], "end_time": "2013-11-29T01:25:12", "type": "binary"}
+
+
+"""
+
+
 import argparse
 import logging, logging.handlers
 from pyinotify import WatchManager, Notifier, ProcessEvent
 import pyinotify
 import fnmatch
 import sys
-import os
+from datetime import datetime
 
 from posttroll.publisher import Publisher, get_own_ip
 from posttroll.message import Message
@@ -79,7 +88,9 @@ class EventHandler(ProcessEvent):
             self.info = {"uri": self.filename,
                          "satellite": "noaa",
                          "number": "19",
-                         "instrument": "avhrr"}
+                         "instrument": "avhrr",
+                         "start_time": datetime(2010, 2, 24, 11, 29),
+                         "orbit": 5402}
             self.identify_filetype()
             if self.filetype != '':
                 message = self.create_message()            
