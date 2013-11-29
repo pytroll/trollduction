@@ -79,26 +79,33 @@ def get_productlist_filename(satellite, number, instrument, variant):
         raise FileMissingError(generic_file + " is missing !")
     
 
-def generate_composites(global_data, area, prodlist, sem):
+def generate_composites(global_data, area, prodlist,
+                        area_completion_hook, file_completion_hook=None):
     """Generate the composites from *global_data* listed in *prodlist* for
     *area*.
     """
-    print "Waiting for a free slot", area
-    sem.acquire()
     print "Working hard!", area
-    local_data = global_data.project(area)
-    #local_data = global_data
-    for prod, filenames in prodlist.items():
-        img = getattr(local_data.image, prod)()
-        for filename, options in filenames:
-            sat_attrs = {"orbit": int(global_data.orbit)}
-            new_filename = local_data.time_slot.strftime(filename)%sat_attrs
-            logger.debug("saving " + new_filename)
-            if "overlay" in options:
-                img.add_overlay()
-            img.save(new_filename, **options)
-
-    sem.release()
+    try:
+        local_data = global_data.project(area)
+        #local_data = global_data
+        for prod, filenames in prodlist.items():
+            img = getattr(local_data.image, prod)()
+            for filename, options in filenames:
+                sat_attrs = {"orbit": int(global_data.orbit)}
+                new_filename = local_data.time_slot.strftime(filename)%sat_attrs
+                if "overlay" in options:
+                    img.add_overlay()
+                try:
+                    img.save(new_filename, **options)
+                    logger.debug("saved " + new_filename)
+                    if file_completion_hook is not None:
+                        file_completion_hook(new_filename, img)
+                except UnknownImageFormat:
+                    logger.error("Wrong format " + options["format"] +
+                                 " for " + str(new_filename))
+                #FIXME: should publish also!
+    finally:
+        area_completion_hook()
 
 
     
@@ -127,16 +134,16 @@ def triage(msg, max_num_threads=1):
     sem = Semaphore(max_num_threads)
 
     for area, products in pl.items():
-        # FIXME: Number of simultaneous threads should be configurable
         # Fork bomb, fork bomb, I'm a fork bomb ! (Tom Jones)
+        sem.acquire()
         thr = Thread(target=generate_composites, args=(global_data,
                                                        area,
                                                        products,
-                                                       sem))
+                                                       sem.release))
         thr.start()
         logger.info("Started thread to process " + info["satellite"] +
                     info["number"] + " on " + area)
-
+        
 
 if __name__ == "__main__":
 
