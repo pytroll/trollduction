@@ -17,6 +17,7 @@ class Listener(object):
         self.add_address(ip, port)
         self.deque = deque(maxlen=deque_length)
         self.pipe = child_pipe
+        self.subscriber = None
         
     def add_address(self, ip, port):
         '''Add address+port combination to listen for messages
