@@ -25,14 +25,14 @@ from posttroll.publisher import get_own_ip
 from multiprocessing import Pipe
 from mpop.utils import debug_on
 debug_on()
-from xml_read import read_product_file
+from trollduction.xml_read import read_product_file
 from mpop.satellites import GenericFactory
 from ConfigParser import ConfigParser
 
-
-from threading import Thread, activeCount, Semaphore
+from trollimage.image import UnknownImageFormat
+from threading import Thread, Semaphore
 import os
-from listener import Listener
+from trollduction.listener import Listener
 import logging
 
 logger = logging.getLogger(__name__)
