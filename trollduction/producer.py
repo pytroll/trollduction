@@ -89,8 +89,12 @@ def generate_composites(global_data, area, prodlist):
     for prod, filenames in prodlist.items():
         img = getattr(local_data.image, prod)()
         for filename, options in filenames:
-            logger.debug("saving " + local_data.time_slot.strftime(filename))
-            img.save(local_data.time_slot.strftime(filename), **options)
+            sat_attrs = {"orbit": int(global_data.orbit)}
+            new_filename = local_data.time_slot.strftime(filename)%sat_attrs
+            logger.debug("saving " + new_filename)
+            if "overlay" in options:
+                img.add_overlay()
+            img.save(new_filename, **options)
         
 
 
