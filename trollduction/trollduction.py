@@ -1,5 +1,4 @@
 from multiprocessing import Pipe
-from multiprocessing.pool import ThreadPool
 from threading import Thread
 from listener import Listener
 #from publisher import Publisher
@@ -7,6 +6,7 @@ from listener import Listener
 from mpop.satellites import GenericFactory as GF
 import datetime as dt
 import time
+from mpop.projector import get_area_def
 
 class Trollduction(object):
     '''Trollduction class for easy generation chain setup
@@ -35,12 +35,15 @@ class Trollduction(object):
             self.listener_thread = None
             self.listener_parent_conn = None
             self.listener_child_conn = None
-            self.publisher = None
-            self.logger = None
+#            self.publisher = None
+#            self.logger = None
             self.image_output_dir = None
+            # single swath or MSG disc: 'single'
+            # multiple granules or GEO images: 'multi'
             self.production_type = None
-            self.pool = None
-            self.pool_size = None
+#            self.pool = None
+#            self.pool_size = None
+#            self.loaded_channels = []
 
     def update_tdconfig(self, fname=None):
         '''Read Trollduction master configuration file and update the
@@ -66,20 +69,21 @@ class Trollduction(object):
                                td_config['listener']['msg_type_list'])
             self.restart_listener()
 
-        if 'num_processes' in keys:
-            # TODO: check if changed
-            self.init_pool(num_processes=td_config['num_processes'])
-        else:
-            self.init_pool()
-
+#        if 'parallel' in keys:
+#            if 'num_processes' in keys:
+#                # TODO: check if changed
+#                self.init_pool(num_processes=td_config['num_processes'])
+#            else:
+#                self.init_pool()
+                
         if '' in keys:
             # TODO: check if changed
             pass
 
 
     def update_product_config(self, fname=None):
-        '''Read area definitions and associated product names from a
-        file and update the values for self.
+        '''Read area definition names and associated product names
+        from a file and update the class member values.
         '''
         if fname is not None:
             self.product_config_file = fname
@@ -117,8 +121,6 @@ class Trollduction(object):
         self.listener_parent_conn = parent_conn
         self.listener_child_conn = child_conn
 
-        print "Pipe()"
-
         # Create a Listener instance
         self.listener = Listener(address_list=address_list, 
                                  msg_type_list=msg_type_list, 
@@ -148,17 +150,6 @@ class Trollduction(object):
         self.start_listener()
 
 
-    def init_pool(self, num_processes=2):
-        '''Initialise worker pool with num_processes workers.
-        '''
-        if self.pool is not None:
-            self.pool.close()
-            self.pool.join()
-        self.pool = ThreadPool(processes=num_processes)
-        self.pool_size = num_processes
-        print 'Pool initialised'
-
-
     def cleanup(self):
         '''Cleanup everything before shutdown
         '''
@@ -176,10 +167,10 @@ class Trollduction(object):
     def run_single(self):
         '''Run image production without threading.
         '''
-
         # TODO: Get relevant preprocessing function for this
-        # production chain types eg.: swath, geo, granule, global_polar,
-        # global_geo, global_mixed
+        #   production chain type: single/multi, or
+        #   swath, geo, granule, global_polar, global_geo, global_mixed
+        # That is, gatherer for the multi-image/multi-granule types
         # preproc_func = getattr(preprocessing, self.production_type)
 
         while True:
@@ -188,302 +179,183 @@ class Trollduction(object):
             print msg
             # shutdown trollduction
             if msg.subject == '/StopTrollduction':
-                self.shutdown()
+                self.cleanup()
+                break
+                #self.shutdown()
             # update trollduction config
-            elif msg.subject == '/td_config':
+            elif msg.subject == '/NewTrollductionConfig':
                 self.update_td_config(msg.data)
             # update product lists
-            elif msg.subject == '/product_config':
+            elif msg.subject == '/NewProductConfig':
                 self.udpate_product_config(msg.data)
             # process new file
-            elif msg.subject == '/NewFileArrived':
-                time_slot = dt.datetime(msg.data['year'],
-                                        msg.data['month'], 
-                                        msg.data['day'],
-                                        msg.data['hour'],
-                                        msg.data['minute'])
+            elif '/NewFileArrived' in msg.subject:
+                self.time_slot = dt.datetime(msg.data['year'],
+                                             msg.data['month'], 
+                                             msg.data['day'],
+                                             msg.data['hour'],
+                                             msg.data['minute'])
 
-                global_data = GF.create_scene(str(msg.data['satellite']), 
-                                              str(msg.data['satnumber']), 
-                                              str(msg.data['instrument']), 
-                                              time_slot, 
-                                              str(msg.data['orbit']))
+                # orbit is empty string for meteosat, change it to None
+                if msg.data['orbit'] == '': msg.data['orbit'] = None
 
                 t1a = time.time()
 
-                global_data.load()
-#                global_data.load(['1','2','3B','4','5'])
+                self.global_data = GF.create_scene(satname=str(msg.data['satellite']), 
+                                                   satnumber=str(msg.data['satnumber']), 
+                                                   instrument=str(msg.data['instrument']), 
+                                                   time_slot=self.time_slot, 
+                                                   orbit=str(msg.data['orbit']))
 
-                t1 = time.time()
+
+                # Find maximum extent that is needed for all the
+                # products to be made.
+                self.get_maximum_extent()
+
+                # Make images for each area
                 for area_name in self.area_def_names:
-                    # TODO: assemble a list of required channels
-                    # TODO: find maximum extent that is needed
-                    # TODO: global_data.load(required_channels)
-                    # TODO: unload channels not required
+
+                    t1b = time.time()
+
+                    # Check which channels are needed. Unload
+                    # unnecessary channels and load those that are not
+                    # already available.
+                    self.load_unload_channels(self.product_list[area_name])
                     # TODO: or something
 
                     # reproject to local domain
-
-                    local_data = global_data.project(area_name)
+                    self.local_data = self.global_data.project(area_name, mode='nearest')
                     
                     print "Data reprojected for area:", area_name
-#                    draw_images_thread(local_data, area_name, 
-#                                       self.product_list[area_name])
-                    draw_images(local_data, area_name, self.product_list[area_name])
 
-                local_data = None
-                global_data = None
-                print "Elapsed time:", time.time()-t1, 's'
+                    # Draw requested images for this area.
+                    self.draw_images(area_name)
+                    print "Single area time elapsed time:", time.time()-t1b, 's'
+
+                self.local_data = None
+                self.global_data = None
+#                self.loaded_channels = []
+                print "Full time elapsed time:", time.time()-t1a, 's'
             else:
                 # Unhandled message types end up here
+                # No need to log these?
                 pass
 
-    def run_threads(self):
-        '''Run image production in threads (#threads = #areas)
+
+
+    def get_maximum_extent(self):
+        '''Get maximum extend needed to produce all defined areas.
+        '''
+        self.maximum_area_extent = [None, None, None, None]
+        for area in self.area_def_names:
+            extent = get_area_def(area)
+
+            if self.maximum_area_extent[0] is None:
+                self.maximum_area_extent = list(extent.area_extent)
+            else:
+                if self.maximum_area_extent[0] > extent.area_extent[0]:
+                    self.maximum_area_extent[0] = extent.area_extent[0]
+                if self.maximum_area_extent[1] > extent.area_extent[1]:
+                    self.maximum_area_extent[1] = extent.area_extent[1]
+                if self.maximum_area_extent[2] < extent.area_extent[2]:
+                    self.maximum_area_extent[2] = extent.area_extent[2]
+                if self.maximum_area_extent[3] < extent.area_extent[3]:
+                    self.maximum_area_extent[3] = extent.area_extent[3]
+
+
+    def load_unload_channels(self, product_list):
+        '''Load channels that are required for the given list of
+        products. Unload channels that are unnecessary.
         '''
 
-        # Get relevant preprocessing function for this production chain
-        # types: swath, geo, granule, global_polar, global_geo, global_mixed
-        # preproc_func = getattr(preprocessing, self.production_type)
+        ch_names = []
+        wavelengths = []
+        for ch in self.global_data.channels:
+            ch_names.append(ch.name)
+            wavelengths.append(ch.wavelength_range)
+            
+#        loaded = self.global_data.loaded_channels()
+#        for l in loaded:
+#            print l.wavelength_range
+        required = []
+        to_load = []
+        to_unload = []
 
-        while True:
-            # wait for new messages
-            msg = self.listener_parent_conn.recv()
-            print msg
-            # shutdown trollduction
-            if msg.subject == 'stop':
-                self.cleanup()
-                sys.exit()
-            # update trollduction config
-            elif msg.subject == 'td_config':
-                self.update_td_config(msg.data)
-            # update product lists
-            elif msg.subject == 'product_config':
-                self.udpate_product_config(msg.data)
-            # process new file
-            elif msg.subject == '/NewFileArrived':
-                # TODO: parse inputs
-                time_slot = dt.datetime(msg.data['year'],
-                                        msg.data['month'], 
-                                        msg.data['day'],
-                                        msg.data['hour'],
-                                        msg.data['minute'])
+        for product in product_list:
+            req = eval('self.global_data.image.'+product+'.prerequisites')
+            for r in req:
+                # get channel name
+                for i in range(len(wavelengths)):
+                    if r >= wavelengths[i][0] and r <= wavelengths[i][-1]:
+                        n = ch_names[i]
+                        break
+                if n not in required:
+                    required.append(n)
 
-                global_data = GF.create_scene(str(msg.data['satellite']), 
-                                              str(msg.data['satnumber']), 
-                                              str(msg.data['instrument']), 
-                                              time_slot, 
-                                              str(msg.data['orbit']))
+        self.global_data.load(required, self.maximum_area_extent)
 
-                global_data.load() #[0.635, 0.85, 10.8])
+        # At this time we only load all the required channels with
+        # maximum extent. The code below could be tuned to also unload
+        # extra channels.
+        
+        '''
+                if n not in to_load and n not in self.loaded_channels:
+                    to_load.append(n)
 
-                threads = []
-                local_data = []
+        for c in self.loaded_channels:
+            if c not in required:
+                to_unload.append(c)
+                self.loaded_channels.remove(c)
 
-                t1 = time.time()
-                for area_name in self.area_def_names:
-                    # TODO: assemble required channels for this area
-                    # TODO: global_data.load(required_channels)
-                    # TODO: unload channels not required
-                    # reproject to local domain
-                    local_data.append(global_data.project(area_name))
-                    
-                    print "Data reprojected for area:", area_name
-
-                    # Send local data for colorcomposit generation & saving
-                    t = Thread(target=draw_images, args=(local_data[-1], 
-                                                         area_name, 
-                                                         self.product_list[area_name]))
-                    t.setDaemon(True)
-                    t.start()
-                    threads.append(t)
-
-                for t in threads:
-                    t.join()
-
-                local_data = []
-                global_data = None
-                print "Elapsed time:", time.time()-t1, 's'
-            else:
-                # Unhandled message types end up here
-                pass
-
-    def run_thread_pool(self):
-        '''Run image production using a thread pool.
+        if len(to_load) > 0:
+            print "load channels:", to_load
+            self.global_data.load(to_load)
+            if len(self.loaded_channels) == 0:
+                self.loaded_channels = to_load
+        if len(to_unload) > 0:
+            print "unload channels:", to_unload
+            self.global_data.unload(to_unload)
         '''
 
-        # Get relevant preprocessing function for this production chain
-        # types: swath, geo, granule, global_polar, global_geo, global_mixed
-        # preproc_func = getattr(preprocessing, self.production_type)
-
-        while True:
-            # wait for new messages
-            msg = self.listener_parent_conn.recv()
-            print msg
-            # shutdown trollduction
-            if msg.subject == 'stop':
-                self.cleanup()
-                sys.exit()
-            # update trollduction config
-            elif msg.subject == 'td_config':
-                self.update_td_config(msg.data)
-            # update product lists
-            elif msg.subject == 'product_config':
-                self.udpate_product_config(msg.data)
-            # process new file
-            elif msg.subject == '/NewFileArrived':
-                # TODO: parse inputs
-                time_slot = dt.datetime(msg.data['year'],
-                                        msg.data['month'], 
-                                        msg.data['day'],
-                                        msg.data['hour'],
-                                        msg.data['minute'])
-
-                global_data = GF.create_scene(str(msg.data['satellite']), 
-                                              str(msg.data['satnumber']), 
-                                              str(msg.data['instrument']), 
-                                              time_slot, 
-                                              str(msg.data['orbit']))
-
-                global_data.load() #[0.635, 0.85, 10.8])
-
-                local_data = []
-                if self.pool is None:
-                    init_pool(num_processes=self.pool_size)
-
-                t1 = time.time()
-                for area_name in self.area_def_names:
-                    # TODO: assemble required channels for this area
-                    # TODO: global_data.load(required_channels)
-                    # TODO: unload channels not required
-                    # reproject to local domain
-                    local_data.append(global_data.project(area_name))
-                    
-                    print "Data reprojected for area:", area_name
-
-                    # Send local data for colorcomposit generation & saving
-
-                    self.pool.apply_async(draw_images, 
-                                          args=(local_data[-1],
-                                                area_name,
-                                                self.product_list[area_name]))
-
-                self.pool.close()
-                self.pool.join()
-                self.pool = None
-
-                local_data = []
-                global_data = None
-                print "Elapsed time:", time.time()-t1, 's'
-            else:
-                # Unhandled message types end up here
-                pass
 
 
-def draw_images(local_data, area_name, product_list):
-    '''Generate images from local data using given area name and
-    product definitions.
-    '''
+    def draw_images(self, area_name):
+        '''Generate images from local data using given area name and
+        product definitions.
+        '''
 
-    # Create images for each color composite
-    for product in product_list:
-        try:
-            print product
-            # Check if this combination is defined
-            func = getattr(local_data.image, product)
-            img = func()
-            
-            # TODO real output filename parsing
-            fname_out = '/home/lahtinep/Software/pytroll/output/' + \
-                area_name + '_' + product + '.png'
-            print fname_out
-            img.save(fname_out)
+        # Create images for each color composite
+        for product in self.product_list[area_name]:
+            # Parse image filename
+            fname = self.image_output_dir + '/' + self.image_filename_template
+            fname = fname.replace('%Y', '%04d' % self.time_slot.year)
+            fname = fname.replace('%m', '%02d' % self.time_slot.month)
+            fname = fname.replace('%d', '%02d' % self.time_slot.day)
+            fname = fname.replace('%H', '%02d' % self.time_slot.hour)
+            fname = fname.replace('%M', '%02d' % self.time_slot.minute)
+            fname = fname.replace('%(area)', area_name)
+            fname = fname.replace('%(composite)', product)
+            fname = fname.replace('%(ending)', 'png')
 
-            # TODO: log succesful production
-            # TODO: publish message
-        except AttributeError:
-            # TODO: log incorrect product name
-            print "Incorrect product name:", product, "for area", area_name
-        except KeyError:
-            # TODO: log missing channel
-            print "Missing channel on:", product, "for area", area_name
+            try:
+                # Check if this combination is defined
+                func = getattr(self.local_data.image, product)
+                img = func()            
+                img.save(fname)
+                print "Image", fname, "saved."
 
-    # TODO: log completion of this area def
-    # TODO: publish completion of this area def
+                # TODO: log succesful production
+                # TODO: publish message
+            except AttributeError:
+                # TODO: log incorrect product name
+                print "Incorrect product name:", product, "for area", area_name
+            except KeyError:
+                # TODO: log missing channel
+                print "Missing channel on", product, "for area", area_name
+            except:
+                # TODO: log other errors
+                print "Undefined error on", product, "for area", area_name
 
+        # TODO: log completion of this area def
+        # TODO: publish completion of this area def
 
-def draw_images_thread(local_data, area_name, product_list):
-    '''Generate images from local data using given area name and
-    product definitions.
-    '''
-
-    threads = []
-
-    # Create images for each color composite
-    for product in product_list:
-        try:
-            print product
-            # Check if this combination is defined
-            func = getattr(local_data.image, product)
-            img = func()
-            
-            # TODO real output filename parsing
-            fname_out = '/home/lahtinep/Software/pytroll/output/' + \
-                area_name + '_' + product + '.png'
-            print fname_out
-
-            t = Thread(target=draw_and_save, args=(func, fname_out))
-            t.setDaemon(True)
-            t.start()
-            threads.append(t)
-
-            # TODO: log succesful production
-            # TODO: publish message
-        except AttributeError:
-            # TODO: log incorrect product name
-            print "AttributeError"
-
-    for t in threads:
-        t.join()
-    # TODO: log completion of this area def
-    # TODO: publish completion of this area def
-
-
-def draw_and_save(func, fname_out):
-    '''
-    '''
-    img = func()
-    img.save(fname_out)
-
-
-'''
-    # removed, everything relevant will be received via messages
-    def file_info(self, fname):
-        #Parse information from filename.
-        
-        file_info = {}
-        
-        if self.production_type == 'hrpt':
-            parts = fname.split('/')[-1].split('.')[0].split('_')
-            file_info['satname'] = parts[1][:4]
-            file_info['satnumber'] = parts[1][4:]
-            file_info['instrument'] = avhrr
-            time_slot = dt.datetime(int(parts[2][:4]),
-                                    int(parts[2][4:6]),
-                                    int(parts[2][6:]),
-                                    int(parts[3][:2]),
-                                    int(parts[3][2:]))
-            file_info['time_slot'] = time_slot
-            file_info['orbit'] = parts[4]
-        else:
-            file_info['satname'] = None
-            file_info['satnumber'] = None
-            file_info['instrument'] = None
-            file_info['time_slot'] = None
-            file_info['orbit'] = None
-
-        # TODO: parse info, or replace create_scene() with a function
-        # that can read files directly by filename
-
-        return file_info
-'''
