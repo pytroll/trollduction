@@ -36,17 +36,17 @@ class EventHandler(ProcessEvent):
     """
     Event handler class for inotify.
     """
-    def __init__(self, filetypes, publish_port = 9000):
+    def __init__(self, filemasks, publish_port = 9000):
         super(EventHandler, self).__init__()
         
         self.logger = logging.getLogger(__name__)
         pub_address = "tcp://" + str(get_own_ip()) + ":" + str(publish_port)
         self.pub = Publisher(pub_address)
-        self.filetypes = filetypes
+        self.filemasks = filemasks
         self.filename = ''
         self.info = {}
         self.filetype = ''
-        self.subject = '/NewFileArrived'
+#        self.subject = '/NewFileArrived'
         
     def __clean__(self):
         self.filename = ''
@@ -88,17 +88,6 @@ class EventHandler(ProcessEvent):
                 self.parse_config()
             """
             self.parse_file_info(event)
-            self.info = {"uri": self.fullname,
-                         "satellite": self.satellite,
-                         "satnumber": self.satnumber,
-                         "instrument": self.instrument,
-                         "orbit": self.orbit,
-                         "year": self.year,
-                         "month": self.month,
-                         "day": self.day,
-                         "hour": self.hour,
-                         "minute": self.minute}
-
             self.identify_filetype()
             if self.filetype != '':
                 message = self.create_message()            
@@ -114,19 +103,9 @@ class EventHandler(ProcessEvent):
         #print event.__dict__
         # New file created and closed
         if not event.dir:
+            # parse information and create self.info dict{}
             self.parse_file_info(event)
-            self.info = {"uri": self.fullname,
-                         "satellite": self.satellite,
-                         "satnumber": self.satnumber,
-                         "instrument": self.instrument,
-                         "orbit": self.orbit,
-                         "year": self.year,
-                         "month": self.month,
-                         "day": self.day,
-                         "hour": self.hour,
-                         "minute": self.minute}
-
-            self.identify_filetype()
+#            self.identify_filetype()
             if self.filetype != '':
                 message = self.create_message()            
                 print "Publishing message foo %s" %str(message)
@@ -155,16 +134,70 @@ class EventHandler(ProcessEvent):
         self.filename = event.name
         self.filepath = event.path
         self.fullname = event.pathname
-        parts = event.name.split('.')[0].split('_')
-        self.satellite = parts[1][:4]
-        self.satnumber = parts[1][4:]
-        self.year = int(parts[2][:4])
-        self.month = int(parts[2][4:6])
-        self.day = int(parts[2][6:])
-        self.hour = int(parts[3][:2])
-        self.minute = int(parts[3][2:])
-        self.instrument = 'avhrr'
-        self.orbit = parts[4]
+
+        if 'MSG' in self.filename:
+            # MSG
+            # H-000-MSG3__-MSG3________-HRV______-000001___-201402130515-__
+            self.filetype = 'msg_xrit'
+            self.satellite = 'meteosat'
+            self.instrument = 'seviri'
+            parts = self.filename.split('-')
+            self.satnumber = str(int(parts[2].strip('_')[-1])+7)
+            self.channel = parts[4].strip('_')
+            self.segment = parts[5].strip('_')
+            self.year = int(parts[6][:4])
+            self.month = int(parts[6][4:6])
+            self.day = int(parts[6][6:8])
+            self.hour = int(parts[6][8:10])
+            self.minute = int(parts[6][10:])
+            self.orbit = ''
+            if parts[7].strip('_') == 'C':
+                self.compressed = 1
+            else:
+                self.compressed = 0
+
+            self.subject = '/NewFileArrived/' + self.filetype
+            self.info = {"uri": self.fullname,
+                         "satellite": self.satellite,
+                         "satnumber": self.satnumber,
+                         "instrument": self.instrument,
+                         "orbit": self.orbit,
+                         "year": self.year,
+                         "month": self.month,
+                         "day": self.day,
+                         "hour": self.hour,
+                         "minute": self.minute,
+                         "segment": self.segment,
+                         "channel": self.channel,
+                         "compressed": self.compressed}
+
+        elif 'hrpt' in self.filename and 'noaa' in self.filename and 'l1b' in self.filename:
+            # HRPT NOAA l1b file
+            #
+            self.filetype = 'hrpt_noaa_l1b'
+            parts = event.name.split('.')[0].split('_')
+            self.satellite = parts[1][:4]
+            self.satnumber = parts[1][4:]
+            self.year = int(parts[2][:4])
+            self.month = int(parts[2][4:6])
+            self.day = int(parts[2][6:])
+            self.hour = int(parts[3][:2])
+            self.minute = int(parts[3][2:])
+            self.instrument = 'avhrr'
+            self.orbit = parts[4]
+
+            self.subject = '/NewFileArrived/' + self.filetype
+            self.info = {"uri": self.fullname,
+                         "satellite": self.satellite,
+                         "satnumber": self.satnumber,
+                         "instrument": self.instrument,
+                         "orbit": self.orbit,
+                         "year": self.year,
+                         "month": self.month,
+                         "day": self.day,
+                         "hour": self.hour,
+                         "minute": self.minute}
+
 
     
 if __name__ == "__main__":    
@@ -182,7 +215,7 @@ if __name__ == "__main__":
                       default=9000, type=int, 
                       help="Local port where messages are published")
 
-    parser.add_argument("-t", "--filetypes", dest="filetypes",
+    parser.add_argument("-m", "--filemask", dest="filemasks",
                         type=str,
                         nargs='+',
                         default=[],
@@ -205,7 +238,7 @@ if __name__ == "__main__":
     
     #message_dict = {'publish_port':args.publish_port, 'filetypes':args.filetypes, 'subject':'/Joonas/'}
     
-    event_handler = EventHandler(args.filetypes,
+    event_handler = EventHandler(args.filemasks,
                                  publish_port = args.publish_port)
     notifier = Notifier(wm, event_handler)
     for monitored_dir in args.monitored_dirs:
