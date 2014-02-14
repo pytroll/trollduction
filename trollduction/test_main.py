@@ -13,19 +13,16 @@ from posttroll.publisher import get_own_ip
 def hrpt():
     td = trollduction.Trollduction()
     td.area_def_names = ['euro4', 'scan', 'scan2', 'scan1']
+    td.image_output_dir = '/tmp'
+    td.image_filename_template = '%Y%m%d_%H%M_%(area)_%(composite).%(ending)'
     td.product_list = {'euro4': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview'],
                        'scan': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview'],
                        'scan2': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview'],
                        'scan1': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview']}
-    td.image_output_dir = '/home/lahtinep/Software/pytroll/output'
     td.production_type = 'hrpt_noaa_l1b'
-#    td.init_pool(num_processes=4)
     td.init_listener(['tcp://'+get_own_ip()+':9000'], ['hrpt_noaa'])
     td.start_listener()
     td.run_single()
-#    td.run_threads()
-#    td.run_thread_pool()
-    
 
 def msg():
     td = trollduction.Trollduction()
