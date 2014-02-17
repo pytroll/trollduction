@@ -124,7 +124,21 @@ class Trollduction(object):
         self.product_config = product_config
 
 
-    def init_listener(self, address_list, msg_type_list):
+    def read_config_file(self, fname=None):
+        '''Read config file to dictionary.
+        '''
+
+        # TODO: check validity
+        # TODO: read config, parse to dict, logging
+
+        if fname is None:
+            return None
+        else:
+            # TODO: read config
+            pass
+
+
+    def init_listener(self, data_type_list):
         '''Initialise listener that receives messages about new files
         to be processed, etc.
         '''
@@ -134,8 +148,7 @@ class Trollduction(object):
         self.listener_child_conn = child_conn
 
         # Create a Listener instance
-        self.listener = Listener(address_list=address_list, 
-                                 msg_type_list=msg_type_list, 
+        self.listener = Listener(data_type_list=data_type_list, 
                                  pipe=self.listener_child_conn)
 
         print "Listener initialised"
