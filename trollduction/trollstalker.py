@@ -264,7 +264,10 @@ if __name__ == "__main__":
 
     notifier.start()
     try:
-        time.sleep(6000000)
+        while True:
+            time.sleep(6000000)
     except KeyboardInterrupt:
+        print "Interupting TrollStalker"
+    finally:
         event_handler.stop()
         notifier.stop()
