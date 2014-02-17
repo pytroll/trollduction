@@ -1,3 +1,26 @@
+'''Trollduction module
+'''
+# -*- coding: utf-8 -*-
+
+# Copyright (c) 2014
+
+# Author(s):
+
+#   Panu Lahtinen <panu.lahtinen@fmi.fi>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 from multiprocessing import Pipe
 from threading import Thread
 from listener import Listener
@@ -7,6 +30,7 @@ from mpop.satellites import GenericFactory as GF
 import datetime as dt
 import time
 from mpop.projector import get_area_def
+import sys
 
 class Trollduction(object):
     '''Trollduction class for easy generation chain setup
@@ -21,7 +45,7 @@ class Trollduction(object):
 
         # read everything from the Trollduction config file
         if td_config_file is not None:
-            self.update_tdconfig()
+            self.update_td_config()
 
         # otherwise set empty placeholders
         else:
@@ -37,6 +61,7 @@ class Trollduction(object):
             self.listener_child_conn = None
 #            self.publisher = None
 #            self.logger = None
+            self.image_filename_template = None
             self.image_output_dir = None
             # single swath or MSG disc: 'single'
             # multiple granules or GEO images: 'multi'
@@ -45,9 +70,8 @@ class Trollduction(object):
 #            self.pool_size = None
 #            self.loaded_channels = []
 
-    def update_tdconfig(self, fname=None):
-        '''Read Trollduction master configuration file and update the
-        class fields.
+    def update_td_config(self, fname=None):
+        '''Update Trollduction configuration from the given file.
         '''
 
         # TODO: add checks what has changed
@@ -65,25 +89,27 @@ class Trollduction(object):
 
         if 'listener' in keys:
             # TODO: check if changed
-            self.init_listener(td_config['listener']['address_list'],
-                               td_config['listener']['msg_type_list'])
-            self.restart_listener()
+            self.restart_listener(td_config['listener']['address_list'], 
+                                  td_config['listener']['msg_type_list'])
 
-#        if 'parallel' in keys:
-#            if 'num_processes' in keys:
-#                # TODO: check if changed
-#                self.init_pool(num_processes=td_config['num_processes'])
-#            else:
-#                self.init_pool()
-                
+        '''
+        if 'parallel' in keys:
+            if 'num_processes' in keys:
+                # TODO: check if changed
+                self.init_pool(num_processes=td_config['num_processes'])
+            else:
+                self.init_pool()
+        '''
+
         if '' in keys:
             # TODO: check if changed
             pass
 
 
     def update_product_config(self, fname=None):
-        '''Read area definition names and associated product names
-        from a file and update the class member values.
+        '''Update area definitions, associated product names, output
+        filename prototypes and other relevant information from the
+        given file.
         '''
         if fname is not None:
             self.product_config_file = fname
@@ -96,20 +122,6 @@ class Trollduction(object):
         # add checks, or do we just assume the config to be valid at
         # this point?
         self.product_config = product_config
-
-
-    def read_config_file(self, fname=None):
-        '''Read config file to dictionary.
-        '''
-
-        # TODO: check validity
-        # TODO: read config, parse to dict, logging
-
-        if fname is None:
-            return None
-        else:
-            # TODO: read config
-            pass
 
 
     def init_listener(self, address_list, msg_type_list):
@@ -125,11 +137,7 @@ class Trollduction(object):
         self.listener = Listener(address_list=address_list, 
                                  msg_type_list=msg_type_list, 
                                  pipe=self.listener_child_conn)
-        #self.listener.add_address_list(address_list)
-        #self.listener.type_list = msg_type_list
 
-        # Create subscriber
-        #self.listener.create_subscriber()
         print "Listener initialised"
 
 
@@ -142,23 +150,23 @@ class Trollduction(object):
         print "Listener started"
 
 
-    def restart_listener(self):
-        '''Restart listener
+    def restart_listener(self, address_list, msg_type_list):
+        '''Restart listener after configuration update.
         '''
         self.listener.stop()
-        self.init_listener()
+        self.init_listener(address_list, msg_type_list)
         self.start_listener()
 
 
     def cleanup(self):
-        '''Cleanup everything before shutdown
+        '''Cleanup Trollduction before shutdown.
         '''
         # TODO: add cleanup, close threads, and stuff
         pass
 
 
     def shutdown(self):
-        '''Shutdown trollduction
+        '''Shutdown trollduction.
         '''
         self.cleanup()
         sys.exit()
@@ -187,7 +195,7 @@ class Trollduction(object):
                 self.update_td_config(msg.data)
             # update product lists
             elif msg.subject == '/NewProductConfig':
-                self.udpate_product_config(msg.data)
+                self.update_product_config(msg.data)
             # process new file
             elif '/NewFileArrived' in msg.subject:
                 self.time_slot = dt.datetime(msg.data['year'],
@@ -197,15 +205,17 @@ class Trollduction(object):
                                              msg.data['minute'])
 
                 # orbit is empty string for meteosat, change it to None
-                if msg.data['orbit'] == '': msg.data['orbit'] = None
+                if msg.data['orbit'] == '':
+                    msg.data['orbit'] = None
 
                 t1a = time.time()
 
-                self.global_data = GF.create_scene(satname=str(msg.data['satellite']), 
-                                                   satnumber=str(msg.data['satnumber']), 
-                                                   instrument=str(msg.data['instrument']), 
-                                                   time_slot=self.time_slot, 
-                                                   orbit=str(msg.data['orbit']))
+                self.global_data = GF.create_scene(\
+                    satname=str(msg.data['satellite']), 
+                    satnumber=str(msg.data['satnumber']), 
+                    instrument=str(msg.data['instrument']), 
+                    time_slot=self.time_slot, 
+                    orbit=str(msg.data['orbit']))
 
 
                 # Find maximum extent that is needed for all the
@@ -224,7 +234,8 @@ class Trollduction(object):
                     # TODO: or something
 
                     # reproject to local domain
-                    self.local_data = self.global_data.project(area_name, mode='nearest')
+                    self.local_data = self.global_data.project(\
+                        area_name, mode='nearest')
                     
                     print "Data reprojected for area:", area_name
 
@@ -278,8 +289,8 @@ class Trollduction(object):
 #        for l in loaded:
 #            print l.wavelength_range
         required = []
-        to_load = []
-        to_unload = []
+#        to_load = []
+#        to_unload = []
 
         for product in product_list:
             req = eval('self.global_data.image.'+product+'.prerequisites')
@@ -358,4 +369,19 @@ class Trollduction(object):
 
         # TODO: log completion of this area def
         # TODO: publish completion of this area def
+
+
+def read_config_file(fname=None):
+    '''Read config file to dictionary.
+    '''
+    
+    # TODO: check validity
+    # TODO: read config, parse to dict, logging
+    
+    if fname is None:
+        return None
+    else:
+        # TODO: read config
+        return None
+
 
