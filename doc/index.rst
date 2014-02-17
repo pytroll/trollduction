@@ -6,6 +6,9 @@
 Welcome to trollduction's documentation!
 ========================================
 
+Quite empty doc at the moment, will be filled in soon...
+
+
 Contents:
 
 .. toctree::
