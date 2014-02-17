@@ -6,8 +6,9 @@
 Welcome to trollduction's documentation!
 ========================================
 
-Quite empty doc at the moment, will be filled in soon...
+Trollduction is a configurable framework for satellite image production.
 
+This documentation is a work in progress, so most of the
 
 Contents:
 
@@ -21,3 +22,30 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 
+Trollduction
+-------------
+
+.. automodule:: trollduction.trollduction
+   :members:
+   :undoc-members:
+
+Trollstalker
+-------------
+
+.. automodule:: trollduction.trollstalker
+   :members:
+   :undoc-members:
+
+Listener
+-------------
+
+.. automodule:: trollduction.listener
+   :members:
+   :undoc-members:
+
+Logger
+-------------
+
+.. automodule:: trollduction.logger
+   :members:
+   :undoc-members:
