@@ -35,7 +35,7 @@ def msg():
                        'eurol': ['airmass', 'ash', 'cloudtop', 'convection', 'convection_co2', 'dust', 'fog', 'green_snow', 'ir108', 'natural', 'night_fog', 'night_microphysics', 'night_overview', 'overview', 'red_snow', 'vis06', 'wv_high', 'wv_low'],
                        'MSGHRVN': ['airmass', 'ash', 'cloudtop', 'convection', 'convection_co2', 'dust', 'fog', 'green_snow', 'ir108', 'natural', 'night_fog', 'night_microphysics', 'night_overview', 'overview', 'red_snow', 'vis06', 'wv_high', 'wv_low']}
     td.production_type = 'msg_xrit'
-    td.init_listener(['tcp://'+get_own_ip()+':9000'], ['hrpt_noaa'])
+    td.init_listener(['HRIT lvl1.5'])
     td.start_listener()
     td.run_single()
     

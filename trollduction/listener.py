@@ -1,23 +1,41 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-from posttroll.subscriber import Subscriber
+# Copyright (c) 2013, 2014
+
+# Author(s):
+
+#   Panu Lahtinen <panu.lahtinen@fmi.fi>
+#   Martin Raspaud <martin.raspaud@smhi.se>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+from posttroll.subscriber import NSSubscriber
 from posttroll.message import Message
 from collections import deque
+import logging
 
+logger = logging.getLogger(__name__)
 
 class Listener(object):
     '''PyTroll listener class for reading messages for Trollduction
     '''
 
-    def __init__(self, address_list=None, msg_type_list=None,
-                 ip=None, port=None, pipe=None):
+    def __init__(self, data_type_list=None, pipe=None):
         '''Init Listener object
         '''
-        self.address_list = []
-        self.add_address_list(address_list)
-        self.add_address(ip, port)
-        self.msg_type_list = []
-        if msg_type_list is not None:
-            self.msg_type_list = msg_type_list
+        self.data_type_list = data_type_list
         self.deque = deque()
         self.pipe = pipe
         self.subscriber = None
@@ -25,29 +43,16 @@ class Listener(object):
         self.running = False
         
 
-    def add_address(self, ip, port):
-        '''Add address that will be listened
-        '''
-        if ip is not None and port is not None:
-            self.address_list.append('tcp://'+ip+':%04d' % port)
-
-
-    def add_address_list(self, address_list):
-        '''Add a list of addresses that will be listened
-        '''
-        for address in address_list:
-            self.address_list.append(address)
-
-
     def create_subscriber(self):
         '''Create a subscriber instance using specified addresses and
         message types.
         '''
         if self.subscriber is None:
-            if len(self.address_list) > 0:
-                if len(self.msg_type_list) > 0:
-                    self.subscriber = Subscriber(self.address_list, 
-                                                 *self.msg_type_list)
+            if len(self.data_type_list) > 0:
+                self.subscriber = NSSubscriber(self.data_type_list,
+                                               addr_listener=True)
+                self.recv = self.subscriber.start().recv
+
 
     def send_to_pipe(self, msg):
         '''Send message to parent via a Pipe()
@@ -59,16 +64,17 @@ class Listener(object):
         '''Run listener
         '''
 
-        # TODO: add logging
-
-        print "Starting Listener"
+        logger.debug("Starting Listener")
 
         self.running = True
 
-        for msg in self.subscriber.recv():
-            print "New message received"
-            if msg.subject == '/stop_listener':
-                break
+        for msg in self.recv(1):
+            if msg is None:
+                if self.running:
+                    continue
+                else:
+                    break
+            logger.debug("New message received")
             if self.pipe is None:
                 self.deque.append(msg)
             else:
@@ -81,12 +87,9 @@ class Listener(object):
         '''Stop subscriber and delete the instance
         '''
         
-        # TODO: add logging
-        
-        self.subscriber.stop()
-        self.subscriber.close()
-        self.subscriber = None
         self.running = False
+        self.subscriber.stop()
+        self.subscriber = None
 
 
     def restart(self):

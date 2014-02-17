@@ -112,7 +112,7 @@ class Trollduction(object):
             pass
 
 
-    def init_listener(self, address_list, msg_type_list):
+    def init_listener(self, data_type_list):
         '''Initialise listener that receives messages about new files
         to be processed, etc.
         '''
@@ -122,8 +122,7 @@ class Trollduction(object):
         self.listener_child_conn = child_conn
 
         # Create a Listener instance
-        self.listener = Listener(address_list=address_list, 
-                                 msg_type_list=msg_type_list, 
+        self.listener = Listener(data_type_list=data_type_list, 
                                  pipe=self.listener_child_conn)
         #self.listener.add_address_list(address_list)
         #self.listener.type_list = msg_type_list

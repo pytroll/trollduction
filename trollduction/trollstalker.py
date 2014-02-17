@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013
+# Copyright (c) 2013, 2014
 
 # Author(s):
 
+#   Joonas Karjalainen <joonas.karjalainen@fmi.fi>
+#   Panu Lahtinen <panu.lahtinen@fmi.fi>
 #   Martin Raspaud <martin.raspaud@smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
@@ -20,15 +22,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+"""./trollstalker.py -d /tmp/data/new/ -p 9000 -m EPI
+"""
+
 import argparse
 import logging, logging.handlers
-from pyinotify import WatchManager, Notifier, ProcessEvent
+from pyinotify import WatchManager, ThreadedNotifier, ProcessEvent
 import pyinotify
 import fnmatch
 import sys
-import os
+import time
 
-from posttroll.publisher import Publisher, get_own_ip
+from posttroll.publisher import NoisyPublisher
 from posttroll.message import Message
 
 
@@ -36,17 +41,20 @@ class EventHandler(ProcessEvent):
     """
     Event handler class for inotify.
     """
-    def __init__(self, filemasks, publish_port = 9000):
+    def __init__(self, filemasks, filetypes, publish_port=0):
         super(EventHandler, self).__init__()
         
         self.logger = logging.getLogger(__name__)
-        pub_address = "tcp://" + str(get_own_ip()) + ":" + str(publish_port)
-        self.pub = Publisher(pub_address)
+        self._pub = NoisyPublisher("trollstalker", publish_port, filetypes)
+        self.pub = self._pub.start()
         self.filemasks = filemasks
         self.filename = ''
         self.info = {}
         self.filetype = ''
-#        self.subject = '/NewFileArrived'
+        #        self.subject = '/NewFileArrived'
+
+    def stop(self):
+        self._pub.stop()
         
     def __clean__(self):
         self.filename = ''
@@ -156,7 +164,7 @@ class EventHandler(ProcessEvent):
             else:
                 self.compressed = 0
 
-            self.subject = '/NewFileArrived/' + self.filetype
+            self.subject =  "/" + self.filetype + '/NewFileArrived/'
             self.info = {"uri": self.fullname,
                          "satellite": self.satellite,
                          "satnumber": self.satnumber,
@@ -212,10 +220,16 @@ if __name__ == "__main__":
                         help="Names of the monitored directories separated by space")
 
     parser.add_argument("-p", "--publish_port", dest="publish_port",
-                      default=9000, type=int, 
+                      default=0, type=int, 
                       help="Local port where messages are published")
 
     parser.add_argument("-m", "--filemask", dest="filemasks",
+                        type=str,
+                        nargs='+',
+                        default=[],
+                        help="Identifier for monitored files")
+
+    parser.add_argument("-t", "--filetype", dest="filetypes",
                         type=str,
                         nargs='+',
                         default=[],
@@ -238,14 +252,19 @@ if __name__ == "__main__":
     
     #message_dict = {'publish_port':args.publish_port, 'filetypes':args.filetypes, 'subject':'/Joonas/'}
     
-    event_handler = EventHandler(args.filemasks,
-                                 publish_port = args.publish_port)
-    notifier = Notifier(wm, event_handler)
+    event_handler = EventHandler(args.filemasks, args.filetypes,
+                                 publish_port=args.publish_port)
+    notifier = ThreadedNotifier(wm, event_handler)
     for monitored_dir in args.monitored_dirs:
         wdd = wm.add_watch(monitored_dir, mask, rec = True)
     
-#    notifier.loop(daemonize=True,\
-#                    pid_file='/tmp/pyinotify.pid',\
-#                    stdout='/tmp/stdout.txt')
+        #    notifier.loop(daemonize=True,\
+        #                    pid_file='/tmp/pyinotify.pid',\
+        #                    stdout='/tmp/stdout.txt')
 
-    notifier.loop()
+    notifier.start()
+    try:
+        time.sleep(6000000)
+    except KeyboardInterrupt:
+        event_handler.stop()
+        notifier.stop()
