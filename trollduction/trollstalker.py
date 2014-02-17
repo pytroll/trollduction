@@ -96,12 +96,11 @@ class EventHandler(ProcessEvent):
                 self.parse_config()
             """
             self.parse_file_info(event)
-            self.identify_filetype()
-            if self.filetype != '':
+            if self.filetype != '' and self.check_filemasks():
                 message = self.create_message()            
                 print "Publishing message %s" %str(message)
                 self.pub.send(str(message))
-                self.__clean__()    
+            self.__clean__()
     
     
     def process_IN_CLOSE_WRITE(self, event):
@@ -114,20 +113,20 @@ class EventHandler(ProcessEvent):
             # parse information and create self.info dict{}
             self.parse_file_info(event)
 #            self.identify_filetype()
-            if self.filetype != '':
+            if self.filetype != '' and self.check_filemasks():
                 message = self.create_message()            
                 print "Publishing message foo %s" %str(message)
                 self.pub.send(str(message))
-                self.__clean__()    
+            self.__clean__()    
 
                 
-    def identify_filetype(self):
+    def check_filemasks(self):
         """
         """
-        for filetype in self.filetypes:
-            if fnmatch.fnmatch(self.filename, '*' + filetype + '*'):
-                self.filetype = filetype
-                break
+        for filemask in self.filemasks:
+            if fnmatch.fnmatch(self.filename, '*' + filemask + '*'):
+                return True
+        return False
         
     def create_message(self):
         """
@@ -194,7 +193,7 @@ class EventHandler(ProcessEvent):
             self.instrument = 'avhrr'
             self.orbit = parts[4]
 
-            self.subject = '/NewFileArrived/' + self.filetype
+            self.subject = '/' + self.filetype + '/NewFileArrived/'
             self.info = {"uri": self.fullname,
                          "satellite": self.satellite,
                          "satnumber": self.satnumber,
