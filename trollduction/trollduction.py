@@ -89,8 +89,7 @@ class Trollduction(object):
 
         if 'listener' in keys:
             # TODO: check if changed
-            self.restart_listener(td_config['listener']['address_list'], 
-                                  td_config['listener']['msg_type_list'])
+            self.restart_listener(td_config['listener']['data_type_list'])
 
         '''
         if 'parallel' in keys:
@@ -163,11 +162,11 @@ class Trollduction(object):
         print "Listener started"
 
 
-    def restart_listener(self, address_list, msg_type_list):
+    def restart_listener(self, data_type_list):
         '''Restart listener after configuration update.
         '''
         self.listener.stop()
-        self.init_listener(address_list, msg_type_list)
+        self.init_listener(data_type_list)
         self.start_listener()
 
 
