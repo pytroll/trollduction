@@ -20,7 +20,7 @@ def hrpt():
                        'scan2': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview'],
                        'scan1': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview']}
     td.production_type = 'hrpt_noaa_l1b'
-    td.init_listener(['tcp://'+get_own_ip()+':9000'], ['hrpt_noaa'])
+    td.init_listener(['HRPT_l1b'])
     td.start_listener()
     td.run_single()
 
@@ -35,7 +35,7 @@ def msg():
                        'eurol': ['airmass', 'ash', 'cloudtop', 'convection', 'convection_co2', 'dust', 'fog', 'green_snow', 'ir108', 'natural', 'night_fog', 'night_microphysics', 'night_overview', 'overview', 'red_snow', 'vis06', 'wv_high', 'wv_low'],
                        'MSGHRVN': ['airmass', 'ash', 'cloudtop', 'convection', 'convection_co2', 'dust', 'fog', 'green_snow', 'ir108', 'natural', 'night_fog', 'night_microphysics', 'night_overview', 'overview', 'red_snow', 'vis06', 'wv_high', 'wv_low']}
     td.production_type = 'msg_xrit'
-    td.init_listener(['HRIT lvl1.5'])
+    td.init_listener(['HRIT_lvl1.5'])
     td.start_listener()
     td.run_single()
     
