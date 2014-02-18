@@ -22,7 +22,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""./trollstalker.py -d /tmp/data/new/ -p 9000 -m EPI
+"""./trollstalker.py -d /tmp/data/new/ -p 9000 -m EPI -t 'HRIT lvl1.5'
 """
 
 import argparse
@@ -51,14 +51,16 @@ class EventHandler(ProcessEvent):
         self.filename = ''
         self.info = {}
         self.filetype = ''
-        #        self.subject = '/NewFileArrived'
 
     def stop(self):
+        '''Stop publisher.
+        '''
         self._pub.stop()
         
     def __clean__(self):
         self.filename = ''
         self.filetype = ''
+        self.subject = ''
         self.info = ''
         self.filepath = ''
         self.fullname = ''
@@ -83,45 +85,36 @@ class EventHandler(ProcessEvent):
     """
         
     def process_IN_CREATE(self, event):
-        """
-        When new file is created, publish message
+        """ When new file is created, publish message.
         """
         self.logger.debug("new file created %s" %event.pathname)
-        #print event.__dict__
         # New file created
         if not event.dir:
-            """            
-            if self.is_config_changed():
-                self.update_config_mtime()
-                self.parse_config()
-            """
             self.parse_file_info(event)
             if self.filetype != '' and self.check_filemasks():
                 message = self.create_message()            
-                print "Publishing message %s" %str(message)
+                print "Publishing message %s" % str(message)
                 self.pub.send(str(message))
             self.__clean__()
     
     
     def process_IN_CLOSE_WRITE(self, event):
-        """
+        """When a file is closed, publish a message.
         """
         self.logger.debug("new file created and closed %s" %event.pathname)
-        #print event.__dict__
         # New file created and closed
         if not event.dir:
             # parse information and create self.info dict{}
             self.parse_file_info(event)
-#            self.identify_filetype()
             if self.filetype != '' and self.check_filemasks():
                 message = self.create_message()            
-                print "Publishing message foo %s" %str(message)
+                print "Publishing message foo %s" % str(message)
                 self.pub.send(str(message))
             self.__clean__()    
 
                 
     def check_filemasks(self):
-        """
+        """Check that the filemask matches the new file
         """
         for filemask in self.filemasks:
             if fnmatch.fnmatch(self.filename, '*' + filemask + '*'):
@@ -129,14 +122,13 @@ class EventHandler(ProcessEvent):
         return False
         
     def create_message(self):
-        """
-        Create broadcasted message
+        """Create broadcasted message
         """
         return Message(self.subject, str(self.filetype), self.info)
 
 
     def parse_file_info(self, event):
-        '''
+        '''Parse satellite and orbit information from the filename.
         '''
         self.filename = event.name
         self.filepath = event.path
@@ -145,7 +137,7 @@ class EventHandler(ProcessEvent):
         if 'MSG' in self.filename:
             # MSG
             # H-000-MSG3__-MSG3________-HRV______-000001___-201402130515-__
-            self.filetype = 'msg_xrit'
+            self.filetype = 'HRIT lvl1.5'
             self.satellite = 'meteosat'
             self.instrument = 'seviri'
             parts = self.filename.split('-')
@@ -178,10 +170,12 @@ class EventHandler(ProcessEvent):
                          "channel": self.channel,
                          "compressed": self.compressed}
 
-        elif 'hrpt' in self.filename and 'noaa' in self.filename and 'l1b' in self.filename:
+        elif 'hrpt' in self.filename and \
+                'noaa' in self.filename and \
+                'l1b' in self.filename:
             # HRPT NOAA l1b file
             #
-            self.filetype = 'hrpt_noaa_l1b'
+            self.filetype = 'HRPT l1b'
             parts = event.name.split('.')[0].split('_')
             self.satellite = parts[1][:4]
             self.satnumber = parts[1][4:]
@@ -216,7 +210,8 @@ if __name__ == "__main__":
                         nargs='+',
                         type=str,
                         default='.',
-                        help="Names of the monitored directories separated by space")
+                        help="Names of the monitored directories "\
+                            "separated by space")
 
     parser.add_argument("-p", "--publish_port", dest="publish_port",
                       default=0, type=int, 
@@ -234,9 +229,10 @@ if __name__ == "__main__":
                         default=[],
                         help="Identifier for monitored files")
 
-    #parser.add_argument("-c", "--configuration_file", dest="configuration_file",
-    #                  default='noaa15_products.xml', type=str, 
-    #                  help="Name of the xml configuration file")
+    #parser.add_argument("-c", "--configuration_file",
+    #                    dest="configuration_file",
+    #                    default='noaa15_products.xml', type=str, 
+    #                    help="Name of the xml configuration file")
 
 
     if len(sys.argv) <= 1:
@@ -249,7 +245,8 @@ if __name__ == "__main__":
     wm = WatchManager()
     mask = pyinotify.IN_CLOSE_WRITE #IN_CREATE # monitored events
     
-    #message_dict = {'publish_port':args.publish_port, 'filetypes':args.filetypes, 'subject':'/Joonas/'}
+    #message_dict = {'publish_port':args.publish_port, 
+    #                'filetypes':args.filetypes, 'subject':'/Joonas/'}
     
     event_handler = EventHandler(args.filemasks, args.filetypes,
                                  publish_port=args.publish_port)
