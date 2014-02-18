@@ -137,7 +137,7 @@ class EventHandler(ProcessEvent):
         if 'MSG' in self.filename:
             # MSG
             # H-000-MSG3__-MSG3________-HRV______-000001___-201402130515-__
-            self.filetype = 'HRIT lvl1.5'
+            self.filetype = 'HRIT_lvl1.5'
             self.satellite = 'meteosat'
             self.instrument = 'seviri'
             parts = self.filename.split('-')
@@ -174,8 +174,8 @@ class EventHandler(ProcessEvent):
                 'noaa' in self.filename and \
                 'l1b' in self.filename:
             # HRPT NOAA l1b file
-            #
-            self.filetype = 'HRPT l1b'
+            # hrpt_noaa16_20140210_0824_69021.l1b
+            self.filetype = 'HRPT_l1b'
             parts = event.name.split('.')[0].split('_')
             self.satellite = parts[1][:4]
             self.satnumber = parts[1][4:]
