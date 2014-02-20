@@ -63,6 +63,11 @@ class Trollduction(object):
 #            self.logger = None
             self.image_filename_template = None
             self.image_output_dir = None
+            self.satname = None
+            self.satnumber = None
+            self.instrument = None
+            self.time_slot = None
+            self.orbit = None
             # single swath or MSG disc: 'single'
             # multiple granules or GEO images: 'multi'
             self.production_type = None
@@ -215,6 +220,9 @@ class Trollduction(object):
                                              msg.data['day'],
                                              msg.data['hour'],
                                              msg.data['minute'])
+                self.satname = msg.data['satellite']
+                self.satnumber = msg.data['satnumber']
+                self.instrument = msg.data['instrument']
 
                 # orbit is empty string for meteosat, change it to None
                 if msg.data['orbit'] == '':
@@ -223,9 +231,9 @@ class Trollduction(object):
                 t1a = time.time()
 
                 self.global_data = GF.create_scene(\
-                    satname=str(msg.data['satellite']), 
-                    satnumber=str(msg.data['satnumber']), 
-                    instrument=str(msg.data['instrument']), 
+                    satname=str(self.satname), 
+                    satnumber=str(self.satnumber), 
+                    instrument=str(self.instrument), 
                     time_slot=self.time_slot, 
                     orbit=str(msg.data['orbit']))
 
@@ -358,6 +366,8 @@ class Trollduction(object):
             fname = fname.replace('%M', '%02d' % self.time_slot.minute)
             fname = fname.replace('%(area)', area_name)
             fname = fname.replace('%(composite)', product)
+            fname = fname.replace('%(satellite)', self.satname+self.satnumber)
+            fname = fname.replace('%(instrument)', self.instrument)
             fname = fname.replace('%(ending)', 'png')
 
             try:
