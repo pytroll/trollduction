@@ -63,14 +63,13 @@ class Trollduction(object):
 #            self.logger = None
             self.image_filename_template = None
             self.image_output_dir = None
-            self.satname = None
-            self.satnumber = None
-            self.instrument = None
-            self.time_slot = None
-            self.orbit = None
+            self.satellite = {'satname': None,
+                              'satnumber': None,
+                              'instrument': None}
+            self.local_data = None
             # single swath or MSG disc: 'single'
             # multiple granules or GEO images: 'multi'
-            self.production_type = None
+#            self.production_type = None
 #            self.pool = None
 #            self.pool_size = None
 #            self.loaded_channels = []
@@ -81,7 +80,6 @@ class Trollduction(object):
 
         # TODO: add checks what has changed
         # TODO: restart relevant parts
-
         if fname is not None:
             self.td_config_file = fname
             td_config = read_config_file(fname)
@@ -215,14 +213,14 @@ class Trollduction(object):
                 self.update_product_config(msg.data)
             # process new file
             elif '/NewFileArrived' in msg.subject:
-                self.time_slot = dt.datetime(msg.data['year'],
-                                             msg.data['month'], 
-                                             msg.data['day'],
-                                             msg.data['hour'],
-                                             msg.data['minute'])
-                self.satname = msg.data['satellite']
-                self.satnumber = msg.data['satnumber']
-                self.instrument = msg.data['instrument']
+                time_slot = dt.datetime(msg.data['year'],
+                                        msg.data['month'], 
+                                        msg.data['day'],
+                                        msg.data['hour'],
+                                        msg.data['minute'])
+                self.satellite['satname'] = msg.data['satellite']
+                self.satellite['satnumber'] = msg.data['satnumber']
+                self.satellite['instrument'] = msg.data['instrument']
 
                 # orbit is empty string for meteosat, change it to None
                 if msg.data['orbit'] == '':
@@ -231,10 +229,10 @@ class Trollduction(object):
                 t1a = time.time()
 
                 self.global_data = GF.create_scene(\
-                    satname=str(self.satname), 
-                    satnumber=str(self.satnumber), 
-                    instrument=str(self.instrument), 
-                    time_slot=self.time_slot, 
+                    satname=str(self.satellite['satname']), 
+                    satnumber=str(self.satellite['satnumber']), 
+                    instrument=str(self.satellite['instrument']), 
+                    time_slot=time_slot, 
                     orbit=str(msg.data['orbit']))
 
 
@@ -254,8 +252,8 @@ class Trollduction(object):
                     # TODO: or something
 
                     # reproject to local domain
-                    self.local_data = self.global_data.project(\
-                        area_name, mode='nearest')
+                    self.local_data = self.global_data.project(area_name, 
+                                                               mode='nearest')
                     
                     print "Data reprojected for area:", area_name
 
@@ -359,15 +357,23 @@ class Trollduction(object):
         for product in self.product_list[area_name]:
             # Parse image filename
             fname = self.image_output_dir + '/' + self.image_filename_template
-            fname = fname.replace('%Y', '%04d' % self.time_slot.year)
-            fname = fname.replace('%m', '%02d' % self.time_slot.month)
-            fname = fname.replace('%d', '%02d' % self.time_slot.day)
-            fname = fname.replace('%H', '%02d' % self.time_slot.hour)
-            fname = fname.replace('%M', '%02d' % self.time_slot.minute)
+            fname = fname.replace('%Y', '%04d' % \
+                                      self.local_data.time_slot.year)
+            fname = fname.replace('%m', '%02d' % \
+                                      self.local_data.time_slot.month)
+            fname = fname.replace('%d', '%02d' % \
+                                      self.local_data.time_slot.day)
+            fname = fname.replace('%H', '%02d' % \
+                                      self.local_data.time_slot.hour)
+            fname = fname.replace('%M', '%02d' % \
+                                      self.local_data.time_slot.minute)
             fname = fname.replace('%(area)', area_name)
             fname = fname.replace('%(composite)', product)
-            fname = fname.replace('%(satellite)', self.satname+self.satnumber)
-            fname = fname.replace('%(instrument)', self.instrument)
+            fname = fname.replace('%(satellite)', 
+                                  self.satellite['satname'] + \
+                                      self.satellite['satnumber'])
+            fname = fname.replace('%(instrument)', 
+                                  self.satellite['instrument'])
             fname = fname.replace('%(ending)', 'png')
 
             try:
