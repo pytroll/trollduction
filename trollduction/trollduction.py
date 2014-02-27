@@ -21,9 +21,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from multiprocessing import Pipe
-from threading import Thread
-from listener import Listener
+#from multiprocessing import Pipe
+#from threading import Thread
+#from listener import Listener, ListenerContainer
 #from publisher import Publisher
 #from logger import Logger
 from mpop.satellites import GenericFactory as GF
@@ -56,9 +56,6 @@ class Trollduction(object):
             # eg. {'euro4km': ['green_snow', 'overview']}
             self.product_list = None
             self.listener = None
-            self.listener_thread = None
-            self.listener_parent_conn = None
-            self.listener_child_conn = None
 #            self.publisher = None
 #            self.logger = None
             self.image_filename_template = None
@@ -66,13 +63,17 @@ class Trollduction(object):
             self.satellite = {'satname': None,
                               'satnumber': None,
                               'instrument': None}
-            self.local_data = None
             # single swath or MSG disc: 'single'
             # multiple granules or GEO images: 'multi'
 #            self.production_type = None
 #            self.pool = None
 #            self.pool_size = None
 #            self.loaded_channels = []
+            self.product_config_file = None
+            self.product_config = None
+            self.global_data = None
+            self.local_data = None
+
 
     def update_td_config(self, fname=None):
         '''Update Trollduction configuration from the given file.
@@ -92,7 +93,8 @@ class Trollduction(object):
 
         if 'listener' in keys:
             # TODO: check if changed
-            self.restart_listener(td_config['listener']['data_type_list'])
+            self.listener.restart_listener(\
+                td_config['listener']['data_type_list'])
 
         '''
         if 'parallel' in keys:
@@ -140,39 +142,6 @@ class Trollduction(object):
             pass
 
 
-    def init_listener(self, data_type_list):
-        '''Initialise listener that receives messages about new files
-        to be processed, etc.
-        '''
-        # Create Pipe connection
-        parent_conn, child_conn = Pipe()
-        self.listener_parent_conn = parent_conn
-        self.listener_child_conn = child_conn
-
-        # Create a Listener instance
-        self.listener = Listener(data_type_list=data_type_list, 
-                                 pipe=self.listener_child_conn)
-
-        print "Listener initialised"
-
-
-    def start_listener(self):
-        '''Start Listener instance into a new daemonized thread.
-        '''
-        self.listener_thread = Thread(target=self.listener.run)
-        self.listener_thread.setDaemon(True)
-        self.listener_thread.start()
-        print "Listener started"
-
-
-    def restart_listener(self, data_type_list):
-        '''Restart listener after configuration update.
-        '''
-        self.listener.stop()
-        self.init_listener(data_type_list)
-        self.start_listener()
-
-
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
         '''
@@ -198,7 +167,7 @@ class Trollduction(object):
 
         while True:
             # wait for new messages
-            msg = self.listener_parent_conn.recv()
+            msg = self.listener.parent_conn.recv()
             print msg
             # shutdown trollduction
             if msg.subject == '/StopTrollduction':
@@ -238,7 +207,7 @@ class Trollduction(object):
 
                 # Find maximum extent that is needed for all the
                 # products to be made.
-                self.get_maximum_extent()
+                maximum_area_extent = get_maximum_extent(self.area_def_names)
 
                 # Make images for each area
                 for area_name in self.area_def_names:
@@ -248,7 +217,8 @@ class Trollduction(object):
                     # Check which channels are needed. Unload
                     # unnecessary channels and load those that are not
                     # already available.
-                    self.load_unload_channels(self.product_list[area_name])
+                    self.load_unload_channels(self.product_list[area_name],
+                                              max_extent=maximum_area_extent)
                     # TODO: or something
 
                     # reproject to local domain
@@ -272,27 +242,7 @@ class Trollduction(object):
 
 
 
-    def get_maximum_extent(self):
-        '''Get maximum extend needed to produce all defined areas.
-        '''
-        self.maximum_area_extent = [None, None, None, None]
-        for area in self.area_def_names:
-            extent = get_area_def(area)
-
-            if self.maximum_area_extent[0] is None:
-                self.maximum_area_extent = list(extent.area_extent)
-            else:
-                if self.maximum_area_extent[0] > extent.area_extent[0]:
-                    self.maximum_area_extent[0] = extent.area_extent[0]
-                if self.maximum_area_extent[1] > extent.area_extent[1]:
-                    self.maximum_area_extent[1] = extent.area_extent[1]
-                if self.maximum_area_extent[2] < extent.area_extent[2]:
-                    self.maximum_area_extent[2] = extent.area_extent[2]
-                if self.maximum_area_extent[3] < extent.area_extent[3]:
-                    self.maximum_area_extent[3] = extent.area_extent[3]
-
-
-    def load_unload_channels(self, product_list):
+    def load_unload_channels(self, product_list, max_extent=None):
         '''Load channels that are required for the given list of
         products. Unload channels that are unnecessary.
         '''
@@ -321,7 +271,7 @@ class Trollduction(object):
                 if n not in required:
                     required.append(n)
 
-        self.global_data.load(required, self.maximum_area_extent)
+        self.global_data.load(required, max_extent)
 
         # At this time we only load all the required channels with
         # maximum extent. The code below could be tuned to also unload
@@ -412,4 +362,25 @@ def read_config_file(fname=None):
         # TODO: read config
         return None
 
+
+def get_maximum_extent(area_def_names):
+    '''Get maximum extend needed to produce all defined areas.
+    '''
+    maximum_area_extent = [None, None, None, None]
+    for area in area_def_names:
+        extent = get_area_def(area)
+        
+        if maximum_area_extent[0] is None:
+            maximum_area_extent = list(extent.area_extent)
+        else:
+            if maximum_area_extent[0] > extent.area_extent[0]:
+                maximum_area_extent[0] = extent.area_extent[0]
+            if maximum_area_extent[1] > extent.area_extent[1]:
+                maximum_area_extent[1] = extent.area_extent[1]
+            if maximum_area_extent[2] < extent.area_extent[2]:
+                maximum_area_extent[2] = extent.area_extent[2]
+            if maximum_area_extent[3] < extent.area_extent[3]:
+                maximum_area_extent[3] = extent.area_extent[3]
+
+    return maximum_area_extent
 

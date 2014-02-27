@@ -9,6 +9,7 @@ from mpop.satellites import GenericFactory as GF
 import trollduction
 import sys
 from posttroll.publisher import get_own_ip
+from listener import Listener, ListenerContainer
 
 def hrpt():
     td = trollduction.Trollduction()
@@ -20,8 +21,7 @@ def hrpt():
                        'scan2': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview'],
                        'scan1': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview']}
     td.production_type = 'hrpt_noaa_l1b'
-    td.init_listener(['HRPT_l1b'])
-    td.start_listener()
+    td.listener = ListenerContainer(data_type_list=['HRPT_l1b'])
     td.run_single()
 
 def msg():
@@ -35,8 +35,7 @@ def msg():
                        'eurol': ['airmass', 'ash', 'cloudtop', 'convection', 'convection_co2', 'dust', 'fog', 'green_snow', 'ir108', 'natural', 'night_fog', 'night_microphysics', 'night_overview', 'overview', 'red_snow', 'vis06', 'wv_high', 'wv_low'],
                        'MSGHRVN': ['airmass', 'ash', 'cloudtop', 'convection', 'convection_co2', 'dust', 'fog', 'green_snow', 'ir108', 'natural', 'night_fog', 'night_microphysics', 'night_overview', 'overview', 'red_snow', 'vis06', 'wv_high', 'wv_low']}
     td.production_type = 'msg_xrit'
-    td.init_listener(['HRIT_lvl1.5'])
-    td.start_listener()
+    td.listener = ListenerContainer(data_type_list=['HRIT_lvl1.5'])
     td.run_single()
     
 
