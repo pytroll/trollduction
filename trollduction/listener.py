@@ -21,12 +21,57 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+'''Listener module for Trollduction.'''
+
 from posttroll.subscriber import NSSubscriber
-from posttroll.message import Message
 from collections import deque
 import logging
+from multiprocessing import Pipe
+from threading import Thread
 
-logger = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
+
+class ListenerContainer(object):
+    '''Container for listener instance
+    '''
+    def __init__(self, data_type_list=None):
+        self.listener = None
+        self.parent_conn = None
+        self.child_conn = None
+        self.thread = None
+
+        if data_type_list is not None:
+            # Create Pipe connection
+            self.parent_conn, self.child_conn = Pipe()
+
+            # Create a Listener instance
+            self.listener = Listener(data_type_list=data_type_list, 
+                                     pipe=self.child_conn)
+            # Start Listener instance into a new daemonized thread.
+            self.thread = Thread(target=self.listener.run)
+            self.thread.setDaemon(True)
+            self.thread.start()
+
+            print "Listener started"
+
+
+    def restart_listener(self, data_type_list):
+        '''Restart listener after configuration update.
+        '''
+        if self.listener is not None:
+            if self.listener.running:
+                self.stop()
+        self.__init__(data_type_list=data_type_list)
+
+
+    def stop(self):
+        '''Stop listener.'''
+        self.listener.stop()
+        self.thread.join()
+        self.parent_conn = None
+        self.child_conn = None
+        self.thread = None
+
 
 class Listener(object):
     '''PyTroll listener class for reading messages for Trollduction
@@ -39,9 +84,10 @@ class Listener(object):
         self.deque = deque()
         self.pipe = pipe
         self.subscriber = None
+        self.recv = None
         self.create_subscriber()
         self.running = False
-        
+
 
     def create_subscriber(self):
         '''Create a subscriber instance using specified addresses and
@@ -64,7 +110,7 @@ class Listener(object):
         '''Run listener
         '''
 
-        logger.debug("Starting Listener")
+        LOG.debug("Starting Listener")
 
         self.running = True
 
@@ -74,7 +120,7 @@ class Listener(object):
                     continue
                 else:
                     break
-            logger.debug("New message received")
+            LOG.debug("New message received")
             if self.pipe is None:
                 self.deque.append(msg)
             else:
@@ -86,7 +132,6 @@ class Listener(object):
     def stop(self):
         '''Stop subscriber and delete the instance
         '''
-        
         self.running = False
         self.subscriber.stop()
         self.subscriber = None
