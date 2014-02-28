@@ -49,17 +49,25 @@ class Trollduction(object):
 
         # otherwise set empty placeholders
         else:
-            self.product_list_file = None
-            self.area_def_names = None
-            # product list is a dict with area def names as keys and
-            # product names as value arrays
-            # eg. {'euro4km': ['green_snow', 'overview']}
+            self.td_config_file = None
+            self.td_config = None
+
+            # This will be inside td_config
+            self.product_config_file = None
+
+            self.product_config = None
+            # These will be in product config struct, not here as
+            # trollduction members
             self.product_list = None
+            self.area_def_names = None
+            self.image_filename_template = None
+            self.image_output_dir = None
+
+
             self.listener = None
 #            self.publisher = None
 #            self.logger = None
-            self.image_filename_template = None
-            self.image_output_dir = None
+
             self.satellite = {'satname': None,
                               'satnumber': None,
                               'instrument': None}
@@ -69,8 +77,6 @@ class Trollduction(object):
 #            self.pool = None
 #            self.pool_size = None
 #            self.loaded_channels = []
-            self.product_config_file = None
-            self.product_config = None
             self.global_data = None
             self.local_data = None
 
