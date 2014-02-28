@@ -108,7 +108,7 @@ class EventHandler(ProcessEvent):
             self.parse_file_info(event)
             if self.filetype != '' and self.check_filemasks():
                 message = self.create_message()            
-                print "Publishing message foo %s" % str(message)
+                print "Publishing message %s" % str(message)
                 self.pub.send(str(message))
             self.__clean__()    
 
