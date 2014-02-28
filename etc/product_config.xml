@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding='utf-8'?>
+
+<!--This is the first iteration of the product configuration file. This is not yet used in Trollduction.-->
+
+<product_config>
+    <common>
+        <!-- calibrated, satellite projection -->
+        <netcdf_file>%Y%m%d_%H%M_%(orbit)_%(satellite)_swath.ncf</netcdf_file>
+        <output_directory>/tmp</output_directory>  # full absolute path
+        <!-- what else??? -->
+    </common>
+ 
+    <area>
+        <!-- Area name to filename -->
+        <name>Europe_4km</name>
+ 
+        <!-- pytroll area definition name -->
+        <definition>euro4</definition>
+ 
+        <!-- Save calibrated and reprojected data as NetCDF4 -->
+        <netcdf_file>%Y%m%d_%H%M_%(orbit)_%(satellite)_%(area).ncf</netcdf_file>
+ 
+        <!-- Product definitions -->
+        <product>
+            <!-- pytroll image composite function -->
+            <composite>green_snow</composite>
+ 
+            <!-- function name for overlay (coastlines, coordinate grids) -->
+            <overlay></overlay>
+ 
+            <!-- Sun zenith angle limits -->
+            <sunzen_minimum></sunzen_minimum>  <!-- only day time -->
+            <sunzen_maximum></sunzen_maximum>  <!-- only night time -->
+                                               <!-- if both set -> twilight between these limits -->
+ 
+            <filename>%Y%m%d_%H%M_%(area)_%(composite)_%(satellite)_RGB-DayNaturalColors-eumetsat_overlay.png</filename>
+        </product>
+ 
+        <product>
+            <!-- next product -->
+        </product>
+    </area>
+ 
+    <area>
+        <!-- next area, products, etc -->
+    </area>
+</product_config>
