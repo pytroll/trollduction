@@ -6,7 +6,7 @@
     <common>
         <!-- calibrated, satellite projection -->
         <netcdf_file>%Y%m%d_%H%M_%(orbit)_%(satellite)_swath.ncf</netcdf_file>
-        <output_directory>/tmp</output_directory>  # full absolute path
+        <output_directory>/tmp</output_directory>
         <!-- what else??? -->
     </common>
  
@@ -34,6 +34,17 @@
                                                <!-- if both set -> twilight between these limits -->
  
             <filename>%Y%m%d_%H%M_%(area)_%(composite)_%(satellite)_RGB-DayNaturalColors-eumetsat_overlay.png</filename>
+
+	    <!-- Valid satellites for this product -->
+	    <!-- If any tags present, only those will be used -->
+	    <valid_satellite>noaa18</valid_satellite>
+	    <valid_satellite>noaa19</valid_satellite>
+	    <valid_satellite>metop-b</valid_satellite>
+
+	    <!-- Invalid satellites for this product -->
+	    <!-- These are skipped -->
+	    <invalid_satellite>noaa15</invalid_satellite>
+	    
         </product>
  
         <product>
