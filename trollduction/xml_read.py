@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013
+# Copyright (c) 2014
 
 # Author(s):
 
-#   Martin Raspaud <martin.raspaud@smhi.se>
+#   Panu Lahtinen <pnuu+git@iki.fi>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,90 +20,51 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""
-Read the xml product lists and generate batch jobs.
+'''XML reader for Trollduction system and product configuration files.
+'''
 
-Scenarios:
+from lxml import etree
 
-SMHI setup:
-a batch executable to use as a daemon (usually) -> run_on_list
+def get_root(fname):
+    '''Read XML file and return the root tree.
+    '''
 
-Future (?):
-Send a batch of requests -> batch_generator & caller daemon
-
-NB: don't forget hooks to send messages in the end.
-"""
-
-import os.path
-
-import xml.etree.ElementTree as ET
-
-def read_product_file(xml_file):
-    tree = ET.parse(xml_file)
+    tree = etree.parse(fname)
     root = tree.getroot()
 
-    product_list = {}
+    return root
 
-    variables = {}
 
-    for variable in root.find("variables"):
-        variables.setdefault(variable.tag, {})
-        variables[variable.tag][variable.attrib["id"]] = variable.text
+def parse_xml(tree):
+    '''Parse the given XML file to dictionary.
+    '''
+    xml_dict = {}
 
-    print variables
+    # this tags will always be lists, if they are present and non-empty
+    listify = ['area', 'product', 'valid_satellite', 'invalid_satellite']
+    children = list(tree)
 
-    for area in root.getiterator("area"):
-        area_name = area.get("id")
-        product_list[area_name] = {}
-        for prod in area:
-            prod_name =  prod.get("id")
-            product_list[area_name][prod_name] = []
-            for filename in prod:
-                args = {}
-                for attr in filename.attrib:
-                    if attr == "path":
-                        filepath = os.path.join(variables["path"][filename.get("path")],
-                                                filename.text)
+    
+    if len(children) == 0:
+        try:
+            xml_dict = tree.text.strip()
+        except AttributeError:
+            pass
+
+    for child in children:
+        if not isinstance(child, etree._Comment):
+            new_val = parse_xml(child)
+            if len(new_val) == 0:
+                continue
+            if xml_dict.has_key(child.tag):
+                if not type(xml_dict[child.tag]) == list:
+                    xml_dict[child.tag] = [xml_dict[child.tag]]
+                xml_dict[child.tag].append(new_val)
+            else:
+                if len(new_val) > 0:
+                    if child.tag in listify:
+                        xml_dict[child.tag] = [new_val]
                     else:
-                        try:
-                            args[attr] = eval(filename.attrib[attr])
-                        except NameError:
-                            args[attr] = filename.attrib[attr]
+                        xml_dict[child.tag] = new_val
 
-                product_list[area_name][prod_name].append((filepath, args))
-
-    return product_list, dict(root.find("metadata").attrib)
-
-#import pprint
-#pprint.pprint(read_product_file('/local_disk/usr/src/mpop-smhi.old/etc/noaa15_products.xml'))
-
-
-def batch_generator(platform, variant, number, time_interval):
-    filename = find_product_file(platform, variant, number)
-    product_list, metadata = read_product_file(filename)
-    # create request message(s?)
-
-
-def handle_request(req):
-    # create global_data for the satellite and datetime.
-
-
-    # create requests from req
-    for area in requests:
-        l = g.project(area)
-        for prod in requests[area]:
-            img = getattr(prod, l.image)()
-            # options + overlay and save
-            
-            img.save(requests[area][prod], **options)
-
-            
-
-
-def caller(satscene, composite, hooks):
-    img = composite(satscene)
-    return img
-
-def post_proc(hooks):
-    for hook in hooks:
-        hook(satscene)
+    return xml_dict
