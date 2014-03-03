@@ -23,7 +23,7 @@
 
 #from multiprocessing import Pipe
 #from threading import Thread
-#from listener import Listener, ListenerContainer
+from listener import ListenerContainer
 #from publisher import Publisher
 #from logger import Logger
 from mpop.satellites import GenericFactory as GF
@@ -31,6 +31,8 @@ import datetime as dt
 import time
 from mpop.projector import get_area_def
 import sys
+import xml_read
+from pprint import pprint
 
 class Trollduction(object):
     '''Trollduction class for easy generation chain setup
@@ -42,78 +44,56 @@ class Trollduction(object):
 
         # configuration file for the Trollduction instance
         self.td_config_file = td_config_file
+        self.td_config = None
+        self.product_config = None
+        self.listener = None
+        self.satellite = {'satname': None,
+                          'satnumber': None,
+                          'instrument': None}
+        self.global_data = None
+        self.local_data = None
+
+        # Not yet in use
+        self.publisher = None
+        self.logger = None
+        
 
         # read everything from the Trollduction config file
-        if td_config_file is not None:
+        if self.td_config_file is not None:
             self.update_td_config()
-
-        # otherwise set empty placeholders
-        else:
-            self.td_config_file = None
-            self.td_config = None
-
-            # This will be inside td_config
-            self.product_config_file = None
-
-            self.product_config = None
-            # These will be in product config struct, not here as
-            # trollduction members
-            self.product_list = None
-            self.area_def_names = None
-            self.image_filename_template = None
-            self.image_output_dir = None
-
-
-            self.listener = None
-#            self.publisher = None
-#            self.logger = None
-
-            self.satellite = {'satname': None,
-                              'satnumber': None,
-                              'instrument': None}
-            # single swath or MSG disc: 'single'
-            # multiple granules or GEO images: 'multi'
-#            self.production_type = None
-#            self.pool = None
-#            self.pool_size = None
-#            self.loaded_channels = []
-            self.global_data = None
-            self.local_data = None
 
 
     def update_td_config(self, fname=None):
         '''Update Trollduction configuration from the given file.
         '''
 
-        # TODO: add checks what has changed
-        # TODO: restart relevant parts
         if fname is not None:
             self.td_config_file = fname
-            td_config = read_config_file(fname)
+            self.td_config = read_config_file(fname)
         elif self.td_config_file is not None:
-            td_config = read_config_file(self.td_config_file)
+            self.td_config = read_config_file(self.td_config_file)
         else:
             return
             
-        keys = td_config.keys()
+        print 'Trollduction configuration:'
+        pprint(self.td_config)
 
-        if 'listener' in keys:
-            # TODO: check if changed
-            self.listener.restart_listener(\
-                td_config['listener']['data_type_list'])
-
-        '''
-        if 'parallel' in keys:
-            if 'num_processes' in keys:
-                # TODO: check if changed
-                self.init_pool(num_processes=td_config['num_processes'])
+        # Initialize/restart listener
+        try:
+            if self.listener is None:
+                self.listener = ListenerContainer(\
+                    data_type_list=self.td_config['listener_tag'])
             else:
-                self.init_pool()
-        '''
+                self.listener.restart_listener(self.td_config['listener_tag'])
+        except KeyError:
+            # TODO: logging
+            print "Key 'listener_tag' is missing from " + self.td_config_file
 
-        if '' in keys:
-            # TODO: check if changed
-            pass
+        try:
+            self.update_product_config(\
+                fname=self.td_config['product_config_file'])
+        except KeyError:
+            print "Key 'product_config' is missing from " + self.td_config_file
 
 
     def update_product_config(self, fname=None):
@@ -121,31 +101,24 @@ class Trollduction(object):
         filename prototypes and other relevant information from the
         given file.
         '''
+
+        if self.td_config is None:
+            self.td_config = {}
         if fname is not None:
-            self.product_config_file = fname
+            self.td_config['product_config_file'] = fname
             product_config = read_config_file(fname)
-        elif self.product_config_file is not None:
-            product_config = read_config_file(self.product_config_file)
+        elif self.td_config['product_config_file'] is not None:
+            product_config = read_config_file(\
+                self.td_config['product_config_file'])
         else:
             product_config = None
 
         # add checks, or do we just assume the config to be valid at
         # this point?
-        self.product_config = product_config
+        self.product_config = product_config        
 
-
-    def read_config_file(self, fname=None):
-        '''Read config file to dictionary.
-        '''
-
-        # TODO: check validity
-        # TODO: read config, parse to dict, logging
-
-        if fname is None:
-            return None
-        else:
-            # TODO: read config
-            pass
+        print 'New product config:'
+        pprint(self.product_config)
 
 
     def cleanup(self):
@@ -213,28 +186,31 @@ class Trollduction(object):
 
                 # Find maximum extent that is needed for all the
                 # products to be made.
-                maximum_area_extent = get_maximum_extent(self.area_def_names)
+#                maximum_area_extent = get_maximum_extent(self.area_def_names)
+                
+#                maximum_area_extent = get_maximum_extent(['EuropeCanary'])
+                maximum_area_extent = None
 
                 # Make images for each area
-                for area_name in self.area_def_names:
+                for area in self.product_config['area']:
 
                     t1b = time.time()
 
                     # Check which channels are needed. Unload
                     # unnecessary channels and load those that are not
                     # already available.
-                    self.load_unload_channels(self.product_list[area_name],
+                    self.load_unload_channels(area['product'], 
                                               max_extent=maximum_area_extent)
                     # TODO: or something
 
                     # reproject to local domain
-                    self.local_data = self.global_data.project(area_name, 
-                                                               mode='nearest')
+                    self.local_data = self.global_data.project(\
+                        area['definition'], mode='nearest')
                     
-                    print "Data reprojected for area:", area_name
+                    print "Data reprojected for area:", area['name']
 
                     # Draw requested images for this area.
-                    self.draw_images(area_name)
+                    self.draw_images(area)
                     print "Single area time elapsed time:", time.time()-t1b, 's'
 
                 self.local_data = None
@@ -248,16 +224,16 @@ class Trollduction(object):
 
 
 
-    def load_unload_channels(self, product_list, max_extent=None):
+    def load_unload_channels(self, products, max_extent=None):
         '''Load channels that are required for the given list of
         products. Unload channels that are unnecessary.
         '''
 
         ch_names = []
         wavelengths = []
-        for ch in self.global_data.channels:
-            ch_names.append(ch.name)
-            wavelengths.append(ch.wavelength_range)
+        for chan in self.global_data.channels:
+            ch_names.append(chan.name)
+            wavelengths.append(chan.wavelength_range)
             
 #        loaded = self.global_data.loaded_channels()
 #        for l in loaded:
@@ -266,16 +242,17 @@ class Trollduction(object):
 #        to_load = []
 #        to_unload = []
 
-        for product in product_list:
-            req = eval('self.global_data.image.'+product+'.prerequisites')
-            for r in req:
+        for product in products:
+            reqs = eval('self.global_data.image.'+ \
+                            product['composite']+'.prerequisites')
+            for req in reqs:
                 # get channel name
                 for i in range(len(wavelengths)):
-                    if r >= wavelengths[i][0] and r <= wavelengths[i][-1]:
-                        n = ch_names[i]
+                    if req >= wavelengths[i][0] and req <= wavelengths[i][-1]:
+                        name = ch_names[i]
                         break
-                if n not in required:
-                    required.append(n)
+                if name not in required:
+                    required.append(name)
 
         self.global_data.load(required, max_extent)
 
@@ -303,38 +280,21 @@ class Trollduction(object):
         '''
 
 
-
-    def draw_images(self, area_name):
+    def draw_images(self, area):
         '''Generate images from local data using given area name and
         product definitions.
         '''
 
+        pprint(area)
+
         # Create images for each color composite
-        for product in self.product_list[area_name]:
+        for product in area['product']:
             # Parse image filename
-            fname = self.image_output_dir + '/' + self.image_filename_template
-            fname = fname.replace('%Y', '%04d' % \
-                                      self.local_data.time_slot.year)
-            fname = fname.replace('%m', '%02d' % \
-                                      self.local_data.time_slot.month)
-            fname = fname.replace('%d', '%02d' % \
-                                      self.local_data.time_slot.day)
-            fname = fname.replace('%H', '%02d' % \
-                                      self.local_data.time_slot.hour)
-            fname = fname.replace('%M', '%02d' % \
-                                      self.local_data.time_slot.minute)
-            fname = fname.replace('%(area)', area_name)
-            fname = fname.replace('%(composite)', product)
-            fname = fname.replace('%(satellite)', 
-                                  self.satellite['satname'] + \
-                                      self.satellite['satnumber'])
-            fname = fname.replace('%(instrument)', 
-                                  self.satellite['instrument'])
-            fname = fname.replace('%(ending)', 'png')
+            fname = self.parse_filename(area, product)
 
             try:
                 # Check if this combination is defined
-                func = getattr(self.local_data.image, product)
+                func = getattr(self.local_data.image, product['composite'])
                 img = func()            
                 img.save(fname)
                 print "Image", fname, "saved."
@@ -343,30 +303,67 @@ class Trollduction(object):
                 # TODO: publish message
             except AttributeError:
                 # TODO: log incorrect product name
-                print "Incorrect product name:", product, "for area", area_name
+                print "Incorrect product name:", product['name'], \
+                    "for area", area['name']
             except KeyError:
                 # TODO: log missing channel
-                print "Missing channel on", product, "for area", area_name
+                print "Missing channel on", product['name'], \
+                    "for area", area['name']
             except:
+                err = sys.exc_info()[0]
                 # TODO: log other errors
-                print "Undefined error on", product, "for area", area_name
+                print "Error", err, "on", product['name'], \
+                    "for area", area['name']
 
         # TODO: log completion of this area def
         # TODO: publish completion of this area def
 
 
+    def parse_filename(self, area, product):
+        '''Parse filename for this product
+        '''
+        try:
+            fname = product['output_dir']
+        except KeyError:
+            try:
+                fname = area['output_dir']
+            except KeyError:
+                fname = self.product_config['common']['output_dir']
+            
+        fname += '/' + product['filename']
+        fname = fname.replace('%Y', '%04d' % \
+                                  self.local_data.time_slot.year)
+        fname = fname.replace('%m', '%02d' % \
+                                  self.local_data.time_slot.month)
+        fname = fname.replace('%d', '%02d' % \
+                                  self.local_data.time_slot.day)
+        fname = fname.replace('%H', '%02d' % \
+                                  self.local_data.time_slot.hour)
+        fname = fname.replace('%M', '%02d' % \
+                                  self.local_data.time_slot.minute)
+        fname = fname.replace('%(areaname)', area['name'])
+        fname = fname.replace('%(composite)', product['name'])
+        fname = fname.replace('%(satellite)', 
+                              self.satellite['satname'] + \
+                                  self.satellite['satnumber'])
+        fname = fname.replace('%(instrument)', 
+                              self.satellite['instrument'])
+        fname = fname.replace('%(ending)', 'png')
+        
+        return fname
+
+                              
 def read_config_file(fname=None):
     '''Read config file to dictionary.
     '''
     
     # TODO: check validity
-    # TODO: read config, parse to dict, logging
+    # TODO: logging
     
     if fname is None:
         return None
     else:
-        # TODO: read config
-        return None
+        return xml_read.parse_xml(xml_read.get_root(fname))
 
 
 def get_maximum_extent(area_def_names):
