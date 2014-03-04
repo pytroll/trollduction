@@ -31,20 +31,19 @@
             <filename>%Y%m%d_%H%M_%(satellite)_%(areaname)_%(composite).png</filename>
 	    
             <!-- Sun zenith angle limits -->
-	    <!-- Not implemented -->
-            <sunzen_minimum></sunzen_minimum>  <!-- only day time -->
-            <sunzen_maximum></sunzen_maximum>  <!-- only night time -->
-                                               <!-- if both set -> twilight between these limits -->
+	    <!-- if both set -> twilight between these limits -->
+	    <!-- only day time -->
+            <sunzen_night_minimum></sunzen_night_minimum>
+	    <!-- only night time -->
+            <sunzen_day_maximum></sunzen_day_maximum>
 
 	    <!-- Valid satellites for this product -->
 	    <!-- If any tags present, only those will be used -->
-	    <!-- Not yet implemented -->
 	    <valid_satellite>noaa18</valid_satellite>
 	    <valid_satellite>noaa19</valid_satellite>
 	    <valid_satellite>metop-b</valid_satellite>
 	    <!-- Invalid satellites for this product -->
 	    <!-- These are skipped -->
-	    <!-- Not yet implemented -->
 	    <invalid_satellite>noaa15</invalid_satellite>
         </product>
 
