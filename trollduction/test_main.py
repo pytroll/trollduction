@@ -13,13 +13,12 @@ from listener import Listener, ListenerContainer
 
 def hrpt():
     td = trollduction.Trollduction()
-    td.area_def_names = ['euro4', 'scan', 'scan2', 'scan1']
+    td.area_def_names = ['euro4', 'scan2', 'eurol']
     td.image_output_dir = '/tmp'
-    td.image_filename_template = '%Y%m%d_%H%M_%(area)_%(composite).%(ending)'
+    td.image_filename_template = '%Y%m%d_%H%M_%(area)_%(composite)_%(satellite).%(ending)'
     td.product_list = {'euro4': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview'],
-                       'scan': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview'],
                        'scan2': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview'],
-                       'scan1': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview']}
+                       'eurol': ['overview', 'ir108', 'cloudtop', 'vis06', 'night_fog', 'night_overview']}
     td.production_type = 'hrpt_noaa_l1b'
     td.listener = ListenerContainer(data_type_list=['HRPT_l1b'])
     td.run_single()
@@ -27,7 +26,7 @@ def hrpt():
 def msg():
     td = trollduction.Trollduction()
     td.image_output_dir = '/tmp'
-    td.image_filename_template = '%Y%m%d_%H%M_%(area)_%(composite).%(ending)'
+    td.image_filename_template = '%Y%m%d_%H%M_%(area)_%(composite)_%(satellite).%(ending)'
     td.area_def_names = ['euro4', 'scan2', 'eurol']
     td.product_list = {'euro4': ['airmass', 'ash', 'cloudtop', 'convection', 'convection_co2', 'dust', 'fog', 'green_snow', 'ir108', 'natural', 'night_fog', 'night_microphysics', 'night_overview', 'overview', 'red_snow', 'vis06', 'wv_high', 'wv_low'],
                        'scan2': ['airmass', 'ash', 'cloudtop', 'convection', 'convection_co2', 'dust', 'fog', 'green_snow', 'ir108', 'natural', 'night_fog', 'night_microphysics', 'night_overview', 'overview', 'red_snow', 'vis06', 'wv_high', 'wv_low'],
@@ -41,5 +40,5 @@ def msg():
 
 if __name__ == '__main__':
 
-#    hrpt()
-    msg()
+    hrpt()
+#    msg()
