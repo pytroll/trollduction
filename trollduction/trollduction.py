@@ -33,6 +33,9 @@ from mpop.projector import get_area_def
 import sys
 import xml_read
 from pprint import pprint
+from pyorbital import astronomy
+import numpy as np
+import os
 
 class Trollduction(object):
     '''Trollduction class for easy generation chain setup
@@ -124,8 +127,8 @@ class Trollduction(object):
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
         '''
-        # TODO: add cleanup, close threads, and stuff
-        pass
+        # TODO: more cleanup, close threads, and stuff
+        self.listener.stop()
 
 
     def shutdown(self):
@@ -149,15 +152,13 @@ class Trollduction(object):
             msg = self.listener.parent_conn.recv()
             print msg
             # shutdown trollduction
-            if msg.subject == '/StopTrollduction':
-                self.cleanup()
-                break
-                #self.shutdown()
+            if '/StopTrollduction' in msg.subject:
+                self.shutdown()
             # update trollduction config
-            elif msg.subject == '/NewTrollductionConfig':
+            elif '/NewTrollductionConfig' in msg.subject:
                 self.update_td_config(msg.data)
             # update product lists
-            elif msg.subject == '/NewProductConfig':
+            elif '/NewProductConfig' in msg.subject:
                 self.update_product_config(msg.data)
             # process new file
             elif '/NewFileArrived' in msg.subject:
@@ -176,6 +177,7 @@ class Trollduction(object):
 
                 t1a = time.time()
 
+                # Create satellite scene
                 self.global_data = GF.create_scene(\
                     satname=str(self.satellite['satname']), 
                     satnumber=str(self.satellite['satnumber']), 
@@ -183,16 +185,53 @@ class Trollduction(object):
                     time_slot=time_slot, 
                     orbit=str(msg.data['orbit']))
 
-
                 # Find maximum extent that is needed for all the
                 # products to be made.
+                # This really requires that area definitions can be
+                # used directly
 #                maximum_area_extent = get_maximum_extent(self.area_def_names)
-                
 #                maximum_area_extent = get_maximum_extent(['EuropeCanary'])
+
+                # Load full data
                 maximum_area_extent = None
+
+                # Save unprojected data to netcdf4
+                if self.product_config['common'].has_key('netcdf_file'):
+                    # parse filename
+                    fname = self.parse_filename(fname='netcdf_file')
+                    print "Saving %s." % fname
+                    # Load the data
+                    self.global_data.load()
+                    self.global_data.save(fname, to_format='netcdf4')
+                    loaded_channels = [ch.name for ch in \
+                                           self.global_data.channels]
+                    if maximum_area_extent is not None:
+                        self.global_data.unload(*loaded_channels)
 
                 # Make images for each area
                 for area in self.product_config['area']:
+
+                    # Skip if not a valid satellite
+                    if area.has_key('valid_satellite'):
+                        if self.satellite['satname'] +\
+                                self.satellite['satnumber'] not in\
+                                area['valid_satellite']:
+                            print self.satellite['satname'] + \
+                                self.satellite['satnumber'], \
+                                "not in list of valid satellites, skipping " +\
+                                area['name']
+                            continue
+
+                    # Skip if invalid satellite
+                    if area.has_key('invalid_satellite'):
+                        if self.satellite['satname'] +\
+                                self.satellite['satnumber'] in\
+                                area['invalid_satellite']:
+                            print self.satellite['satname'] + \
+                                self.satellite['satnumber'], \
+                                "is in the list of invalid satellites, " + \
+                                "skipping " + area['name']
+                            continue
 
                     t1b = time.time()
 
@@ -200,22 +239,31 @@ class Trollduction(object):
                     # unnecessary channels and load those that are not
                     # already available.
                     self.load_unload_channels(area['product'], 
-                                              max_extent=maximum_area_extent)
-                    # TODO: or something
+                                              extent=maximum_area_extent)
 
                     # reproject to local domain
-                    self.local_data = self.global_data.project(\
-                        area['definition'], mode='nearest')
+                    self.local_data = \
+                        self.global_data.project(area['definition'], 
+                                                 mode='nearest')
                     
+                    # Save projected data to netcdf4
+                    if area.has_key('netcdf_file'):
+                        # parse filename
+                        fname = self.parse_filename(level1=area, 
+                                                    fname='netcdf_file')
+                        print "Saving %s." % fname
+                        self.local_data.save(fname, to_format='netcdf4')
+
                     print "Data reprojected for area:", area['name']
 
                     # Draw requested images for this area.
                     self.draw_images(area)
                     print "Single area time elapsed time:", time.time()-t1b, 's'
 
+                # Release memory
                 self.local_data = None
                 self.global_data = None
-#                self.loaded_channels = []
+
                 print "Full time elapsed time:", time.time()-t1a, 's'
             else:
                 # Unhandled message types end up here
@@ -223,61 +271,49 @@ class Trollduction(object):
                 pass
 
 
-
-    def load_unload_channels(self, products, max_extent=None):
-        '''Load channels that are required for the given list of
-        products. Unload channels that are unnecessary.
+    def load_unload_channels(self, products, extent=None):
+        '''Load channels for *extent* that are required for the given
+        list of *products*. Unload channels that are unnecessary.
         '''
 
-        ch_names = []
-        wavelengths = []
-        for chan in self.global_data.channels:
-            ch_names.append(chan.name)
-            wavelengths.append(chan.wavelength_range)
-            
-#        loaded = self.global_data.loaded_channels()
-#        for l in loaded:
-#            print l.wavelength_range
-        required = []
-#        to_load = []
-#        to_unload = []
+        # Rewritten using global_data.channels[].is_loaded()
 
+        loaded_channels = []
+        required_channels = []
+        wavelengths = []
+
+        # Get information which channels are loaded
+        for chan in self.global_data.channels:
+            required_channels.append(False)
+            wavelengths.append(chan.wavelength_range)
+            if chan.is_loaded():
+                loaded_channels.append(True)
+            else:
+                loaded_channels.append(False)
+
+        # Get a list of required channels
         for product in products:
             reqs = eval('self.global_data.image.'+ \
                             product['composite']+'.prerequisites')
             for req in reqs:
-                # get channel name
-                for i in range(len(wavelengths)):
-                    if req >= wavelengths[i][0] and req <= wavelengths[i][-1]:
-                        name = ch_names[i]
+                for i in range(len(self.global_data.channels)):
+                    if req in wavelengths[i]:
+                        required_channels[i] = True
                         break
-                if name not in required:
-                    required.append(name)
 
-        self.global_data.load(required, max_extent)
+        to_load = []
+        to_unload = []
+        for i in range(len(self.global_data.channels)):
+            if required_channels[i] and not loaded_channels[i]:
+                to_load.append(self.global_data.channels[i].name)
+            if not required_channels[i] and loaded_channels[i]:
+                to_unload.append(self.global_data.channels[i].name)
 
-        # At this time we only load all the required channels with
-        # maximum extent. The code below could be tuned to also unload
-        # extra channels.
-        
-        '''
-                if n not in to_load and n not in self.loaded_channels:
-                    to_load.append(n)
+        print "Channels to unload:", to_unload
+        print "Channels to load:", to_load
 
-        for c in self.loaded_channels:
-            if c not in required:
-                to_unload.append(c)
-                self.loaded_channels.remove(c)
-
-        if len(to_load) > 0:
-            print "load channels:", to_load
-            self.global_data.load(to_load)
-            if len(self.loaded_channels) == 0:
-                self.loaded_channels = to_load
-        if len(to_unload) > 0:
-            print "unload channels:", to_unload
-            self.global_data.unload(to_unload)
-        '''
+        self.global_data.unload(*to_unload)
+        self.global_data.load(to_load, extent)
 
 
     def draw_images(self, area):
@@ -289,6 +325,61 @@ class Trollduction(object):
 
         # Create images for each color composite
         for product in area['product']:
+
+            # Skip if not a valid satellite
+            if product.has_key('valid_satellite'):
+                if self.satellite['satname'] +\
+                        self.satellite['satnumber'] not in\
+                        product['valid_satellite']:
+                    print self.satellite['satname'] + \
+                        self.satellite['satnumber'], \
+                        "not in list of valid satellites, skipping " +\
+                        product['name']
+                    continue
+
+            # Skip if invalid satellite
+                if product.has_key('invalid_satellite'):
+                    if self.satellite['satname'] +\
+                            self.satellite['satnumber'] in\
+                            product['invalid_satellite']:
+                        print self.satellite['satname'] + \
+                            self.satellite['satnumber'], \
+                            "is in the list of invalid satellites, " + \
+                            "skipping " + product['name']
+                        continue
+
+            
+            # Load coordinates
+            if product.has_key('sunzen_night_minimum') or \
+                    product.has_key('sunzen_day_maximum'):
+                if self.local_data.area.lons is None:
+                    print "Load coordinates"
+                    self.local_data.area.lons, self.local_data.area.lats = \
+                        self.local_data.area.get_lonlats()
+                # Calculate cosine of Sun zenith angle
+                try:
+                    self.local_data.__getattribute__('sun_zen')
+                except AttributeError:
+                    print "Calculate Sun zenith angles"
+                    self.local_data.sun_zen = \
+                        astronomy.sun_zenith_angle(self.local_data.time_slot, 
+                                          self.local_data.area.lons,
+                                          self.local_data.area.lats)
+
+            # Skip if Sun is too low (day-only product)
+            if product.has_key('sunzen_day_maximum'):
+                if np.radians(float(product['sunzen_day_maximum'])) > \
+                        np.max(self.local_data.sun_zen):
+                    print 'Skipping, Sun too low for day-time product.'
+                    continue
+
+            # Skip if Sun is too high (night-only product)
+            if product.has_key('sunzen_night_minimum'):
+                if np.radians(float(product['sunzen_night_minimum'])) < \
+                        np.max(self.local_data.sun_zen):
+                    print 'Skipping, Sun too high for night-time product.'
+                    continue
+
             # Parse image filename
             fname = self.parse_filename(area, product)
 
@@ -319,33 +410,45 @@ class Trollduction(object):
         # TODO: publish completion of this area def
 
 
-    def parse_filename(self, area, product):
-        '''Parse filename for this product
+    def parse_filename(self, level1=None, level2=None, fname='filename'):
+        '''Parse filename.
         '''
         try:
-            fname = product['output_dir']
-        except KeyError:
+            out_dir = level2['output_dir']
+        except (KeyError, TypeError):
             try:
-                fname = area['output_dir']
-            except KeyError:
-                fname = self.product_config['common']['output_dir']
+                out_dir = level1['output_dir']
+            except (KeyError, TypeError):
+                out_dir = self.product_config['common']['output_dir']
             
-        fname += '/' + product['filename']
-        fname = fname.replace('%Y', '%04d' % \
-                                  self.local_data.time_slot.year)
-        fname = fname.replace('%m', '%02d' % \
-                                  self.local_data.time_slot.month)
-        fname = fname.replace('%d', '%02d' % \
-                                  self.local_data.time_slot.day)
-        fname = fname.replace('%H', '%02d' % \
-                                  self.local_data.time_slot.hour)
-        fname = fname.replace('%M', '%02d' % \
-                                  self.local_data.time_slot.minute)
-        fname = fname.replace('%(areaname)', area['name'])
-        fname = fname.replace('%(composite)', product['name'])
+        try:
+            fname = level2[fname]
+        except (KeyError, TypeError):
+            try:
+                fname = level1[fname]
+            except (KeyError, TypeError):
+                fname = self.product_config['common'][fname]
+
+        fname = os.path.join(out_dir, fname)
+
+        try:
+            time_slot = self.local_data.time_slot
+        except AttributeError:
+            time_slot = self.global_data.time_slot
+        fname = fname.replace('%Y', '%04d' % time_slot.year)
+        fname = fname.replace('%m', '%02d' % time_slot.month)
+        fname = fname.replace('%d', '%02d' % time_slot.day)
+        fname = fname.replace('%H', '%02d' % time_slot.hour)
+        fname = fname.replace('%M', '%02d' % time_slot.minute)
+        if level1 is not None:
+            fname = fname.replace('%(areaname)', level1['name'])
+        if level2 is not None:
+            fname = fname.replace('%(composite)', level2['name'])
         fname = fname.replace('%(satellite)', 
                               self.satellite['satname'] + \
                                   self.satellite['satnumber'])
+#        try:
+        fname = fname.replace('%(orbit)', self.global_data.orbit)
         fname = fname.replace('%(instrument)', 
                               self.satellite['instrument'])
         fname = fname.replace('%(ending)', 'png')
