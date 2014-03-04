@@ -297,7 +297,8 @@ class Trollduction(object):
                             product['composite']+'.prerequisites')
             for req in reqs:
                 for i in range(len(self.global_data.channels)):
-                    if req in wavelengths[i]:
+                    if req >= np.min(wavelengths[i]) and \
+                            req <= np.max(wavelengths[i]):
                         required_channels[i] = True
                         break
 
@@ -309,6 +310,8 @@ class Trollduction(object):
             if not required_channels[i] and loaded_channels[i]:
                 to_unload.append(self.global_data.channels[i].name)
 
+        print "loaded_channels:", loaded_channels
+        print "required_channels:", required_channels
         print "Channels to unload:", to_unload
         print "Channels to load:", to_load
 
