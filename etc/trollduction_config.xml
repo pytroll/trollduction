@@ -6,7 +6,7 @@
     <!-- Name of this production chain -->
     <name>HRPT_l1b</name>
     <!-- Location of product configuration file -->
-    <product_config>/tmp/product_config.xml</product_config>
+    <product_config_file>/tmp/product_config.xml</product_config_file>
     <!-- Tag which is listened from posttroll -->
     <listener_tag>HRPT_l1b</listener_tag>
     <!--listener_tag>HRIT_lvl1.5</listener_tag-->
