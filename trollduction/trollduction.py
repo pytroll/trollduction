@@ -359,7 +359,7 @@ class Trollduction(object):
                     print "Load coordinates"
                     self.local_data.area.lons, self.local_data.area.lats = \
                         self.local_data.area.get_lonlats()
-                # Calculate cosine of Sun zenith angle
+                # Calculate Sun zenith angle
                 try:
                     self.local_data.__getattribute__('sun_zen')
                 except AttributeError:
@@ -371,15 +371,21 @@ class Trollduction(object):
 
             # Skip if Sun is too low (day-only product)
             if product.has_key('sunzen_day_maximum'):
-                if np.radians(float(product['sunzen_day_maximum'])) > \
-                        np.max(self.local_data.sun_zen):
+                area_def = get_area_def(area['definition'])
+                if float(product['sunzen_day_maximum']) < \
+                        self.local_data.sun_zen[area_def.y_size/2,
+                                                area_def.x_size/2]:
+#                        np.max(self.local_data.sun_zen):
                     print 'Skipping, Sun too low for day-time product.'
                     continue
 
             # Skip if Sun is too high (night-only product)
             if product.has_key('sunzen_night_minimum'):
-                if np.radians(float(product['sunzen_night_minimum'])) < \
-                        np.max(self.local_data.sun_zen):
+                area_def = get_area_def(area['definition'])
+                if float(product['sunzen_night_minimum']) > \
+                        self.local_data.sun_zen[area_def.y_size/2,
+                                                area_def.x_size/2]:
+#                        np.max(self.local_data.sun_zen):
                     print 'Skipping, Sun too high for night-time product.'
                     continue
 
