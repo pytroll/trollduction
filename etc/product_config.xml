@@ -31,6 +31,7 @@
             <filename>%Y%m%d_%H%M_%(satellite)_%(areaname)_%(composite).png</filename>
 	    
             <!-- Sun zenith angle limits -->
+	    <!-- Limits are relative to image center -->
 	    <!-- if both set -> twilight between these limits -->
 	    <!-- only day time -->
             <sunzen_night_minimum></sunzen_night_minimum>
