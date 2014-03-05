@@ -23,7 +23,7 @@
 
 #from multiprocessing import Pipe
 #from threading import Thread
-from trollduction.listener import ListenerContainer
+from listener import ListenerContainer
 #from publisher import Publisher
 #from logger import Logger
 from mpop.satellites import GenericFactory as GF
@@ -31,7 +31,7 @@ import datetime as dt
 import time
 from mpop.projector import get_area_def
 import sys
-import trollduction.xml_read
+import xml_read
 from pprint import pprint
 from pyorbital import astronomy
 import numpy as np
