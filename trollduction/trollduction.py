@@ -153,11 +153,11 @@ class Trollduction(object):
                 self.update_product_config(msg.data)
             # process new file
             elif '/NewFileArrived' in msg.subject:
-                time_slot = dt.datetime(msg.data['year'],
-                                        msg.data['month'], 
-                                        msg.data['day'],
-                                        msg.data['hour'],
-                                        msg.data['minute'])
+                time_slot = dt.datetime(int(msg.data['year']),
+                                        int(msg.data['month']), 
+                                        int(msg.data['day']),
+                                        int(msg.data['hour']),
+                                        int(msg.data['minute']))
 
                 # orbit is empty string for meteosat, change it to None
                 if msg.data['orbit'] == '':
