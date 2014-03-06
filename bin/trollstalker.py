@@ -122,6 +122,8 @@ class EventHandler(ProcessEvent):
                                 part = 1
                             else:
                                 part = 0
+                        if info[key].has_key('add_int'):
+                            part = str(int(part)+int(info[key]['add_int']))
                         self.info[key] = part
                     else:
                         self.info[key] = pattern['info'][key]
