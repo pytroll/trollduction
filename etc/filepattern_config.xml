@@ -3,21 +3,77 @@
 <!-- This configuration is used by trollstalker -->
 
 <filename_pattern_config>
-    <!-- MSG HRIT -->
-    <!-->H-000-MSG3__-MSG3________-_________-EPI______-201402130845-__</-->
+    <!-- MSG HRIT from meteosat9 seviri -->
+    <!-->H-000-MSG2__-MSG2________-_________-EPI______-201402130845-__</-->
     <pattern>
 	<msg_type>HRIT_lvl1.5</msg_type>
-	<file_pattern>?-???-MSG???-????????????-?????????-EPI??????-????????????-??</file_pattern>
+	<file_pattern>?-???-MSG2??-????????????-?????????-EPI??????-????????????-??</file_pattern>
 	<split_char>-</split_char>
 	<info>
 	    <satellite>meteosat</satellite>
+	    <satnumber>9</satnumber>
 	    <instrument>seviri</instrument>
 	    <!-- parsing -->
-	    <satnumber>
+	    <!--satnumber>
 	        <part>2</part>
 		<chars>-1</chars>
 		<strip_char>_</strip_char>
-	    </satnumber>
+		<add_int>7</add_int>
+	    </satnumber-->
+	    <orbit></orbit>
+	    <channel>
+	        <part>4</part>
+		<strip_char>_</strip_char>
+	    </channel>
+	    <segment>
+	        <part>5</part>
+		<strip_char>_</strip_char>
+	    </segment>
+	    <year>
+	        <part>6</part>
+		<chars>0:4</chars>
+	    </year>
+	    <month>
+	        <part>6</part>
+		<chars>4:6</chars>
+	    </month>
+	    <day>
+	        <part>6</part>
+		<chars>6:8</chars>
+	    </day>
+	    <hour>
+	        <part>6</part>
+		<chars>8:10</chars>
+	    </hour>
+	    <minute>
+	        <part>6</part>
+		<chars>10:</chars>
+	    </minute>
+	    <compressed>
+	        <part>7</part>
+		<strip_char>_</strip_char>
+		<text_pattern>C</text_pattern>
+	    </compressed>
+	</info>
+    </pattern>
+
+    <!-- MSG HRIT from meteosat10 seviri -->
+    <!-->H-000-MSG3__-MSG3________-_________-EPI______-201402130845-__</-->
+    <pattern>
+	<msg_type>HRIT_lvl1.5</msg_type>
+	<file_pattern>?-???-MSG3??-????????????-?????????-EPI??????-????????????-??</file_pattern>
+	<split_char>-</split_char>
+	<info>
+	    <satellite>meteosat</satellite>
+	    <satnumber>10</satnumber>
+	    <instrument>seviri</instrument>
+	    <!-- parsing -->
+	    <!--satnumber>
+	        <part>2</part>
+		<chars>-1</chars>
+		<strip_char>_</strip_char>
+		<add_int>7</add_int>
+	    </satnumber-->
 	    <orbit></orbit>
 	    <channel>
 	        <part>4</part>
