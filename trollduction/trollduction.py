@@ -433,7 +433,8 @@ class Trollduction(object):
         fname = fname.replace('%(satellite)', 
                               self.global_data.info['satname'] + \
                                   self.global_data.info['satnumber'])
-        fname = fname.replace('%(orbit)', self.global_data.info['orbit'])
+        if self.global_data.info['orbit'] is not None:
+            fname = fname.replace('%(orbit)', self.global_data.info['orbit'])
         fname = fname.replace('%(instrument)', 
                               self.global_data.info['instrument'])
         fname = fname.replace('%(ending)', 'png')
