@@ -27,78 +27,48 @@
 
 import argparse
 import logging, logging.handlers
-from pyinotify import WatchManager, ThreadedNotifier, ProcessEvent
-import pyinotify
+from pyinotify import WatchManager, ThreadedNotifier, \
+    ProcessEvent, IN_CLOSE_WRITE, IN_CLOSE_NOWRITE
 import fnmatch
 import sys
 import time
 
 from posttroll.publisher import NoisyPublisher
 from posttroll.message import Message
-
+from trollduction import xml_read
 
 class EventHandler(ProcessEvent):
     """
     Event handler class for inotify.
     """
-    def __init__(self, filemasks, filetypes, publish_port=0):
+    def __init__(self, file_tags, publish_port=0, filepattern_fname=None):
         super(EventHandler, self).__init__()
         
         self.logger = logging.getLogger(__name__)
-        self._pub = NoisyPublisher("trollstalker", publish_port, filetypes)
+        self._pub = NoisyPublisher("trollstalker", publish_port, file_tags)
+        self.file_tags = file_tags
         self.pub = self._pub.start()
-        self.filemasks = filemasks
-        self.filename = ''
+        self.subject = ''
         self.info = {}
-        self.filetype = ''
+        self.msg_type = ''
+        self.filepattern_fname = filepattern_fname
+
 
     def stop(self):
         '''Stop publisher.
         '''
         self._pub.stop()
+
         
     def __clean__(self):
-        self.filename = ''
-        self.filetype = ''
+        '''Clean instance attributes.
+        '''
         self.subject = ''
-        self.info = ''
-        self.filepath = ''
-        self.fullname = ''
-        self.satellite = ''
-        self.satnumber = ''
-        self.year = ''
-        self.month = ''
-        self.day = ''
-        self.hour = ''
-        self.minute = ''
-        self.instrument = ''
-        self.orbit = ''
+        self.info = {}
+        self.msg_type = ''
     
-    """
-    def is_config_changed(self):
-        if os.stat(self.config_file).st_mtime > self.config_mtime:
-            return True
-    
-    def update_config_mtime(self):
-        self.config_mtime = os.stat(self.config_file).st_mtime
-    
-    """
-        
-    def process_IN_CREATE(self, event):
-        """ When new file is created, publish message.
-        """
-        self.logger.debug("new file created %s" %event.pathname)
-        # New file created
-        if not event.dir:
-            self.parse_file_info(event)
-            if self.filetype != '' and self.check_filemasks():
-                message = self.create_message()            
-                print "Publishing message %s" % str(message)
-                self.pub.send(str(message))
-            self.__clean__()
-    
-    
-    def process_IN_CLOSE_WRITE(self, event):
+
+    def process_IN_CLOSE(self, event):
         """When a file is closed, publish a message.
         """
         self.logger.debug("new file created and closed %s" %event.pathname)
@@ -106,102 +76,64 @@ class EventHandler(ProcessEvent):
         if not event.dir:
             # parse information and create self.info dict{}
             self.parse_file_info(event)
-            if self.filetype != '' and self.check_filemasks():
+            if self.msg_type != '':
                 message = self.create_message()            
                 print "Publishing message %s" % str(message)
                 self.pub.send(str(message))
             self.__clean__()    
 
-                
-    def check_filemasks(self):
-        """Check that the filemask matches the new file
-        """
-        for filemask in self.filemasks:
-            if fnmatch.fnmatch(self.filename, '*' + filemask + '*'):
-                return True
-        return False
-        
+            
     def create_message(self):
         """Create broadcasted message
         """
-        return Message(self.subject, str(self.filetype), self.info)
+        return Message(self.subject, str(self.msg_type), self.info)
 
 
     def parse_file_info(self, event):
         '''Parse satellite and orbit information from the filename.
+        Message is sent, if a matching filepattern is found.
         '''
-        self.filename = event.name
-        self.filepath = event.path
-        self.fullname = event.pathname
+        # Read configuration file
+        xml_dict = xml_read.get_filepattern_config(fname=self.filepattern_fname)
+        #xml_dict = xml_read.parse_xml(xml_read.get_root('/tmp/foo.xml'))
 
-        if 'MSG' in self.filename:
-            # MSG
-            # H-000-MSG3__-MSG3________-HRV______-000001___-201402130515-__
-            self.filetype = 'HRIT_lvl1.5'
-            self.satellite = 'meteosat'
-            self.instrument = 'seviri'
-            parts = self.filename.split('-')
-            self.satnumber = str(int(parts[2].strip('_')[-1])+7)
-            self.channel = parts[4].strip('_')
-            self.segment = parts[5].strip('_')
-            self.year = int(parts[6][:4])
-            self.month = int(parts[6][4:6])
-            self.day = int(parts[6][6:8])
-            self.hour = int(parts[6][8:10])
-            self.minute = int(parts[6][10:])
-            self.orbit = ''
-            if parts[7].strip('_') == 'C':
-                self.compressed = 1
-            else:
-                self.compressed = 0
+        # Search for a matching file pattern
+        for pattern in xml_dict['pattern']:
+            if pattern['msg_type'] not in self.file_tags:
+                continue
+            if fnmatch.fnmatch(event.name, pattern['file_pattern']):
+                self.msg_type = pattern['msg_type']
+                self.subject = "/" + self.msg_type + "/NewFileArrived/"
+                # Parse info{} dict
+                #self.info = {}
+                self.info['uri'] = event.pathname
+                parts = event.name.split(pattern['split_char'])
+                
+                info = pattern['info']
+                for key in info.keys():
+                    if isinstance(info[key], dict):
+                        part = parts[int(info[key]['part'])]
+                        if info[key].has_key('strip_char'):
+                            part = part.strip(info[key]['strip_char'])
+                        if info[key].has_key('chars'):
+                            part = eval('part['+info[key]['chars']+']')
+                        if info[key].has_key('text_pattern'):
+                            if info[key]['text_pattern'] in part:
+                                part = 1
+                            else:
+                                part = 0
+                        self.info[key] = part
+                    else:
+                        self.info[key] = pattern['info'][key]
+                return
 
-            self.subject =  "/" + self.filetype + '/NewFileArrived/'
-            self.info = {"uri": self.fullname,
-                         "satellite": self.satellite,
-                         "satnumber": self.satnumber,
-                         "instrument": self.instrument,
-                         "orbit": self.orbit,
-                         "year": self.year,
-                         "month": self.month,
-                         "day": self.day,
-                         "hour": self.hour,
-                         "minute": self.minute,
-                         "segment": self.segment,
-                         "channel": self.channel,
-                         "compressed": self.compressed}
-
-        elif 'hrpt' in self.filename and \
-                'noaa' in self.filename and \
-                'l1b' in self.filename:
-            # HRPT NOAA l1b file
-            # hrpt_noaa16_20140210_0824_69021.l1b
-            self.filetype = 'HRPT_l1b'
-            parts = event.name.split('.')[0].split('_')
-            self.satellite = parts[1][:4]
-            self.satnumber = parts[1][4:]
-            self.year = int(parts[2][:4])
-            self.month = int(parts[2][4:6])
-            self.day = int(parts[2][6:])
-            self.hour = int(parts[3][:2])
-            self.minute = int(parts[3][2:])
-            self.instrument = 'avhrr'
-            self.orbit = parts[4]
-
-            self.subject = '/' + self.filetype + '/NewFileArrived/'
-            self.info = {"uri": self.fullname,
-                         "satellite": self.satellite,
-                         "satnumber": self.satnumber,
-                         "instrument": self.instrument,
-                         "orbit": self.orbit,
-                         "year": self.year,
-                         "month": self.month,
-                         "day": self.day,
-                         "hour": self.hour,
-                         "minute": self.minute}
-
+        # No match, so the self.info{} will be empty
 
     
-if __name__ == "__main__":    
+def main():
+    '''Main(). Commandline parsing and stalker startup.
+    '''
+
     logging.basicConfig(level=logging.DEBUG)
     
     parser = argparse.ArgumentParser() 
@@ -217,22 +149,21 @@ if __name__ == "__main__":
                       default=0, type=int, 
                       help="Local port where messages are published")
 
-    parser.add_argument("-m", "--filemask", dest="filemasks",
+    parser.add_argument("-t", "--file-tags", dest="file_tags",
                         type=str,
                         nargs='+',
                         default=[],
                         help="Identifier for monitored files")
 
-    parser.add_argument("-t", "--filetype", dest="filetypes",
-                        type=str,
-                        nargs='+',
-                        default=[],
-                        help="Identifier for monitored files")
+    parser.add_argument("-c", "--configuration_file",
+                        dest="configuration_file",
+                        default="", type=str, 
+                        help="Name of the xml configuration file")
 
-    #parser.add_argument("-c", "--configuration_file",
-    #                    dest="configuration_file",
-    #                    default='noaa15_products.xml', type=str, 
-    #                    help="Name of the xml configuration file")
+    parser.add_argument("-f", "--filepattern_file",
+                        dest="filepattern_file",
+                        default="", type=str, 
+                        help="Name of the xml configuration file")
 
 
     if len(sys.argv) <= 1:
@@ -241,24 +172,49 @@ if __name__ == "__main__":
     else:
         args = parser.parse_args()
 
-    #Event handler observes the operations in defined folder   
-    wm = WatchManager()
-    mask = pyinotify.IN_CLOSE_WRITE #IN_CREATE # monitored events
-    
-    #message_dict = {'publish_port':args.publish_port, 
-    #                'filetypes':args.filetypes, 'subject':'/Joonas/'}
-    
-    event_handler = EventHandler(args.filemasks, args.filetypes,
-                                 publish_port=args.publish_port)
-    notifier = ThreadedNotifier(wm, event_handler)
-    for monitored_dir in args.monitored_dirs:
-        wdd = wm.add_watch(monitored_dir, mask, rec = True)
-    
-        #    notifier.loop(daemonize=True,\
-        #                    pid_file='/tmp/pyinotify.pid',\
-        #                    stdout='/tmp/stdout.txt')
+    # Parse commandline arguments.  If configuration file is given, it
+    # overrides everything else.
+    try:
+        config_fname = args.configuration_file
+        config = xml_read.parse_xml(xml_read.get_root(config_fname))
+        file_tags = config['file_tag']
+        monitored_dirs = config['directory']
+        try:
+            publish_port = int(config['publish_port'])
+        except KeyError:
+            publish_port = 0
+        try:
+            filepattern_fname = config['filepattern_file']
+        except KeyError:
+            filepattern_fname = None
+    except AttributeError:
+        # Check other commandline arguments
+        monitored_dirs = args.monitored_dirs
+        publish_port = args.publish_port
+        file_tags = args.file_tags
+        if args.filepattern_file == '':
+            filepattern_fname = None
+        else:
+            filepattern_fname = args.filepattern_file
 
+
+    #Event handler observes the operations in defined folder   
+    manager = WatchManager()
+    events = [IN_CLOSE_WRITE, IN_CLOSE_NOWRITE] # monitored events
+    
+    event_handler = EventHandler(file_tags,
+                                 publish_port=publish_port,
+                                 filepattern_fname=filepattern_fname)
+    notifier = ThreadedNotifier(manager, event_handler)
+
+    # Add directories and event masks to watch manager
+    for monitored_dir in monitored_dirs:
+        for event in events:
+            manager.add_watch(monitored_dir, event, rec = True)
+    
+    # Start watching for new files
     notifier.start()
+
     try:
         while True:
             time.sleep(6000000)
@@ -267,3 +223,6 @@ if __name__ == "__main__":
     finally:
         event_handler.stop()
         notifier.stop()
+
+if __name__ == "__main__":
+    main()
