@@ -24,6 +24,7 @@
 """
 from setuptools import setup
 import imp
+import os
 
 version = imp.load_source('trollduction.version', 'trollduction/version.py')
 
@@ -41,6 +42,7 @@ setup(name="trollduction",
                    "Topic :: Scientific/Engineering"],
       url="https://github.com/mraspaud/trollduction",
       packages=['trollduction'],
+      data_files=[('etc',[os.path.join('etc', 'filepattern_config.xml')])], 
       zip_safe=False,
       install_requires=[],
       test_suite = 'trollduction.tests.suite',
