@@ -24,6 +24,7 @@
 '''
 
 from lxml import etree
+import os
 
 def get_root(fname):
     '''Read XML file and return the root tree.
@@ -35,16 +36,16 @@ def get_root(fname):
     return root
 
 
-def parse_xml(tree):
+def parse_xml(tree, also_empty=False):
     '''Parse the given XML file to dictionary.
     '''
     xml_dict = {}
 
     # this tags will always be lists, if they are present and non-empty
-    listify = ['area', 'product', 'valid_satellite', 'invalid_satellite']
+    listify = ['area', 'product', 'valid_satellite', 'invalid_satellite', 
+               'pattern', 'file_tag', 'directory']
     children = list(tree)
 
-    
     if len(children) == 0:
         try:
             xml_dict = tree.text.strip()
@@ -53,11 +54,15 @@ def parse_xml(tree):
 
     for child in children:
         if not isinstance(child, etree._Comment):
-            new_val = parse_xml(child)
+            new_val = parse_xml(child, also_empty=also_empty)
             if len(new_val) == 0:
-                continue
+                if also_empty:
+                    xml_dict[child.tag] = ''
+                    continue
+                else:
+                    continue
             if xml_dict.has_key(child.tag):
-                if not type(xml_dict[child.tag]) == list:
+                if not isinstance(xml_dict[child.tag], list):
                     xml_dict[child.tag] = [xml_dict[child.tag]]
                 xml_dict[child.tag].append(new_val)
             else:
@@ -68,3 +73,19 @@ def parse_xml(tree):
                         xml_dict[child.tag] = new_val
 
     return xml_dict
+
+
+def get_filepattern_config(fname=None):
+    '''Retrieves the filepattern configuration file for trollstalker,
+    and returns the parsed XML as a dictionary.  Optional argument
+    *fname* can be used to specify the file.  If *fname* is None, the
+    systemwide file is read.
+    '''
+    
+    if fname is None:
+        fname = os.path.realpath(__file__).split(os.path.sep)[:-2]
+        fname.append('etc')
+        fname.append('filepattern_config.xml')
+        fname = os.path.sep.join(fname)
+
+    return parse_xml(get_root(fname), also_empty=True)
