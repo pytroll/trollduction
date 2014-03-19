@@ -333,8 +333,14 @@ class Trollduction(object):
             # Check if Sun zenith angle limits match this product
             if product.has_key('sunzen_night_minimum') or \
                     product.has_key('sunzen_day_maximum'):
+                if product.has_key('sunzen_lonlat'):
+                    lonlat = \
+                        [float(x) for x in product['sunzen_lonlat'].split(',')]
+                else:
+                    lonlat = None
                 if not self.check_sunzen(product, area_def=\
-                                             get_area_def(area['definition'])):
+                                             get_area_def(area['definition']),
+                                         lonlat=lonlat):
                     # If the return value is False, skip this product
                     continue
 
@@ -457,15 +463,11 @@ class Trollduction(object):
             print 'No area definition or coordinates given.'
             return False
 
-        # This can be later expanded to use the given (lon, lat)
-        # location
-        y_idx = int(area_def.y_size/2)
-        x_idx = int(area_def.x_size/2)
-
         # Check availability of coordinates, load if necessary
         if data.area.lons is None:
             print "Load coordinates for", data_name
             data.area.lons, data.area.lats = data.area.get_lonlats()
+
 
         # Check availability of Sun zenith angles, calculate if necessary
         try:
@@ -475,6 +477,17 @@ class Trollduction(object):
             data.sun_zen = astronomy.sun_zenith_angle(data.time_slot,
                                                       data.area.lons,
                                                       data.area.lats)
+
+        if lonlat is None or len(lonlat) != 2:
+            # Use image center
+            y_idx = int(area_def.y_size/2)
+            x_idx = int(area_def.x_size/2)
+        else:
+            # Find the closest pixel to the given coordinates
+            dists = (data.area.lons - lonlat[0])**2 + \
+                (data.area.lats - lonlat[1])**2
+            y_idx, x_idx = np.where(dists == np.min(dists))
+            y_idx, x_idx = int(y_idx), int(x_idx)
 
         # Check if Sun is too low (day-only products)
         try:
