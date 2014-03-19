@@ -167,7 +167,6 @@ def main():
                         default="", type=str, 
                         help="Name of the xml configuration file")
 
-
     if len(sys.argv) <= 1:
         parser.print_help()
         sys.exit()
