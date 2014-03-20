@@ -459,12 +459,15 @@ class Trollduction(object):
         '''Check if the data is within Sun zenith angle limits.
         *config*: configuration options for this product
         *area_def*: area definition of the data
-        *xy_loc*: pixel location where zenith angle limit is checked
-        *lonlat*: longitude/latitude location where zenith angle limit is 
-                  checked. This is overridden if *xy_loc* is given.
-        If both *xy_loc* and *lonlat* are None, image center is used
-        as reference point.
+        *xy_loc*: pixel location (2-tuple or 2-element list with x-
+                  and y-coordinates) where zenith angle limit is checked
+        *lonlat*: longitude/latitude location (2-tuple or 2-element
+                  list with longitude and latitude) where zenith angle
+                  limit is checked.
         *data_name*: name of the dataset to get data from
+
+        If both *xy_loc* and *lonlat* are None, image center is used
+        as reference point. *xy_loc* overrides *lonlat*.
         '''
 
         try:
@@ -496,16 +499,16 @@ class Trollduction(object):
             # Use the given xy-location
             x_idx, y_idx = xy_loc
         else:
-            if lonlat is None or len(lonlat) != 2:
-                # Use image center
-                y_idx = int(area_def.y_size/2)
-                x_idx = int(area_def.x_size/2)
-            else:
+            if lonlat is not None and len(lonlat) == 2:
                 # Find the closest pixel to the given coordinates
                 dists = (data.area.lons - lonlat[0])**2 + \
                     (data.area.lats - lonlat[1])**2
                 y_idx, x_idx = np.where(dists == np.min(dists))
                 y_idx, x_idx = int(y_idx), int(x_idx)
+            else:
+                # Use image center
+                y_idx = int(area_def.y_size/2)
+                x_idx = int(area_def.x_size/2)
 
         # Check if Sun is too low (day-only products)
         try:
