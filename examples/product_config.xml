@@ -31,16 +31,20 @@
             <filename>%Y%m%d_%H%M_%(satellite)_%(areaname)_%(composite).png</filename>
 	    
             <!-- Sun zenith angle limits -->
-	    <!-- Limits are relative to image center -->
-	    <!-- if both set -> twilight between these limits -->
+	    <!-- If both are set -> images are made only during the
+	         twilight between these limits -->
+	    <!-- If <sunzen_xy_loc> or <sunzen_lonlat> are not given,
+	         limits are checked at image center. -->
 	    <!-- only night time -->
             <sunzen_night_minimum></sunzen_night_minimum>
 	    <!-- only day time -->
             <sunzen_day_maximum></sunzen_day_maximum>
+	    <!-- Check the sun zenith angle at this pixel location (x, y).
+	         Overrides other location choices. -->
+	    <sunzen_xy_loc>831,415</sunzen_xy_loc>
 	    <!-- Use these coordinates (longitude, latitude) to
-	         determine sunzen limits.  Effective only if zenith
-	         angle has been given -->
-	    <sunzen_lonlat>-25,60</sunzen_lonlat>
+	         check sunzen limits. -->
+	    <sunzen_lonlat>25,60</sunzen_lonlat>
 	    <!-- Valid satellites for this product -->
 	    <!-- If any tags present, only those will be used -->
 	    <valid_satellite>noaa18</valid_satellite>

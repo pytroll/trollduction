@@ -288,7 +288,7 @@ class Trollduction(object):
 
     def check_satellite(self, config):
         '''Check if the current configuration allows the use of this
-        satellite
+        satellite.
         '''
 
         # Check the list of valid satellites
@@ -333,14 +333,20 @@ class Trollduction(object):
             # Check if Sun zenith angle limits match this product
             if product.has_key('sunzen_night_minimum') or \
                     product.has_key('sunzen_day_maximum'):
-                if product.has_key('sunzen_lonlat'):
-                    lonlat = \
-                        [float(x) for x in product['sunzen_lonlat'].split(',')]
-                else:
+                if product.has_key('sunzen_xy_loc'):
+                    xy_loc = [int(x) for x in \
+                                  product['sunzen_xy_loc'].split(',')]
                     lonlat = None
+                else:
+                    xy_loc = None
+                    if product.has_key('sunzen_lonlat'):
+                        lonlat = [float(x) for x in \
+                                      product['sunzen_lonlat'].split(',')]
+                    else:
+                        lonlat = None
                 if not self.check_sunzen(product, area_def=\
                                              get_area_def(area['definition']),
-                                         lonlat=lonlat):
+                                         xy_loc=xy_loc, lonlat=lonlat):
                     # If the return value is False, skip this product
                     continue
 
@@ -448,9 +454,17 @@ class Trollduction(object):
         return fname
 
 
-    def check_sunzen(self, config, area_def=None, data_name='local_data', 
-                     lonlat=None):
+    def check_sunzen(self, config, area_def=None, xy_loc=None, lonlat=None,
+                     data_name='local_data'):
         '''Check if the data is within Sun zenith angle limits.
+        *config*: configuration options for this product
+        *area_def*: area definition of the data
+        *xy_loc*: pixel location where zenith angle limit is checked
+        *lonlat*: longitude/latitude location where zenith angle limit is 
+                  checked. This is overridden if *xy_loc* is given.
+        If both *xy_loc* and *lonlat* are None, image center is used
+        as reference point.
+        *data_name*: name of the dataset to get data from
         '''
 
         try:
@@ -459,7 +473,7 @@ class Trollduction(object):
             print "No such data", data_name
             return False
 
-        if area_def is None and lonlat is None:
+        if area_def is None and lonlat is None and xy_loc is None:
             print 'No area definition or coordinates given.'
             return False
 
@@ -478,19 +492,27 @@ class Trollduction(object):
                                                       data.area.lons,
                                                       data.area.lats)
 
-        if lonlat is None or len(lonlat) != 2:
-            # Use image center
-            y_idx = int(area_def.y_size/2)
-            x_idx = int(area_def.x_size/2)
+        if xy_loc is not None and len(xy_loc) == 2:
+            # Use the given xy-location
+            x_idx, y_idx = xy_loc
         else:
-            # Find the closest pixel to the given coordinates
-            dists = (data.area.lons - lonlat[0])**2 + \
-                (data.area.lats - lonlat[1])**2
-            y_idx, x_idx = np.where(dists == np.min(dists))
-            y_idx, x_idx = int(y_idx), int(x_idx)
+            if lonlat is None or len(lonlat) != 2:
+                # Use image center
+                y_idx = int(area_def.y_size/2)
+                x_idx = int(area_def.x_size/2)
+            else:
+                # Find the closest pixel to the given coordinates
+                dists = (data.area.lons - lonlat[0])**2 + \
+                    (data.area.lats - lonlat[1])**2
+                y_idx, x_idx = np.where(dists == np.min(dists))
+                y_idx, x_idx = int(y_idx), int(x_idx)
 
         # Check if Sun is too low (day-only products)
         try:
+            print "Checking Sun zenith-angle limit at (lon, lat) "\
+                "%3.1f, %3.1f (x, y: %d, %d)" % (data.area.lons[y_idx, x_idx],
+                                                data.area.lats[y_idx, x_idx],
+                                                x_idx, y_idx)
             if float(config['sunzen_day_maximum']) < \
                     data.sun_zen[y_idx, x_idx]:
                 print 'Sun too low for day-time product.'
