@@ -31,10 +31,11 @@ import time
 from mpop.projector import get_area_def
 import sys
 import xml_read
-from pprint import pprint
+#from pprint import pprint
 from pyorbital import astronomy
 import numpy as np
 import os
+import logging
 
 class Trollduction(object):
     '''Trollduction class for easy generation chain setup
@@ -69,9 +70,16 @@ class Trollduction(object):
             self.td_config = read_config_file(fname)
         else:
             return
-            
-        print 'Trollduction configuration:'
-        pprint(self.td_config)
+
+        # Set logger
+        self.set_logger()
+        # Set publisher
+        self.set_publisher()
+
+        self.publish_and_log(info='Trollduction configuration read successful')
+
+        #print 'Trollduction configuration:'
+        #pprint(self.td_config)
 
         # Initialize/restart listener
         try:
@@ -81,14 +89,17 @@ class Trollduction(object):
             else:
                 self.listener.restart_listener(self.td_config['listener_tag'])
         except KeyError:
-            # TODO: logging
-            print "Key 'listener_tag' is missing from", fname
+            self.publish_and_log(level='critical', 
+                                 info="Key <listener_tag> is missing from"
+                                 " Trollduction config: %s" % fname)
 
         try:
             self.update_product_config(\
                 fname=self.td_config['product_config_file'])
         except KeyError:
-            print "Key 'product_config_file' is missing from", fname
+            self.publish_and_log(level='critical', 
+                                 info="Key <product_config_file> is missing "
+                                 "from Trollduction config: %s" % fname)
 
 
     def update_product_config(self, fname=None):
@@ -108,15 +119,22 @@ class Trollduction(object):
         if self.td_config['product_config_file'] != fname:
             self.td_config['product_config_file'] = fname
 
-        print 'New product config:'
-        pprint(self.product_config)
+        self.publish_and_log(info='New product config read from %s' % \
+                                 fname)
+        #print 'New product config:'
+        #pprint(self.product_config)
 
 
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
         '''
-        # TODO: more cleanup, close threads, and stuff
-        self.listener.stop()
+        # more cleanup needed?
+        if self.listener is not None:
+            self.listener.stop()
+        if self.publisher is not None:
+            self.publisher.stop()
+        if self.logger is not None:
+            self.stop_logger()
 
 
     def shutdown(self):
@@ -138,21 +156,30 @@ class Trollduction(object):
         while True:
             # wait for new messages
             msg = self.listener.parent_conn.recv()
-            print msg
+            # Set logger. This checks if the day has changed, and
+            # updates the log filename
+            self.set_logger()
+            self.publish_and_log(level='info', info='New message received')
+
             # shutdown trollduction
             if '/StopTrollduction' in msg.subject:
+                self.publish_and_log(info='Shutting down Trollduction on'
+                                     ' request')
                 self.cleanup()
-                # TODO: logging
-                # TODO: message
                 break # this should shutdown Trollduction
             # update trollduction config
             elif '/NewTrollductionConfig' in msg.subject:
+                self.publish_and_log(info='Reading new Trollduction config')
                 self.update_td_config(msg.data)
             # update product lists
             elif '/NewProductConfig' in msg.subject:
+                self.publish_and_log(info='Reading new product config')
                 self.update_product_config(msg.data)
             # process new file
             elif '/NewFileArrived' in msg.subject:
+                self.publish_and_log(info='New data available: %s' % \
+                                         msg.data['uri'])
+
                 time_slot = dt.datetime(int(msg.data['year']),
                                         int(msg.data['month']), 
                                         int(msg.data['day']),
@@ -221,17 +248,23 @@ class Trollduction(object):
                     if area.has_key('netcdf_file'):
                         self.write_netcdf('local_data')
 
-                    print "Data reprojected for area:", area['name']
+                    self.publish_and_log(info='Data reprojected for area: %s' %\
+                                             area['name'])
+                    #print "Data reprojected for area:", area['name']
 
                     # Draw requested images for this area.
                     self.draw_images(area)
-                    print "Single area time elapsed time:", time.time()-t1b, 's'
+
+                    self.publish_and_log(info='Area processed in %.1f s' % \
+                                             (time.time()-t1b))
 
                 # Release memory
                 self.local_data = None
                 self.global_data = None
 
-                print "Full time elapsed time:", time.time()-t1a, 's'
+                self.publish_and_log(info='File %s processd in %.1f s' % \
+                                         (msg.data['uri'], time.time()-t1a))
+                #print "Full time elapsed time:", time.time()-t1a, 's'
             else:
                 # Unhandled message types end up here
                 # No need to log these?
@@ -277,10 +310,16 @@ class Trollduction(object):
             if not required_channels[i] and loaded_channels[i]:
                 to_unload.append(self.global_data.channels[i].name)
 
-        print "Loaded_channels:", loaded_channels
-        print "Required_channels:", required_channels
-        print "Channels to unload:", to_unload
-        print "Channels to load:", to_load
+        self.publish_and_log(level='debug', 
+                             info='Channels to unload: %s' % \
+                                 ', '.join(to_unload))
+        self.publish_and_log(level='debug', 
+                             info='Channels to load: %s' % \
+                                 ', '.join(to_load))
+        #print "Loaded_channels:", loaded_channels
+        #print "Required_channels:", required_channels
+        #print "Channels to unload:", to_unload
+        #print "Channels to load:", to_load
 
         self.global_data.unload(*to_unload)
         self.global_data.load(to_load, extent)
@@ -296,10 +335,18 @@ class Trollduction(object):
             if self.global_data.info['satname'] +\
                     self.global_data.info['satnumber'] not in\
                     config['valid_satellite']:
-                print self.global_data.info['satname'] + \
-                    self.global_data.info['satnumber'], \
-                    "not in list of valid satellites, skipping " +\
-                    config['name']
+
+                info = 'Satellite %s not in list of valid ' \
+                    'satellites, skipping product %s.' % \
+                    (self.global_data.info['satname'] + \
+                         self.global_data.info['satnumber'],
+                     config['name'])
+                self.publish_and_log(info=info)
+
+                #print self.global_data.info['satname'] + \
+                #    self.global_data.info['satnumber'], \
+                #    "not in list of valid satellites, skipping " +\
+                #    config['name']
                 
                 return False
 
@@ -308,10 +355,19 @@ class Trollduction(object):
             if self.global_data.info['satname'] +\
                     self.global_data.info['satnumber'] in\
                     config['invalid_satellite']:
-                print self.global_data.info['satname'] + \
-                    self.global_data.info['satnumber'], \
-                    "is in the list of invalid satellites, " + \
-                    "skipping " + config['name']
+
+                info = 'Satellite %s is in the list of invalid ' \
+                    'satellites, skipping product %s.' % \
+                    (self.global_data.info['satname'] + \
+                         self.global_data.info['satnumber'],
+                     config['name'])
+                self.publish_and_log(info=info)
+
+                #print self.global_data.info['satname'] + \
+                #    self.global_data.info['satnumber'], \
+                #    "is in the list of invalid satellites, " + \
+                #    "skipping " + config['name']
+
                 return False
 
         return True
@@ -358,43 +414,56 @@ class Trollduction(object):
                 func = getattr(self.local_data.image, product['composite'])
                 img = func()            
                 img.save(fname)
-                print "Image", fname, "saved."
 
-                # TODO: log succesful production
-                # TODO: publish message
+                self.publish_and_log(info='Image %s saved.' % fname)
+
+                #print "Image", fname, "saved."
             except AttributeError:
-                # TODO: log incorrect product name
-                print "Incorrect product name:", product['name'], \
-                    "for area", area['name']
+                # Log incorrect product funcion name
+                self.publish_and_log(level='error', 
+                                     info='Incorrect product name: %s ' \
+                                         'for area %s' % \
+                                         (product['name'], area['name']))
+                #print "Incorrect product name:", product['name'], \
+                #    "for area", area['name']
             except KeyError:
-                # TODO: log missing channel
-                print "Missing channel on", product['name'], \
-                    "for area", area['name']
+                # log missing channel
+                self.publish_and_log(level='warning',
+                                     info='Missing channel on product '\
+                                         '%s for area %s' % \
+                                         (product['name'], area['name']))
+                #print "Missing channel on", product['name'], \
+                #    "for area", area['name']
             except:
-                err = sys.exc_info()[0]
-                # TODO: log other errors
-                print "Error", err, "on", product['name'], \
-                    "for area", area['name']
+                err, val = sys.exc_info()[0]
+                # log other errors
+                self.publish_and_log(level='error', 
+                                     info='Error %s on product %s for area %s' \
+                                         % (val.message, 
+                                            product['name'], 
+                                            area['name']))
+                #print "Error", err, "on", product['name'], \
+                #    "for area", area['name']
 
-        # TODO: log completion of this area def
-        # TODO: publish completion of this area def
-
+        # log and publish completion of this area def
+        self.publish_and_log(info='Area %s completed' % area['name'])
 
 
     def write_netcdf(self, data_name='global_data', unload=False):
         '''Write the data as netCDF4.
         '''
 
+        self.publish_and_log(info='Saving data to netCDF4')
         try:
             data = getattr(self, data_name)
         except AttributeError:
-            print "No such data", data_name
+            self.publish_and_log(info='No such data: %s' % data_name)
+            #print "No such data", data_name
             return
 
         # parse filename
         fname = self.parse_filename(fname_key='netcdf_file')
 
-        print "Saving %s." % fname
         # Load all the data
         data.load()
         # Save the data
@@ -403,6 +472,8 @@ class Trollduction(object):
         if unload:
             loaded_channels = [ch.name for ch in data.channels]
             data.unload(*loaded_channels)
+
+        self.publish_and_log(info='Data saved to %s' % fname)
 
 
     def parse_filename(self, area=None, product=None, fname_key='filename'):
@@ -470,27 +541,37 @@ class Trollduction(object):
         as reference point. *xy_loc* overrides *lonlat*.
         '''
 
+        self.publish_and_log(info='Checking Sun zenith angle limits')
         try:
             data = getattr(self, data_name)
         except AttributeError:
-            print "No such data", data_name
+            self.publish_and_log(level='error', 
+                                 info='No such data: %s' % data_name)
+            #print "No such data", data_name
             return False
 
-        if area_def is None and lonlat is None and xy_loc is None:
-            print 'No area definition or coordinates given.'
+        if area_def is None and xy_loc is None:
+            self.publish_and_log(level='error', 
+                                 info='No area definition or pixel location '
+                                 'given')
+            #print 'No area definition or coordinates given.'
             return False
 
         # Check availability of coordinates, load if necessary
         if data.area.lons is None:
-            print "Load coordinates for", data_name
+            self.publish_and_log(level='debug', 
+                                 info='Load coordinates for %s' % data_name)
+            #print "Load coordinates for", data_name
             data.area.lons, data.area.lats = data.area.get_lonlats()
-
 
         # Check availability of Sun zenith angles, calculate if necessary
         try:
             data.__getattribute__('sun_zen')
         except AttributeError:
-            print "Calculate Sun zenith angles for", data_name
+            self.publish_and_log(level='debug', 
+                                 info='Calculating Sun zenith angles for %s' %\
+                                     data_name)
+            #print "Calculate Sun zenith angles for", data_name
             data.sun_zen = astronomy.sun_zenith_angle(data.time_slot,
                                                       data.area.lons,
                                                       data.area.lats)
@@ -512,13 +593,21 @@ class Trollduction(object):
 
         # Check if Sun is too low (day-only products)
         try:
-            print "Checking Sun zenith-angle limit at (lon, lat) "\
-                "%3.1f, %3.1f (x, y: %d, %d)" % (data.area.lons[y_idx, x_idx],
+            self.publish_and_log(level='debug',
+                                 info='Checking Sun zenith-angle limit at ' 
+                                 '(lon, lat) "%3.1f, %3.1f (x, y: %d, %d)' % \
+                                     (data.area.lons[y_idx, x_idx],
                                                 data.area.lats[y_idx, x_idx],
-                                                x_idx, y_idx)
+                                                x_idx, y_idx))
+            #print "Checking Sun zenith-angle limit at (lon, lat) "\
+            #    "%3.1f, %3.1f (x, y: %d, %d)" % (data.area.lons[y_idx, x_idx],
+            #                                    data.area.lats[y_idx, x_idx],
+            #                                    x_idx, y_idx)
+
             if float(config['sunzen_day_maximum']) < \
                     data.sun_zen[y_idx, x_idx]:
-                print 'Sun too low for day-time product.'
+                self.publish_and_log(info='Sun too low for day-time product.')
+                #print 'Sun too low for day-time product.'
                 return False
         except KeyError:
             pass
@@ -527,20 +616,119 @@ class Trollduction(object):
         try:
             if float(config['sunzen_night_minimum']) > \
                     data.sun_zen[y_idx, x_idx]:
-                print 'Sun too high for night-time product.'
+                self.publish_and_log(info='Sun too low for night-time product.')
+                #print 'Sun too high for night-time product.'
                 return False
         except KeyError:
             pass
 
         return True
 
-          
+
+    def set_logger(self):
+        '''Set logging based on the settings in trollduction
+        configuration file.
+        '''
+
+        # Directory where the logs are saved
+        try:
+            directory = self.td_config['log_dir']
+        except KeyError:
+            directory = ''
+        if len(directory) and not os.path.isdir(directory):
+            os.makedirs(directory)
+            #directory = ''
+
+        try:
+            fname = os.path.join(directory, self.td_config['log_filename'])
+            utc_date = dt.datetime.utcnow()
+            fname = utc_date.strftime(fname)
+
+            # Do nothing, if the file already exists
+            if os.path.exists(fname) and self.logger is not None:
+                return
+
+            log_to_file = True
+        except KeyError:
+            log_to_file = False
+
+        if self.logger is not None:
+            # Close and remove old file handlers, if any
+            for handler in self.logger.handlers:
+                handler.close()
+                self.logger.removeHandler(handler)
+
+        # Create a new logger
+        self.logger = logging.getLogger(self.td_config['name'])
+        self.logger.setLevel(logging.DEBUG)
+
+        # Log message format
+        formatter = logging.Formatter('[%(levelname)s: %(asctime)s : '
+                                      '%(name)s] %(message)s')
+
+        if log_to_file:
+            # Create file handler
+            filehandler = logging.FileHandler(fname)
+            # Set logging level
+            try:
+                log_level = getattr(logging, self.td_config['file_log_level'])
+            except KeyError:
+                log_level = logging.INFO
+            filehandler.setLevel(log_level)
+            filehandler.setFormatter(formatter)
+                
+            # Attach file handler
+            self.logger.addHandler(filehandler)
+
+        # Create console logger
+        consolehandler = logging.StreamHandler()
+        # Set logging level
+        try:
+            log_level = getattr(logging, self.td_config['console_log_level'])
+        except KeyError:
+            log_level = logging.INFO
+        consolehandler.setLevel(log_level)
+
+        consolehandler.setFormatter(formatter)
+        self.logger.addHandler(consolehandler)
+
+        # Log the logger startup
+        self.logger.info('Logger loaded')
+        
+        if not log_to_file:
+            # If no log file is saved, give a warning
+            self.logger.warn('Log file is not saved (missing <log_filename>)')
+
+
+    def stop_logger(self):
+        '''Stop logger.
+        '''
+        pass
+
+
+    def set_publisher(self):
+        '''Setup publisher.
+        '''
+        pass
+
+
+    def publish_and_log(self, level='info', info='', msg=True, log=True):
+        '''Publish and/or log the given information text.
+        '''
+        
+        # Log the information
+        if log and self.logger is not None:
+            log = getattr(self.logger, level)
+            log(info)
+
+        # Publish a message using Posttroll
+        if msg and self.publisher is not None:
+            pass
+
+
 def read_config_file(fname=None):
     '''Read config file to dictionary.
     '''
-    
-    # TODO: check validity
-    # TODO: logging
     
     if fname is None:
         return None
