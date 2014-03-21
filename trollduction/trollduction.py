@@ -86,8 +86,10 @@ class Trollduction(object):
             if self.listener is None:
                 self.listener = ListenerContainer(\
                     data_type_list=self.td_config['listener_tag'])
+                self.publish_and_log(info="Listener started")
             else:
                 self.listener.restart_listener(self.td_config['listener_tag'])
+                self.publish_and_log(info="Listener restarted")
         except KeyError:
             self.publish_and_log(level='critical', 
                                  info="Key <listener_tag> is missing from"
