@@ -158,13 +158,11 @@ def main():
                         help="Identifier for monitored files")
 
     parser.add_argument("-c", "--configuration_file",
-                        dest="configuration_file",
-                        default="", type=str, 
+                        type=str, 
                         help="Name of the xml configuration file")
 
     parser.add_argument("-f", "--filepattern_file",
-                        dest="filepattern_file",
-                        default="", type=str, 
+                        type=str, 
                         help="Name of the xml configuration file")
 
     if len(sys.argv) <= 1:
@@ -173,36 +171,40 @@ def main():
     else:
         args = parser.parse_args()
 
-    # Parse commandline arguments.  If configuration file is given, it
-    # overrides everything else.
-    try:
+    # Parse commandline arguments.  If command line args are given, it
+    # overrides the configuration file.
+
+    # Check first commandline arguments
+    monitored_dirs = args.monitored_dirs
+    publish_port = args.publish_port
+    file_tags = args.file_tags
+    if args.filepattern_file == '':
+        filepattern_fname = None
+    else:
+        filepattern_fname = args.filepattern_file
+
+
+
+    if args.configuration_file is not None:
         config_fname = args.configuration_file
         config = xml_read.parse_xml(xml_read.get_root(config_fname))
-        file_tags = config['file_tag']
-        monitored_dirs = config['directory']
+        file_tags = file_tags or config['file_tag']
+        monitored_dirs = monitored_dirs or config['directory']
         try:
-            publish_port = int(config['publish_port'])
+            publish_port = publish_port or int(config['publish_port'])
         except KeyError:
-            publish_port = 0
+            if publish_port is None:
+                publish_port = 0
         try:
-            filepattern_fname = config['filepattern_file']
+            filepattern_fname = filepattern_fname or config['filepattern_file']
         except KeyError:
-            filepattern_fname = None
-    except AttributeError:
-        # Check other commandline arguments
-        monitored_dirs = args.monitored_dirs
-        publish_port = args.publish_port
-        file_tags = args.file_tags
-        if args.filepattern_file == '':
-            filepattern_fname = None
-        else:
-            filepattern_fname = args.filepattern_file
+            pass
 
 
-    #Event handler observes the operations in defined folder   
+    #Event handler observes the operations in defined folder
     manager = WatchManager()
     events = [IN_CLOSE_WRITE, IN_CLOSE_NOWRITE] # monitored events
-    
+
     event_handler = EventHandler(file_tags,
                                  publish_port=publish_port,
                                  filepattern_fname=filepattern_fname)
