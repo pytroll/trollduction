@@ -22,13 +22,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""./trollstalker.py -d /tmp/data/new/ -p 9000 -m EPI -t 'HRIT lvl1.5'
+"""./trollstalker.py -d /tmp/data/new/ -p 9000 -m EPI -t HRPT_l1b  or
+   ./trollstalker.py -c /path/to/trollstalker_config.xml
 """
 
 import argparse
-import logging, logging.handlers
 from pyinotify import WatchManager, ThreadedNotifier, \
-    ProcessEvent, IN_CLOSE_WRITE, IN_CLOSE_NOWRITE
+    ProcessEvent, IN_CLOSE_WRITE, IN_CLOSE_NOWRITE, IN_MOVED_IN
 import fnmatch
 import sys
 import time
@@ -44,7 +44,6 @@ class EventHandler(ProcessEvent):
     def __init__(self, file_tags, publish_port=0, filepattern_fname=None):
         super(EventHandler, self).__init__()
         
-        self.logger = logging.getLogger(__name__)
         self._pub = NoisyPublisher("trollstalker", publish_port, file_tags)
         self.file_tags = file_tags
         self.pub = self._pub.start()
@@ -71,7 +70,6 @@ class EventHandler(ProcessEvent):
     def process_IN_CLOSE(self, event):
         """When a file is closed, publish a message.
         """
-        self.logger.debug("new file created and closed %s" %event.pathname)
         # New file created and closed
         if not event.dir:
             # parse information and create self.info dict{}
@@ -136,8 +134,6 @@ def main():
     '''Main(). Commandline parsing and stalker startup.
     '''
 
-    logging.basicConfig(level=logging.DEBUG)
-    
     parser = argparse.ArgumentParser() 
     
     parser.add_argument("-d", "--monitored_dirs", dest="monitored_dirs",
@@ -204,7 +200,7 @@ def main():
 
     #Event handler observes the operations in defined folder
     manager = WatchManager()
-    events = [IN_CLOSE_WRITE, IN_CLOSE_NOWRITE] # monitored events
+    events = IN_CLOSE_WRITE | IN_CLOSE_NOWRITE | IN_MOVED_IN # monitored events
 
     event_handler = EventHandler(file_tags,
                                  publish_port=publish_port,
@@ -213,8 +209,7 @@ def main():
 
     # Add directories and event masks to watch manager
     for monitored_dir in monitored_dirs:
-        for event in events:
-            manager.add_watch(monitored_dir, event, rec = True)
+        manager.add_watch(monitored_dir, events, rec = True)
     
     # Start watching for new files
     notifier.start()
