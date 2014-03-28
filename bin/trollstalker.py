@@ -143,7 +143,7 @@ def main():
     parser.add_argument("-d", "--monitored_dirs", dest="monitored_dirs",
                         nargs='+',
                         type=str,
-                        default='.',
+                        default=[],
                         help="Names of the monitored directories "\
                             "separated by space")
 
@@ -163,7 +163,7 @@ def main():
 
     parser.add_argument("-f", "--filepattern_file",
                         type=str, 
-                        help="Name of the xml configuration file")
+                        help="Name of the xml filepattern file")
 
     if len(sys.argv) <= 1:
         parser.print_help()
@@ -176,14 +176,16 @@ def main():
 
     # Check first commandline arguments
     monitored_dirs = args.monitored_dirs
+    if monitored_dirs == '':
+        monitored_dirs = None
+
     publish_port = args.publish_port
+
     file_tags = args.file_tags
+
+    filepattern_fname = args.filepattern_file
     if args.filepattern_file == '':
         filepattern_fname = None
-    else:
-        filepattern_fname = args.filepattern_file
-
-
 
     if args.configuration_file is not None:
         config_fname = args.configuration_file
@@ -199,7 +201,6 @@ def main():
             filepattern_fname = filepattern_fname or config['filepattern_file']
         except KeyError:
             pass
-
 
     #Event handler observes the operations in defined folder
     manager = WatchManager()
