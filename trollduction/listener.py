@@ -25,11 +25,8 @@
 
 from posttroll.subscriber import NSSubscriber
 from collections import deque
-import logging
 from multiprocessing import Pipe
 from threading import Thread
-
-LOG = logging.getLogger(__name__)
 
 class ListenerContainer(object):
     '''Container for listener instance
@@ -108,8 +105,6 @@ class Listener(object):
         '''Run listener
         '''
 
-        LOG.debug("Starting Listener")
-
         self.running = True
 
         for msg in self.recv(1):
@@ -118,7 +113,7 @@ class Listener(object):
                     continue
                 else:
                     break
-            LOG.debug("New message received")
+
             if self.pipe is None:
                 self.deque.append(msg)
             else:
