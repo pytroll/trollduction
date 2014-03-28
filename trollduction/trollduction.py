@@ -36,6 +36,7 @@ from pyorbital import astronomy
 import numpy as np
 import os
 from publog import PubLog
+import Queue
 
 class Trollduction(object):
     '''Trollduction class for easy generation chain setup
@@ -130,12 +131,14 @@ class Trollduction(object):
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
         '''
+
+        self.publog.publish_and_log(info='Shutting down Trollduction.')
+
         # more cleanup needed?
         if self.listener is not None:
             self.listener.stop()
         if self.publog is not None:
             self.publog.stop()
-
 
     def shutdown(self):
         '''Shutdown trollduction.
@@ -155,7 +158,14 @@ class Trollduction(object):
 
         while True:
             # wait for new messages
-            msg = self.listener.parent_conn.recv() #heart_rate)
+            try:
+                msg = self.listener.queue.get(True, 5)
+            except KeyboardInterrupt:
+                self.publog.publish_and_log(info='Keyboard interrupt detected')
+                self.cleanup()
+                break
+            except Queue.Empty:
+                continue
 
             # Skip self published messages
             if '/Message' in msg.subject:
