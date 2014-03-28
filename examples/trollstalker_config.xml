@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding='utf-8'?>
+
+<!-- This configuration is used by trollstalker -->
+
+<trollstalker_config>
+    <!-- Required tags -->
+    <!--file_tag>HRIT_lvl1.5</file_tag-->
+    <file_tag>HRPT_l1b</file_tag>
+    <directory>/data/new</directory>
+    <!-- Optional tags.  Empty tags are ignored. -->
+    <publish_port></publish_port>
+    <filepattern_file></filepattern_file>
+</trollstalker_config>
