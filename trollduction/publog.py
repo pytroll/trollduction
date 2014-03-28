@@ -84,6 +84,7 @@ class PubLog(object):
         '''
         self.running = False
         self.hb_thread.join()
+        self.publisher.stop()
 
 class Logger(object):
     '''File and console logger for Trollduction
@@ -193,3 +194,7 @@ class Publisher(object):
         #print message
         self.pub.send(str(message))
 
+    def stop(self):
+        '''Stop Publisher.
+        '''
+        self._pub.stop()
