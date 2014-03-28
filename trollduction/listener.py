@@ -24,26 +24,25 @@
 '''Listener module for Trollduction.'''
 
 from posttroll.subscriber import NSSubscriber
-from collections import deque
-from multiprocessing import Pipe
+from Queue import Queue
 from threading import Thread
+import time
 
 class ListenerContainer(object):
     '''Container for listener instance
     '''
     def __init__(self, data_type_list=None):
         self.listener = None
-        self.parent_conn = None
-        self.child_conn = None
+        self.queue = None
         self.thread = None
 
         if data_type_list is not None:
-            # Create Pipe connection
-            self.parent_conn, self.child_conn = Pipe()
+            # Create queue for the messages
+            self.queue = Queue() #Pipe()
 
             # Create a Listener instance
             self.listener = Listener(data_type_list=data_type_list, 
-                                     pipe=self.child_conn)
+                                     queue=self.queue)
             # Start Listener instance into a new daemonized thread.
             self.thread = Thread(target=self.listener.run)
             self.thread.setDaemon(True)
@@ -63,8 +62,6 @@ class ListenerContainer(object):
         '''Stop listener.'''
         self.listener.stop()
         self.thread.join()
-        self.parent_conn = None
-        self.child_conn = None
         self.thread = None
 
 
@@ -72,12 +69,11 @@ class Listener(object):
     '''PyTroll listener class for reading messages for Trollduction
     '''
 
-    def __init__(self, data_type_list=None, pipe=None):
+    def __init__(self, data_type_list=None, queue=None):
         '''Init Listener object
         '''
         self.data_type_list = data_type_list
-        self.deque = deque()
-        self.pipe = pipe
+        self.queue = queue
         self.subscriber = None
         self.recv = None
         self.create_subscriber()
@@ -95,10 +91,10 @@ class Listener(object):
                 self.recv = self.subscriber.start().recv
 
 
-    def send_to_pipe(self, msg):
-        '''Send message to parent via a Pipe()
+    def add_to_queue(self, msg):
+        '''Add message to queue
         '''
-        self.pipe.send(msg)
+        self.queue.put(msg)
 
 
     def run(self):
@@ -114,18 +110,14 @@ class Listener(object):
                 else:
                     break
 
-            if self.pipe is None:
-                self.deque.append(msg)
-            else:
-                while len(self.deque) > 0:
-                    self.send_to_pipe(self.deque.popleft())
-            self.send_to_pipe(msg)
+            self.add_to_queue(msg)
             
 
     def stop(self):
         '''Stop subscriber and delete the instance
         '''
         self.running = False
+        time.sleep(1)
         self.subscriber.stop()
         self.subscriber = None
 
