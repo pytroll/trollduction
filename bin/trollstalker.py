@@ -28,7 +28,7 @@
 
 import argparse
 from pyinotify import WatchManager, ThreadedNotifier, \
-    ProcessEvent, IN_CLOSE_WRITE, IN_CLOSE_NOWRITE, IN_MOVED_TO
+    ProcessEvent, IN_CLOSE_WRITE
 import fnmatch
 import sys
 import time
@@ -67,9 +67,14 @@ class EventHandler(ProcessEvent):
         self.msg_type = ''
     
 
-    def process_IN_CLOSE(self, event):
+    def process_IN_CLOSE_WRITE(self, event):
         """When a file is closed, publish a message.
         """
+        print "IN_CLOSE_WRITE"
+        self.process(event)
+
+
+    def process(self, event):
         # New file created and closed
         if not event.dir:
             # parse information and create self.info dict{}
@@ -200,7 +205,7 @@ def main():
 
     #Event handler observes the operations in defined folder
     manager = WatchManager()
-    events = IN_CLOSE_WRITE | IN_CLOSE_NOWRITE | IN_MOVED_TO # monitored events
+    events = IN_CLOSE_WRITE # monitored event(s)
 
     event_handler = EventHandler(file_tags,
                                  publish_port=publish_port,
