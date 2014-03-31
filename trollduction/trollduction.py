@@ -76,6 +76,10 @@ class Trollduction(object):
                              self.td_config['file_log_level'],
                              self.td_config['console_log_level'])
 
+        if 'use_local_time' in self.td_config:
+            self.publog.logger.use_local_time()
+        self.publog.logger.check_logger()
+
         self.publog.publish_and_log(info='Trollduction configuration read '
                                     'successful')
 
@@ -282,7 +286,7 @@ class Trollduction(object):
                 self.local_data = None
                 self.global_data = None
 
-                self.publog.publish_and_log(info='File %s processd in '
+                self.publog.publish_and_log(info='File %s processed in '
                                             '%.1f s' % \
                                                 (msg.data['uri'], 
                                                  time.time()-t1a))

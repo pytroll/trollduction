@@ -100,7 +100,13 @@ class Logger(object):
         self.full_fname = None
         self.logger = None
 
-        self.check_logger()
+        self.use_local_time = False
+
+
+    def use_local_time(self):
+        '''Use local time instead of the default UTC time.
+        '''
+        self.local_time = True
 
 
     def check_logger(self):
@@ -142,6 +148,12 @@ class Logger(object):
         # Log message format
         formatter = logging.Formatter('[%(levelname)s: %(asctime)s : '
                                       '%(name)s] %(message)s')
+        if self.use_local_time:
+            # use local time
+            pass
+        else:
+            # Use UTC time
+            formatter.converter = time.gmtime
 
         # Create file handler
         filehandler = logging.FileHandler(self.full_fname)
