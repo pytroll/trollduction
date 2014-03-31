@@ -61,7 +61,7 @@ def parse_xml(tree, also_empty=False):
                     continue
                 else:
                     continue
-            if xml_dict.has_key(child.tag):
+            if child.tag in xml_dict:
                 if not isinstance(xml_dict[child.tag], list):
                     xml_dict[child.tag] = [xml_dict[child.tag]]
                 xml_dict[child.tag].append(new_val)
