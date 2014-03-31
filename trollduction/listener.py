@@ -27,6 +27,9 @@ from posttroll.subscriber import NSSubscriber
 from Queue import Queue
 from threading import Thread
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ListenerContainer(object):
     '''Container for listener instance
@@ -60,10 +63,11 @@ class ListenerContainer(object):
 
     def stop(self):
         '''Stop listener.'''
+        logger.debug("Stopping listener…")
         self.listener.stop()
         self.thread.join()
         self.thread = None
-
+        logger.debug("Listener stopped.")
 
 class Listener(object):
     '''PyTroll listener class for reading messages for Trollduction
@@ -120,7 +124,6 @@ class Listener(object):
         time.sleep(1)
         self.subscriber.stop()
         self.subscriber = None
-
 
     def restart(self):
         '''Restart subscriber
