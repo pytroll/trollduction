@@ -111,16 +111,16 @@ class EventHandler(ProcessEvent):
                 for key in info.keys():
                     if isinstance(info[key], dict):
                         part = parts[int(info[key]['part'])]
-                        if info[key].has_key('strip_char'):
+                        if 'strip_char' in info[key]:
                             part = part.strip(info[key]['strip_char'])
-                        if info[key].has_key('chars'):
+                        if 'chars' in info[key]:
                             part = eval('part['+info[key]['chars']+']')
-                        if info[key].has_key('text_pattern'):
+                        if 'text_pattern' in info[key]:
                             if info[key]['text_pattern'] in part:
                                 part = 1
                             else:
                                 part = 0
-                        if info[key].has_key('add_int'):
+                        if 'add_int' in info[key]:
                             part = str(int(part)+int(info[key]['add_int']))
                         self.info[key] = part
                     else:
