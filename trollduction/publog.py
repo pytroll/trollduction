@@ -100,7 +100,7 @@ class Logger(object):
         self.full_fname = None
         self.logger = None
 
-        self.use_local_time = False
+        self.local_time = False
 
 
     def use_local_time(self):
@@ -148,7 +148,7 @@ class Logger(object):
         # Log message format
         formatter = logging.Formatter('[%(levelname)s: %(asctime)s : '
                                       '%(name)s] %(message)s')
-        if self.use_local_time:
+        if self.local_time:
             # use local time
             pass
         else:
