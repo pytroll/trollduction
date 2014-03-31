@@ -28,7 +28,7 @@
 
 import argparse
 from pyinotify import WatchManager, ThreadedNotifier, \
-    ProcessEvent, IN_CLOSE_WRITE
+    ProcessEvent, IN_CLOSE_WRITE, IN_MOVED_TO
 import fnmatch
 import sys
 import time
@@ -41,7 +41,8 @@ class EventHandler(ProcessEvent):
     """
     Event handler class for inotify.
     """
-    def __init__(self, file_tags, publish_port=0, filepattern_fname=None):
+    def __init__(self, file_tags, publish_port=0, filepattern_fname=None, 
+                 debug=False):
         super(EventHandler, self).__init__()
         
         self._pub = NoisyPublisher("trollstalker", publish_port, file_tags)
@@ -51,7 +52,7 @@ class EventHandler(ProcessEvent):
         self.info = {}
         self.msg_type = ''
         self.filepattern_fname = filepattern_fname
-
+        self.debug = debug
 
     def stop(self):
         '''Stop publisher.
@@ -70,6 +71,16 @@ class EventHandler(ProcessEvent):
     def process_IN_CLOSE_WRITE(self, event):
         """When a file is closed, publish a message.
         """
+        if self.debug:
+            print "trigger: IN_MOVED_TO"
+        self.process(event)
+
+
+    def process_IN_MOVED_TO(self, event):
+        """When a file is closed, publish a message.
+        """
+        if self.debug:
+            print "trigger: IN_MOVED_TO"
         self.process(event)
 
 
@@ -79,8 +90,9 @@ class EventHandler(ProcessEvent):
             # parse information and create self.info dict{}
             self.parse_file_info(event)
             if self.msg_type != '':
-                message = self.create_message()            
-                print "Publishing message %s" % str(message)
+                message = self.create_message()
+                if self.debug:
+                    print "Publishing message %s" % str(message)
                 self.pub.send(str(message))
             self.__clean__()    
 
@@ -106,8 +118,6 @@ class EventHandler(ProcessEvent):
             if fnmatch.fnmatch(event.name, pattern['file_pattern']):
                 self.msg_type = pattern['msg_type']
                 self.subject = "/" + self.msg_type + "/NewFileArrived/"
-                # Parse info{} dict
-                #self.info = {}
                 self.info['uri'] = event.pathname
                 parts = event.name.split(pattern['split_char'])
                 
@@ -164,6 +174,9 @@ def main():
     parser.add_argument("-f", "--filepattern_file",
                         type=str, 
                         help="Name of the xml filepattern file")
+    parser.add_argument("-D", "--debug", default=False, 
+                        dest="debug", action='store_true',
+                        help="Enable debug messages")
 
     if len(sys.argv) <= 1:
         parser.print_help()
@@ -204,11 +217,12 @@ def main():
 
     #Event handler observes the operations in defined folder
     manager = WatchManager()
-    events = IN_CLOSE_WRITE # monitored event(s)
+    events = IN_CLOSE_WRITE | IN_MOVED_TO # monitored event(s)
 
     event_handler = EventHandler(file_tags,
                                  publish_port=publish_port,
-                                 filepattern_fname=filepattern_fname)
+                                 filepattern_fname=filepattern_fname,
+                                 debug=args.debug)
     notifier = ThreadedNotifier(manager, event_handler)
 
     # Add directories and event masks to watch manager
