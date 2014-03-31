@@ -114,7 +114,7 @@ class Trollduction(object):
 
         # add checks, or do we just assume the config to be valid at
         # this point?
-        self.product_config = product_config        
+        self.product_config = product_config
         if self.td_config['product_config_file'] != fname:
             self.td_config['product_config_file'] = fname
 
@@ -131,7 +131,7 @@ class Trollduction(object):
 
         # more cleanup needed?
         self._loop = False
-        
+
         if self.listener is not None:
             self.listener.stop()
 
@@ -186,7 +186,7 @@ class Trollduction(object):
                 logger.info('New data available: %s', msg.data['uri'])
 
                 time_slot = dt.datetime(int(msg.data['year']),
-                                        int(msg.data['month']), 
+                                        int(msg.data['month']),
                                         int(msg.data['day']),
                                         int(msg.data['hour']),
                                         int(msg.data['minute']))
@@ -200,9 +200,9 @@ class Trollduction(object):
                 # Create satellite scene
                 self.global_data = GF.create_scene(\
                     satname=str(msg.data['satellite']),
-                    satnumber=str(msg.data['satnumber']), 
-                    instrument=str(msg.data['instrument']), 
-                    time_slot=time_slot, 
+                    satnumber=str(msg.data['satnumber']),
+                    instrument=str(msg.data['instrument']),
+                    time_slot=time_slot,
                     orbit=str(msg.data['orbit']))
 
                 # Update missing information to global_data.info{}
@@ -241,14 +241,14 @@ class Trollduction(object):
                     # Check which channels are needed. Unload
                     # unnecessary channels and load those that are not
                     # already available.
-                    self.load_unload_channels(area['product'], 
+                    self.load_unload_channels(area['product'],
                                               extent=maximum_area_extent)
 
                     # reproject to local domain
                     self.local_data = \
-                        self.global_data.project(area['definition'], 
+                        self.global_data.project(area['definition'],
                                                  mode='nearest')
-                    
+
                     # Save projected data to netcdf4
                     if 'netcdf_file' in area:
                         self.write_netcdf('local_data')
@@ -266,7 +266,7 @@ class Trollduction(object):
                 self.global_data = None
 
                 logger.info('File %s processed in %.1f s',
-                            msg.data['uri'], 
+                            msg.data['uri'],
                             time.time() - t1a)
                 #print "Full time elapsed time:", time.time()-t1a, 's'
             else:
@@ -347,7 +347,7 @@ class Trollduction(object):
                 #    self.global_data.info['satnumber'], \
                 #    "not in list of valid satellites, skipping " +\
                 #    config['name']
-                
+
                 return False
 
         # Check the list of invalid satellites
@@ -385,7 +385,7 @@ class Trollduction(object):
             if not self.check_satellite(product):
                 # Skip this product, if the return value is True
                 continue
-            
+
             # Check if Sun zenith angle limits match this product
             if 'sunzen_night_minimum' in product or \
                     'sunzen_day_maximum' in product:
@@ -412,7 +412,7 @@ class Trollduction(object):
             try:
                 # Check if this combination is defined
                 func = getattr(self.local_data.image, product['composite'])
-                img = func()            
+                img = func()
                 img.save(fname)
 
                 logger.info('Image %s saved.', fname)
@@ -426,24 +426,22 @@ class Trollduction(object):
                 #    "for area", area['name']
             except KeyError:
                 # log missing channel
-                logger.warning('Missing channel on product '\
-                               '%s for area %s' % \
-                               (product['name'], area['name']))
+                logger.warning('Missing channel on product %s for area %s',
+                               product['name'], area['name'])
                 #print "Missing channel on", product['name'], \
                 #    "for area", area['name']
             except:
                 err, val = sys.exc_info()[0]
                 # log other errors
-                logger.error( 
-                                     'Error %s on product %s for area %s' \
-                                         % (val.message, 
-                                            product['name'], 
-                                            area['name']))
+                logger.error('Error %s on product %s for area %s',
+                             val.message, 
+                             product['name'], 
+                             area['name'])
                 #print "Error", err, "on", product['name'], \
                 #    "for area", area['name']
 
         # log and publish completion of this area def
-        logger.info('Area %s completed' % area['name'])
+        logger.info('Area %s completed', area['name'])
 
 
     def write_netcdf(self, data_name='global_data', unload=False):
@@ -454,7 +452,7 @@ class Trollduction(object):
         try:
             data = getattr(self, data_name)
         except AttributeError:
-            logger.info('No such data: %s' % data_name)
+            logger.info('No such data: %s', data_name)
             #print "No such data", data_name
             return
 
@@ -470,7 +468,7 @@ class Trollduction(object):
             loaded_channels = [ch.name for ch in data.channels]
             data.unload(*loaded_channels)
 
-        logger.info('Data saved to %s' % fname)
+        logger.info('Data saved to %s', fname)
 
 
     def parse_filename(self, area=None, product=None, fname_key='filename'):
@@ -486,7 +484,7 @@ class Trollduction(object):
                 out_dir = area['output_dir']
             except (KeyError, TypeError):
                 out_dir = self.product_config['common']['output_dir']
-            
+
         try:
             fname = product[fname_key]
         except (KeyError, TypeError):
@@ -510,15 +508,15 @@ class Trollduction(object):
             fname = fname.replace('%(areaname)', area['name'])
         if product is not None:
             fname = fname.replace('%(composite)', product['name'])
-        fname = fname.replace('%(satellite)', 
+        fname = fname.replace('%(satellite)',
                               self.global_data.info['satname'] + \
                                   self.global_data.info['satnumber'])
         if self.global_data.info['orbit'] is not None:
             fname = fname.replace('%(orbit)', self.global_data.info['orbit'])
-        fname = fname.replace('%(instrument)', 
+        fname = fname.replace('%(instrument)',
                               self.global_data.info['instrument'])
         fname = fname.replace('%(ending)', 'png')
-        
+
         return fname
 
 
@@ -542,22 +540,18 @@ class Trollduction(object):
         try:
             data = getattr(self, data_name)
         except AttributeError:
-            logger.error( 
-                                 'No such data: %s' % data_name)
+            logger.error('No such data: %s', data_name)
             #print "No such data", data_name
             return False
 
         if area_def is None and xy_loc is None:
-            logger.error( 
-                                 'No area definition or pixel location '
-                                 'given')
+            logger.error('No area definition or pixel location given')
             #print 'No area definition or coordinates given.'
             return False
 
         # Check availability of coordinates, load if necessary
         if data.area.lons is None:
-            logger.debug( 
-                                 'Load coordinates for %s' % data_name)
+            logger.debug('Load coordinates for %s', data_name)
             #print "Load coordinates for", data_name
             data.area.lons, data.area.lats = data.area.get_lonlats()
 
@@ -565,9 +559,7 @@ class Trollduction(object):
         try:
             data.__getattribute__('sun_zen')
         except AttributeError:
-            logger.debug( 
-                                 'Calculating Sun zenith angles for %s' %\
-                                     data_name)
+            logger.debug('Calculating Sun zenith angles for %s', data_name)
             #print "Calculate Sun zenith angles for", data_name
             data.sun_zen = astronomy.sun_zenith_angle(data.time_slot,
                                                       data.area.lons,
@@ -590,12 +582,11 @@ class Trollduction(object):
 
         # Check if Sun is too low (day-only products)
         try:
-            logger.debug(
-                                 'Checking Sun zenith-angle limit at ' 
-                                 '(lon, lat) "%3.1f, %3.1f (x, y: %d, %d)' % \
-                                     (data.area.lons[y_idx, x_idx],
-                                                data.area.lats[y_idx, x_idx],
-                                                x_idx, y_idx))
+            logger.debug('Checking Sun zenith-angle limit at '
+                         '(lon, lat) "%3.1f, %3.1f (x, y: %d, %d)',
+                         data.area.lons[y_idx, x_idx],
+                         data.area.lats[y_idx, x_idx],
+                         x_idx, y_idx)
             #print "Checking Sun zenith-angle limit at (lon, lat) "\
             #    "%3.1f, %3.1f (x, y: %d, %d)" % (data.area.lons[y_idx, x_idx],
             #                                    data.area.lats[y_idx, x_idx],
@@ -627,7 +618,7 @@ class Trollduction(object):
 def read_config_file(fname=None):
     '''Read config file to dictionary.
     '''
-    
+
     if fname is None:
         return None
     else:
@@ -640,7 +631,7 @@ def get_maximum_extent(area_def_names):
     maximum_area_extent = [None, None, None, None]
     for area in area_def_names:
         extent = get_area_def(area)
-        
+
         if maximum_area_extent[0] is None:
             maximum_area_extent = list(extent.area_extent)
         else:
