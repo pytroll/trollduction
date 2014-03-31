@@ -70,7 +70,6 @@ class EventHandler(ProcessEvent):
     def process_IN_CLOSE_WRITE(self, event):
         """When a file is closed, publish a message.
         """
-        print "IN_CLOSE_WRITE"
         self.process(event)
 
 
