@@ -28,7 +28,7 @@
 
 import argparse
 from pyinotify import WatchManager, ThreadedNotifier, \
-    ProcessEvent, IN_CLOSE_WRITE, IN_CLOSE_NOWRITE, IN_MOVED_IN
+    ProcessEvent, IN_CLOSE_WRITE, IN_CLOSE_NOWRITE, IN_MOVED_TO
 import fnmatch
 import sys
 import time
@@ -200,7 +200,7 @@ def main():
 
     #Event handler observes the operations in defined folder
     manager = WatchManager()
-    events = IN_CLOSE_WRITE | IN_CLOSE_NOWRITE | IN_MOVED_IN # monitored events
+    events = IN_CLOSE_WRITE | IN_CLOSE_NOWRITE | IN_MOVED_TO # monitored events
 
     event_handler = EventHandler(file_tags,
                                  publish_port=publish_port,
