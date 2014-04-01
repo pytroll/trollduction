@@ -109,7 +109,7 @@ class EventHandler(ProcessEvent):
         '''
         # Read configuration file
         xml_dict = xml_read.get_filepattern_config(fname=self.filepattern_fname)
-        #xml_dict = xml_read.parse_xml(xml_read.get_root('/tmp/foo.xml'))
+        # xml_dict = xml_read.parse_xml(xml_read.get_root('/tmp/foo.xml'))
 
         # Search for a matching file pattern
         for pattern in xml_dict['pattern']:
@@ -215,7 +215,7 @@ def main():
         except KeyError:
             pass
 
-    #Event handler observes the operations in defined folder
+    # Event handler observes the operations in defined folder
     manager = WatchManager()
     events = IN_CLOSE_WRITE | IN_MOVED_TO # monitored event(s)
 

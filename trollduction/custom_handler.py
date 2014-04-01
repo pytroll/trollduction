@@ -27,7 +27,8 @@ from logging.handlers import TimedRotatingFileHandler
 import re
 import time
 import os
-keys = {"%Y": r"\d{4}",
+
+KEYS = {"%Y": r"\d{4}",
         "%y": r"\d{2}",
         "%m": r"\d{2}",
         "%d": r"\d{2}",
@@ -51,7 +52,7 @@ class PanusTimedRotatingFileHandler(TimedRotatingFileHandler):
         filename = time.strftime(self.template, time_tuple)
 
         self.match = os.path.basename(self.template)
-        for key, val in keys.iteritems():
+        for key, val in KEYS.iteritems():
             self.match = self.match.replace(key, val)
 
         self.match = re.compile(self.match)
@@ -101,9 +102,9 @@ class PanusTimedRotatingFileHandler(TimedRotatingFileHandler):
         new_rollover_at = self.computeRollover(current_time)
         while new_rollover_at <= current_time:
             new_rollover_at = new_rollover_at + self.interval
-        #If DST changes and midnight or weekly rollover, adjust for this.
-        if ((self.when == 'MIDNIGHT' or self.when.startswith('W'))
-            and not self.utc):
+        # If DST changes and midnight or weekly rollover, adjust for this.
+        if ((self.when == 'MIDNIGHT' or self.when.startswith('W')) \
+                and not self.utc):
             dst_at_rollover = time.localtime(new_rollover_at)[-1]
             if now != dst_at_rollover:
                 if not now:  # DST kicks in before next rollover,

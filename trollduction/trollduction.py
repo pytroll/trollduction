@@ -245,7 +245,6 @@ class Trollduction(object):
                         self.write_netcdf('local_data')
 
                     logger.info('Data reprojected for area: %s', area['name'])
-                    #print "Data reprojected for area:", area['name']
 
                     # Draw requested images for this area.
                     self.draw_images(area)
@@ -259,7 +258,6 @@ class Trollduction(object):
                 logger.info('File %s processed in %.1f s',
                             msg.data['uri'],
                             time.time() - t1a)
-                #print "Full time elapsed time:", time.time()-t1a, 's'
             else:
                 # Unhandled message types end up here
                 # No need to log these?
@@ -307,10 +305,6 @@ class Trollduction(object):
 
         logger.debug('Channels to unload: %s', ', '.join(to_unload))
         logger.debug('Channels to load: %s', ', '.join(to_load))
-        #print "Loaded_channels:", loaded_channels
-        #print "Required_channels:", required_channels
-        #print "Channels to unload:", to_unload
-        #print "Channels to load:", to_load
 
         self.global_data.unload(*to_unload)
         self.global_data.load(to_load, extent)
@@ -334,11 +328,6 @@ class Trollduction(object):
                      config['name'])
                 logger.info(info)
 
-                #print self.global_data.info['satname'] + \
-                #    self.global_data.info['satnumber'], \
-                #    "not in list of valid satellites, skipping " +\
-                #    config['name']
-
                 return False
 
         # Check the list of invalid satellites
@@ -353,11 +342,6 @@ class Trollduction(object):
                          self.global_data.info['satnumber'],
                      config['name'])
                 logger.info(info)
-
-                #print self.global_data.info['satname'] + \
-                #    self.global_data.info['satnumber'], \
-                #    "is in the list of invalid satellites, " + \
-                #    "skipping " + config['name']
 
                 return False
 
@@ -408,28 +392,21 @@ class Trollduction(object):
 
                 logger.info('Image %s saved.', fname)
 
-                #print "Image", fname, "saved."
             except AttributeError:
                 # Log incorrect product funcion name
                 logger.error('Incorrect product name: %s for area %s',
                              product['name'], area['name'])
-                #print "Incorrect product name:", product['name'], \
-                #    "for area", area['name']
             except KeyError:
                 # log missing channel
                 logger.warning('Missing channel on product %s for area %s',
                                product['name'], area['name'])
-                #print "Missing channel on", product['name'], \
-                #    "for area", area['name']
             except:
-                err, val = sys.exc_info()[0]
+                _, val = sys.exc_info()[0]
                 # log other errors
                 logger.error('Error %s on product %s for area %s',
                              val.message, 
                              product['name'], 
                              area['name'])
-                #print "Error", err, "on", product['name'], \
-                #    "for area", area['name']
 
         # log and publish completion of this area def
         logger.info('Area %s completed', area['name'])
@@ -444,7 +421,6 @@ class Trollduction(object):
             data = getattr(self, data_name)
         except AttributeError:
             logger.info('No such data: %s', data_name)
-            #print "No such data", data_name
             return
 
         # parse filename
@@ -524,26 +500,28 @@ class Trollduction(object):
         *data_name*: name of the dataset to get data from
 
         If both *xy_loc* and *lonlat* are None, image center is used
-        as reference point. *xy_loc* overrides *lonlat*.
+        as reference point.  *xy_loc* overrides *lonlat*.
         '''
+
+        if xy_loc is None:
+            xy_loc = []
+        if lonlat is None:
+            lonlat = []
 
         logger.info('Checking Sun zenith angle limits')
         try:
             data = getattr(self, data_name)
         except AttributeError:
             logger.error('No such data: %s', data_name)
-            #print "No such data", data_name
             return False
 
-        if area_def is None and xy_loc is None:
+        if area_def is None and len(xy_loc) < 2:
             logger.error('No area definition or pixel location given')
-            #print 'No area definition or coordinates given.'
             return False
 
         # Check availability of coordinates, load if necessary
         if data.area.lons is None:
             logger.debug('Load coordinates for %s', data_name)
-            #print "Load coordinates for", data_name
             data.area.lons, data.area.lats = data.area.get_lonlats()
 
         # Check availability of Sun zenith angles, calculate if necessary
@@ -551,16 +529,15 @@ class Trollduction(object):
             data.__getattribute__('sun_zen')
         except AttributeError:
             logger.debug('Calculating Sun zenith angles for %s', data_name)
-            #print "Calculate Sun zenith angles for", data_name
             data.sun_zen = astronomy.sun_zenith_angle(data.time_slot,
                                                       data.area.lons,
                                                       data.area.lats)
 
-        if xy_loc is not None and len(xy_loc) == 2:
+        if len(xy_loc) == 2:
             # Use the given xy-location
             x_idx, y_idx = xy_loc
         else:
-            if lonlat is not None and len(lonlat) == 2:
+            if len(lonlat) == 2:
                 # Find the closest pixel to the given coordinates
                 dists = (data.area.lons - lonlat[0])**2 + \
                     (data.area.lats - lonlat[1])**2
@@ -578,16 +555,11 @@ class Trollduction(object):
                          data.area.lons[y_idx, x_idx],
                          data.area.lats[y_idx, x_idx],
                          x_idx, y_idx)
-            #print "Checking Sun zenith-angle limit at (lon, lat) "\
-            #    "%3.1f, %3.1f (x, y: %d, %d)" % (data.area.lons[y_idx, x_idx],
-            #                                    data.area.lats[y_idx, x_idx],
-            #                                    x_idx, y_idx)
 
             if float(config['sunzen_day_maximum']) < \
                     data.sun_zen[y_idx, x_idx]:
                 logger.info('Sun too low for day-time '
                                             'product.')
-                #print 'Sun too low for day-time product.'
                 return False
         except KeyError:
             pass
@@ -598,7 +570,6 @@ class Trollduction(object):
                     data.sun_zen[y_idx, x_idx]:
                 logger.info('Sun too low for night-time '
                                             'product.')
-                #print 'Sun too high for night-time product.'
                 return False
         except KeyError:
             pass
