@@ -72,12 +72,10 @@ class PanusTimedRotatingFileHandler(TimedRotatingFileHandler):
             if self.match.match(filename):
                 result.append(os.path.join(dirname, filename))
         result.sort(reverse=True)
-        print result
         if len(result) < self.backupCount:
             result = []
         else:
             result = result[:len(result) - self.backupCount]
-        print result
         return result
 
     def doRollover(self):
