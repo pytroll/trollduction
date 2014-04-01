@@ -23,19 +23,15 @@
 '''
 
 from listener import ListenerContainer
-#from publisher import Publisher
-#from logger import Logger
 from mpop.satellites import GenericFactory as GF
 import datetime as dt
 import time
 from mpop.projector import get_area_def
 import sys
 import xml_read
-#from pprint import pprint
 from pyorbital import astronomy
 import numpy as np
 import os
-#from trollduction.publog import PubLog
 import Queue
 import logging
 import logging.handlers
@@ -77,9 +73,6 @@ class Trollduction(object):
 
         logger.info('Trollduction configuration read successfully.')
 
-        #print 'Trollduction configuration:'
-        #pprint(self.td_config)
-
         # Initialize/restart listener
         try:
             if self.listener is None:
@@ -119,8 +112,6 @@ class Trollduction(object):
             self.td_config['product_config_file'] = fname
 
         logger.info('New product config read from %s', fname)
-        #print 'New product config:'
-        #pprint(self.product_config)
 
 
     def cleanup(self):
