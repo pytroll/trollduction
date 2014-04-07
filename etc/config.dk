@@ -1,0 +1,19 @@
+[l1b2image-processor]
+script=/local_disk/usr/src/trollduction/bin/l2processor.py
+config=/local_disk/usr/src/trollduction/cfg/trollduction_config.xml
+log_config=/local_disk/usr/src/trollduction/etc/logging.cfg
+listener_tag=HRPT_l1b
+publish_port=0
+filepattern_cfg=/local_disk/usr/src/trollduction/etc/filepattern_config.xml
+product_config_file=/local_disk/usr/src/trollduction/cfg/product_config.xml
+
+# [HRPT_l1b-images]
+# origin=file:///tmp/hr/
+# config=/local_disk/usr/src/trollduction/cfg/trollduction_config.xml
+# file_tags=HRPT_l1b
+# publish_port=0
+# filepattern_cfg=/local_disk/usr/src/trollduction/etc/filepattern_config.xml
+# product_file=/local_disk/usr/src/trollduction/cfg/product_config.xml
+
+
+
