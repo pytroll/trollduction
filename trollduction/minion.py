@@ -121,6 +121,7 @@ class CommandReceiver(object):
         self._response_port = None
         self._loop = False
         self.thr = None
+        self._server = None
 
     def start(self):
         """Start the process.
@@ -144,6 +145,11 @@ class CommandReceiver(object):
         logger.debug("restart requested")
         self.stop()
         self.start()
+
+    def poke(self):
+        """Say if we're alive
+        """
+        return self._loop
 
     def reload(self):
         """Reload config

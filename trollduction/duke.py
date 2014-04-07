@@ -110,19 +110,23 @@ class ProcessWatcher(object):
             val.cancel()
 
     def alert(self, pid):
-        logger.critical("%d has stopped !!!!", pid)
+        logger.critical("Didn't get a beat for %d !!!!", pid)
         self.action(pid)
-        
+
 class DungeonKeeper(object):
+    """This is the manager class.
+    """
     def __init__(self, config_file):
         self.config_file = config_file
         self.procs_config = {}
         self.procs = {}
-        self.proc_times = {}
-        self.pids = {}
-        self.watcher = ProcessWatcher(self.respawn)
+        self.pid_url = {}
+        #self.watcher = ProcessWatcher(self.respawn)
+        self.watcher = ProcessWatcher(self.poke)
 
     def respawn(self, pid):
+        """Respawn a process that died.
+        """
         for proc, ppid in self.procs.iteritems():
             if ppid == pid:
                 break
@@ -193,22 +197,34 @@ class DungeonKeeper(object):
             for msg in sub.recv(1):
                 if msg:
                     print msg.data
+                    self.pid_url[msg.data["pid"]] = msg.data["url"]
                     self.watcher.reset_timer(msg.data["pid"])
                     #self.reload_minion(**msg.data)
 
     def stop(self):
         self.watcher.stop()
 
+    def poke(self, pid):
+        resp = self.send_and_recv("poke", self.pid_url[pid])
+        logger.debug("poke %s", resp)
+
     def reload_minion(self, **kwargs):
         """Reload a minion
         """
+        resp = self.send_and_recv("reload", kwargs["url"])
+        logger.debug("reload %s", resp)
+
+    def send_and_recv(self, msg, url):
+        """Connect to url, send *msg*, wait for response and close. Return the
+        response.
+        """
         client = context.socket(zmq.REQ)
-        minion_address = kwargs["url"]
-        print "connection to", minion_address
-        client.connect(minion_address)
-        client.send("reload")
-        print "request sent"
-        print "reload", minion_address, client.recv()
+        client.connect(url)
+        client.send(msg)
+        resp = client.recv()
+        client.close()
+        return resp
+
 
 if __name__ == '__main__':
 
