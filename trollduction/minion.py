@@ -51,6 +51,8 @@ def get_lan_ip(interface=None):
             "eth0",
             "eth1",
             "eth2",
+            "eth3",
+            "eth4",
             "wlan0",
             "wlan1",
             "wifi0",
@@ -66,9 +68,10 @@ def get_lan_ip(interface=None):
             break
         except IOError:
             pass
-    return ip_
-
-
+    try:
+        return ip_
+    except UnboundLocalError:
+        return socket.gethostbyname(socket.gethostname())
 
 from threading import Thread, Event
 from posttroll.publisher import NoisyPublisher, context
