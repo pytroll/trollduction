@@ -25,7 +25,7 @@
 """
 
 
-from trollduction.trollduction import Trollduction
+from trollduction.trollduction import OldTrollduction as Trollduction
 import argparse
 import logging
 import logging.config
@@ -40,10 +40,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    logging.config.fileConfig(args.log_config)
-
     logger = logging.getLogger("trollduction")
-
+    logging.config.fileConfig(args.log_config)
 
     # Create a new Trollduction instance, initialised with the config
     td = Trollduction(args.config_file)
