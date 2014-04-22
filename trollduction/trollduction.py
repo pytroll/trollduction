@@ -1,21 +1,23 @@
 # -*- coding: utf-8 -*-
-
+# 
 # Copyright (c) 2014
-
+# 
 # Author(s):
-
+# 
 #   Panu Lahtinen <panu.lahtinen@fmi.fi>
-
+#   Martin Raspaud <martin.raspaud@smhi.se>
+# 
+# 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-
+# 
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-
+# 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -31,6 +33,8 @@ TODO:
  - allow adding custom options per file for saving (eg format,
    tiles/stripes/tifftags)
  - use config.ini instead of trollduction_config.xml
+ - add area-by-area selection for projection method
+   (crude/nearest/<something new>)
 
 '''
 
@@ -49,14 +53,14 @@ import Queue
 import logging
 import logging.handlers
 from fnmatch import fnmatch
-logger = logging.getLogger(__name__)
 
+LOGGER = logging.getLogger(__name__)
 
-### Config watcher stuff
+# Config watcher stuff
 
 import pyinotify
 
-### Generic event handler
+# Generic event handler
 
 class EventHandler(pyinotify.ProcessEvent):
     """Handle events with a generic *fun* function.
@@ -68,6 +72,8 @@ class EventHandler(pyinotify.ProcessEvent):
         self._fun = fun
 
     def process_file(self, pathname):
+        '''Process event *pathname*
+        '''
         if self._file_to_watch is None:
             self._fun(pathname)
         elif fnmatch(self._file_to_watch, os.path.basename(pathname)):
@@ -103,23 +109,27 @@ class ConfigWatcher(object):
         self.config_file = config_file
         self.watchman = pyinotify.WatchManager()
 
-        logger.debug("Setting up watcher for %s", config_file)
+        LOGGER.debug("Setting up watcher for %s", config_file)
 
-        self.notifier = pyinotify.ThreadedNotifier(self.watchman,
-                                                   EventHandler(reload_config,
-                                                                os.path.basename(config_file)))
+        self.notifier = \
+            pyinotify.ThreadedNotifier(self.watchman,
+                                       EventHandler(reload_config,
+                                                    os.path.basename(config_file
+                                                                     )
+                                                    )
+                                       )
         self.watchman.add_watch(os.path.dirname(config_file), mask)
 
     def start(self):
         """Start the config watcher.
         """
-        logger.info("Start watching %s", self.config_file)
+        LOGGER.info("Start watching %s", self.config_file)
         self.notifier.start()
 
     def stop(self):
         """Stop the config watcher.
         """
-        logger.info("Stop watching %s", self.config_file)
+        LOGGER.info("Stop watching %s", self.config_file)
         self.notifier.stop()
 
 class DataProcessor(object):
@@ -135,7 +145,7 @@ class DataProcessor(object):
     def run(self, product_config, msg):
         """Process the data
         """
-        logger.info('New data available: %s', msg.data['uri'])
+        LOGGER.info('New data available: %s', msg.data['uri'])
 
         self.product_config = product_config
 
@@ -167,22 +177,22 @@ class DataProcessor(object):
 
         # Find maximum extent that is needed for all the
         # products to be made.
-        # This really requires that area definitions can be
-        # used directly
-        #                maximum_area_extent = get_maximum_extent(self.area_def_names)
-        #                maximum_area_extent = get_maximum_extent(['EuropeCanary'])
+        maximum_area_extent = get_maximum_extent_ll(self.product_config['area'])
 
-        # Load full data
-        maximum_area_extent = None
+        LOGGER.debug("Maximum area extent (left, down, right, up): " \
+                         "%3.1f, %2.1f, %3.1f, %2.1f degrees" % \
+                         (maximum_area_extent[0],
+                          maximum_area_extent[1],
+                          maximum_area_extent[2],
+                          maximum_area_extent[3]))
 
         # Save unprojected data to netcdf4
-        self.global_data.load()
         if 'netcdf_file' in self.product_config['common']:
-            unload = False
+            self.global_data.load()
             if maximum_area_extent is not None:
                 unload = True
-            self.writer.write(self.write_netcdf, data_name='global_data', unload=unload)
-            #self.write_netcdf(data_name='global_data', unload=unload)
+            self.writer.write(self.write_netcdf, data_name='global_data', 
+                              unload=unload)
 
         # Make images for each area
         for area in self.product_config['area']:
@@ -194,38 +204,47 @@ class DataProcessor(object):
 
             t1b = time.time()
 
-            # Check which channels are needed. Unload
-            # unnecessary channels and load those that are not
-            # already available.
-            #self.load_unload_channels(area['product'],
-            #                          extent=maximum_area_extent)
+            # Check which channels are needed. Unload unnecessary
+            # channels and load those that are not already available.
+            # If NetCDF4 data is to be saved, use all data, otherwise
+            # unload unnecessary channels.
+            if 'netcdf_file' in area:
+                LOGGER.info('Load all channels for saving.')
+                try:
+                    self.global_data.load(area_extent=maximum_area_extent, 
+                                          extent_in_ll=True)
+                except TypeError:
+                    # load the whole area, if extent_in_ll keywoard
+                    # isn't available in the instrument reader
+                    self.global_data.load()
+            else:
+                self.load_unload_channels(area['product'],
+                                          extent=maximum_area_extent)
 
             # reproject to local domain
-            logger.debug("projecting to " + str(area))
+            LOGGER.debug("projecting to " + area['name'])
             self.local_data = \
                 self.global_data.project(area['definition'],
                                          mode='nearest')
 
             # Save projected data to netcdf4
             if 'netcdf_file' in area:
-                #self.write_netcdf('local_data')
                 self.writer.write(self.write_netcdf, 'local_data')
-            logger.info('Data reprojected for area: %s', area['name'])
-            #print "Data reprojected for area:", area['name']
+            LOGGER.info('Data reprojected for area: %s', area['name'])
 
             # Draw requested images for this area.
             self.draw_images(area)
 
-            logger.info('Area processed in %.1f s', (time.time()-t1b))
+            LOGGER.info('Area processed in %.1f s', (time.time()-t1b))
 
-        logger.info('File %s processed in %.1f s',
+        LOGGER.info('File %s processed in %.1f s',
                     msg.data['uri'],
                     time.time() - t1a)
 
         # Wait for the writer to finish
-        logger.debug("Waiting for the files to be saved")
+        LOGGER.debug("Waiting for the files to be saved")
         self.writer.prod_queue.join()
-        logger.debug("All files saved")
+        LOGGER.debug("All files saved")
 
         # Release memory
         del self.local_data
@@ -273,15 +292,17 @@ class DataProcessor(object):
             if not required_channels[i] and loaded_channels[i]:
                 to_unload.append(self.global_data.channels[i].name)
 
-        logger.debug('Channels to unload: %s', ', '.join(to_unload))
-        logger.debug('Channels to load: %s', ', '.join(to_load))
-        #print "Loaded_channels:", loaded_channels
-        #print "Required_channels:", required_channels
-        #print "Channels to unload:", to_unload
-        #print "Channels to load:", to_load
+        LOGGER.debug('Channels to unload: %s', ', '.join(to_unload))
+        LOGGER.debug('Channels to load: %s', ', '.join(to_load))
 
         self.global_data.unload(*to_unload)
-        self.global_data.load(to_load, extent)
+        try:
+            self.global_data.load(to_load, extent, extent_in_ll=True)
+        except TypeError:
+            # load the whole area, if extent_in_ll keywoard isn't
+            # available in instrument reader
+            self.global_data.load(to_load)
+
 
     def check_satellite(self, config):
         '''Check if the current configuration allows the use of this
@@ -299,12 +320,7 @@ class DataProcessor(object):
                     (self.global_data.info['satname'] + \
                          self.global_data.info['satnumber'],
                      config['name'])
-                logger.info(info)
-
-                #print self.global_data.info['satname'] + \
-                #    self.global_data.info['satnumber'], \
-                #    "not in list of valid satellites, skipping " +\
-                #    config['name']
+                LOGGER.info(info)
 
                 return False
 
@@ -319,12 +335,7 @@ class DataProcessor(object):
                     (self.global_data.info['satname'] + \
                          self.global_data.info['satnumber'],
                      config['name'])
-                logger.info(info)
-
-                #print self.global_data.info['satname'] + \
-                #    self.global_data.info['satnumber'], \
-                #    "is in the list of invalid satellites, " + \
-                #    "skipping " + config['name']
+                LOGGER.info(info)
 
                 return False
 
@@ -371,63 +382,53 @@ class DataProcessor(object):
                 # Check if this combination is defined
                 func = getattr(self.local_data.image, product['composite'])
                 img = func()
-                logger.info('Saving image %s.', fname)
-                #img.save(fname)
+                LOGGER.info('Saving image %s.', fname)
+
                 self.writer.write(img.save, fname)
                 logging.info("sent to queue")
 
-                #print "Image", fname, "saved."
             except AttributeError:
                 # Log incorrect product funcion name
-                logger.error('Incorrect product name: %s for area %s',
+                LOGGER.error('Incorrect product name: %s for area %s',
                              product['name'], area['name'])
-                #print "Incorrect product name:", product['name'], \
-                #    "for area", area['name']
             except KeyError:
                 # log missing channel
-                logger.warning('Missing channel on product %s for area %s',
+                LOGGER.warning('Missing channel on product %s for area %s',
                                product['name'], area['name'])
-                #print "Missing channel on", product['name'], \
-                #    "for area", area['name']
             except:
                 err, val = sys.exc_info()[0]
                 # log other errors
-                logger.error('Error %s on product %s for area %s',
+                LOGGER.error('Error %s on product %s for area %s',
                              val.message,
                              product['name'],
                              area['name'])
-                #print "Error", err, "on", product['name'], \
-                #    "for area", area['name']
 
         # log and publish completion of this area def
-        logger.info('Area %s completed', area['name'])
+        LOGGER.info('Area %s completed', area['name'])
 
 
     def write_netcdf(self, data_name='global_data', unload=False):
         '''Write the data as netCDF4.
         '''
 
-        logger.info('Saving data to netCDF4')
+        LOGGER.info('Saving data to netCDF4')
         try:
             data = getattr(self, data_name)
         except AttributeError:
-            logger.info('No such data: %s', data_name)
-            #print "No such data", data_name
+            LOGGER.info('No such data: %s', data_name)
             return
 
         # parse filename
         fname = self.parse_filename(fname_key='netcdf_file')
 
-        # Load all the data
-        #data.load()
         # Save the data
         data.save(fname, to_format='netcdf4')
 
-        #if unload:
-        #    loaded_channels = [ch.name for ch in data.channels]
-        #    data.unload(*loaded_channels)
+        if unload:
+            loaded_channels = [ch.name for ch in data.channels]
+            data.unload(*loaded_channels)
 
-        logger.info('Data saved to %s', fname)
+        LOGGER.info('Data saved to %s', fname)
 
 
     def parse_filename(self, area=None, product=None, fname_key='filename'):
@@ -495,31 +496,27 @@ class DataProcessor(object):
         as reference point. *xy_loc* overrides *lonlat*.
         '''
 
-        logger.info('Checking Sun zenith angle limits')
+        LOGGER.info('Checking Sun zenith angle limits')
         try:
             data = getattr(self, data_name)
         except AttributeError:
-            logger.error('No such data: %s', data_name)
-            #print "No such data", data_name
+            LOGGER.error('No such data: %s', data_name)
             return False
 
         if area_def is None and xy_loc is None:
-            logger.error('No area definition or pixel location given')
-            #print 'No area definition or coordinates given.'
+            LOGGER.error('No area definition or pixel location given')
             return False
 
         # Check availability of coordinates, load if necessary
         if data.area.lons is None:
-            logger.debug('Load coordinates for %s', data_name)
-            #print "Load coordinates for", data_name
+            LOGGER.debug('Load coordinates for %s', data_name)
             data.area.lons, data.area.lats = data.area.get_lonlats()
 
         # Check availability of Sun zenith angles, calculate if necessary
         try:
             data.__getattribute__('sun_zen')
         except AttributeError:
-            logger.debug('Calculating Sun zenith angles for %s', data_name)
-            #print "Calculate Sun zenith angles for", data_name
+            LOGGER.debug('Calculating Sun zenith angles for %s', data_name)
             data.sun_zen = astronomy.sun_zenith_angle(data.time_slot,
                                                       data.area.lons,
                                                       data.area.lats)
@@ -541,21 +538,15 @@ class DataProcessor(object):
 
         # Check if Sun is too low (day-only products)
         try:
-            logger.debug('Checking Sun zenith-angle limit at '
-                         '(lon, lat) "%3.1f, %3.1f (x, y: %d, %d)',
+            LOGGER.debug('Checking Sun zenith-angle limit at '
+                         '(lon, lat) %3.1f, %3.1f (x, y: %d, %d)',
                          data.area.lons[y_idx, x_idx],
                          data.area.lats[y_idx, x_idx],
                          x_idx, y_idx)
-            #print "Checking Sun zenith-angle limit at (lon, lat) "\
-            #    "%3.1f, %3.1f (x, y: %d, %d)" % (data.area.lons[y_idx, x_idx],
-            #                                    data.area.lats[y_idx, x_idx],
-            #                                    x_idx, y_idx)
 
             if float(config['sunzen_day_maximum']) < \
                     data.sun_zen[y_idx, x_idx]:
-                logger.info('Sun too low for day-time '
-                                            'product.')
-                #print 'Sun too low for day-time product.'
+                LOGGER.info('Sun too low for day-time product.')
                 return False
         except KeyError:
             pass
@@ -564,9 +555,8 @@ class DataProcessor(object):
         try:
             if float(config['sunzen_night_minimum']) > \
                     data.sun_zen[y_idx, x_idx]:
-                logger.info('Sun too low for night-time '
+                LOGGER.info('Sun too low for night-time '
                                             'product.')
-                #print 'Sun too high for night-time product.'
                 return False
         except KeyError:
             pass
@@ -598,10 +588,14 @@ class DataWriter(Thread):
                 self.prod_queue.task_done()
 
     def write(self, fun, *args, **kwargs):
+        '''Write to queue.
+        '''
         self.prod_queue.put((fun, args, kwargs))
 
     def stop(self):
-        logger.info("stopping data writer")
+        '''Stop the data writer.
+        '''
+        LOGGER.info("stopping data writer")
         self._loop = False
 
 from minion import Minion
@@ -611,7 +605,7 @@ class Trollduction(Minion):
     """
 
     def __init__(self, config, managed=True):
-        logger.debug("Minion should be starting now")
+        LOGGER.debug("Minion should be starting now")
         Minion.__init__(self)
 
         self.td_config = None
@@ -630,8 +624,9 @@ class Trollduction(Minion):
         try:
             self.update_td_config_from_file(config)
             if not managed:
-                self.config_watcher = ConfigWatcher(config,
-                                                    self.update_td_config_from_file)
+                self.config_watcher = \
+                    ConfigWatcher(config,
+                                  self.update_td_config_from_file)
                 self.config_watcher.start()
 
         except AttributeError:
@@ -639,37 +634,39 @@ class Trollduction(Minion):
             self.update_td_config()
         Minion.start(self)
 
-    #def start(self):
-        #Minion.start(self)
-        #self.thr = Thread(target=self.run_single).start()
+    # def start(self):
+        # Minion.start(self)
+        # self.thr = Thread(target=self.run_single).start()
 
     def update_td_config_from_file(self, fname):
+        '''Read Trollduction config file and use the new parameters.
+        '''
         self.td_config = read_config_file(fname)
-        self.update_td_config(self)
+        self.update_td_config()
 
     def update_td_config(self):
-        '''Update Trollduction configuration from the given file.
+        '''Setup Trollduction with the loaded configuration.
         '''
 
-        logger.info('Trollduction configuration read successfully.')
+        LOGGER.info('Trollduction configuration read successfully.')
 
         # Initialize/restart listener
         try:
             if self.listener is None:
                 self.listener = ListenerContainer(\
                     data_type_list=self.td_config['listener_tag'])
-                logger.info("Listener started")
+                LOGGER.info("Listener started")
             else:
                 self.listener.restart_listener(self.td_config['listener_tag'])
-                logger.info("Listener restarted")
+                LOGGER.info("Listener restarted")
         except KeyError:
-            logger.critical("Key <listener_tag> is missing from"
+            LOGGER.critical("Key <listener_tag> is missing from"
                             " Trollduction config")
 
         try:
             self.update_product_config(self.td_config['product_config_file'])
         except KeyError:
-            logger.critical("Key <product_config_file> is missing "
+            LOGGER.critical("Key <product_config_file> is missing "
                             "from Trollduction config")
 
     def update_product_config(self, fname):
@@ -686,12 +683,12 @@ class Trollduction(Minion):
         if self.td_config['product_config_file'] != fname:
             self.td_config['product_config_file'] = fname
 
-        logger.info('New product config read from %s', fname)
+        LOGGER.info('New product config read from %s', fname)
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
         '''
 
-        logger.info('Shutting down Trollduction.')
+        LOGGER.info('Shutting down Trollduction.')
 
         # more cleanup needed?
         self._loop = False
@@ -722,7 +719,7 @@ class Trollduction(Minion):
             try:
                 msg = self.listener.queue.get(True, 5)
             except KeyboardInterrupt:
-                logger.info('Keyboard interrupt detected')
+                LOGGER.info('Keyboard interrupt detected')
                 self.stop()
                 raise
             except Queue.Empty:
@@ -731,7 +728,8 @@ class Trollduction(Minion):
             # this should be
             # if msg.type == "file":
             if '/NewFileArrived' in msg.subject:
-                self.update_product_config(self.td_config['product_config_file'])
+                self.update_product_config(\
+                    self.td_config['product_config_file'])
                 self.data_processor.run(self.product_config, msg)
 
 
@@ -754,8 +752,6 @@ class OldTrollduction(object):
 
         self._loop = True
 
-#        self.publog = None
-
         # read everything from the Trollduction config file
         if td_config_file is not None:
             self.update_td_config(td_config_file)
@@ -770,26 +766,26 @@ class OldTrollduction(object):
         else:
             return
 
-        logger.info('Trollduction configuration read successfully.')
+        LOGGER.info('Trollduction configuration read successfully.')
 
         # Initialize/restart listener
         try:
             if self.listener is None:
                 self.listener = ListenerContainer(\
                     data_type_list=self.td_config['listener_tag'])
-                logger.info("Listener started")
+                LOGGER.info("Listener started")
             else:
                 self.listener.restart_listener(self.td_config['listener_tag'])
-                logger.info("Listener restarted")
+                LOGGER.info("Listener restarted")
         except KeyError:
-            logger.critical("Key <listener_tag> is missing from"
+            LOGGER.critical("Key <listener_tag> is missing from"
                             " Trollduction config: %s", fname)
 
         try:
             self.update_product_config(\
                 fname=self.td_config['product_config_file'])
         except KeyError:
-            logger.critical("Key <product_config_file> is missing "
+            LOGGER.critical("Key <product_config_file> is missing "
                             "from Trollduction config: %s", fname)
 
 
@@ -810,14 +806,14 @@ class OldTrollduction(object):
         if self.td_config['product_config_file'] != fname:
             self.td_config['product_config_file'] = fname
 
-        logger.info('New product config read from %s', fname)
+        LOGGER.info('New product config read from %s', fname)
 
 
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
         '''
 
-        logger.info('Shutting down Trollduction.')
+        LOGGER.info('Shutting down Trollduction.')
 
         # more cleanup needed?
         self._loop = False
@@ -846,7 +842,7 @@ class OldTrollduction(object):
             try:
                 msg = self.listener.queue.get(True, 5)
             except KeyboardInterrupt:
-                logger.info('Keyboard interrupt detected')
+                LOGGER.info('Keyboard interrupt detected')
                 self.cleanup()
                 raise
             except Queue.Empty:
@@ -856,24 +852,24 @@ class OldTrollduction(object):
             if '/Message' in msg.subject:
                 continue
 
-            logger.info('New message received ' + str(msg))
+            LOGGER.info('New message received ' + str(msg))
 
             # shutdown trollduction
             if '/StopTrollduction' in msg.subject:
-                logger.info('Shutting down Trollduction on request')
+                LOGGER.info('Shutting down Trollduction on request')
                 self.cleanup()
                 break # this should shutdown Trollduction
             # update trollduction config
             elif '/NewTrollductionConfig' in msg.subject:
-                logger.info('Reading new Trollduction config')
+                LOGGER.info('Reading new Trollduction config')
                 self.update_td_config(msg.data)
             # update product lists
             elif '/NewProductConfig' in msg.subject:
-                logger.info('Reading new product config')
+                LOGGER.info('Reading new product config')
                 self.update_product_config(msg.data)
             # process new file
             elif '/NewFileArrived' in msg.subject:
-                logger.info('New data available: %s', msg.data['uri'])
+                LOGGER.info('New data available: %s', msg.data['uri'])
 
                 time_slot = dt.datetime(int(msg.data['year']),
                                         int(msg.data['month']),
@@ -903,17 +899,20 @@ class OldTrollduction(object):
 
                 # Find maximum extent that is needed for all the
                 # products to be made.
-                # This really requires that area definitions can be
-                # used directly
-#                maximum_area_extent = get_maximum_extent(self.area_def_names)
-#                maximum_area_extent = get_maximum_extent(['EuropeCanary'])
 
-                # Load full data
-                maximum_area_extent = None
+                maximum_area_extent = \
+                    get_maximum_extent_ll(self.product_config['area'])
+
+                LOGGER.debug("Maximum area extent (left, down, right, up): " \
+                                 "%3.1f, %2.1f, %3.1f, %2.1f degrees" % \
+                                 (maximum_area_extent[0],
+                                  maximum_area_extent[1],
+                                  maximum_area_extent[2],
+                                  maximum_area_extent[3]))
 
                 # Save unprojected data to netcdf4
                 if 'netcdf_file' in self.product_config['common']:
-                    unload = False
+                    self.global_data.load()
                     if maximum_area_extent is not None:
                         unload = True
                     self.write_netcdf(data_name='global_data', unload=unload)
@@ -930,35 +929,49 @@ class OldTrollduction(object):
 
                     # Check which channels are needed. Unload
                     # unnecessary channels and load those that are not
-                    # already available.
-                    self.load_unload_channels(area['product'],
-                                              extent=maximum_area_extent)
+                    # already available.  If NetCDF4 data is to be
+                    # saved, use all data, otherwise unload
+                    # unnecessary channels.
+                    if 'netcdf_file' in area:
+                        LOGGER.info('Load all channels for saving.')
+                        try:
+                            self.global_data.load(area_extent=\
+                                                      maximum_area_extent, 
+                                                  extent_in_ll=True)
+                        except TypeError:
+                            # load all data if extent_in_ll isn't
+                            # available in instrument reader
+                            self.global_data.load()
+
+                    else:
+                        LOGGER.info('Loading required channels.')
+                        self.load_unload_channels(area['product'],
+                                                  extent=maximum_area_extent)
 
                     # reproject to local domain
+                    LOGGER.info('Reprojecting data for area: %s' % area['name'])
                     self.local_data = \
                         self.global_data.project(area['definition'],
                                                  mode='nearest')
 
                     # Save projected data to netcdf4
                     if 'netcdf_file' in area:
-                        self.write_netcdf('local_data')
+                        self.write_netcdf('local_data', area=area)
 
-                    logger.info('Data reprojected for area: %s', area['name'])
-                    #print "Data reprojected for area:", area['name']
+                    LOGGER.info('Data reprojected for area: %s', area['name'])
 
                     # Draw requested images for this area.
                     self.draw_images(area)
 
-                    logger.info('Area processed in %.1f s', (time.time()-t1b))
+                    LOGGER.info('Area processed in %.1f s', (time.time()-t1b))
 
                 # Release memory
                 self.local_data = None
                 self.global_data = None
 
-                logger.info('File %s processed in %.1f s',
+                LOGGER.info('File %s processed in %.1f s',
                             msg.data['uri'],
                             time.time() - t1a)
-                #print "Full time elapsed time:", time.time()-t1a, 's'
             else:
                 # Unhandled message types end up here
                 # No need to log these?
@@ -1004,15 +1017,17 @@ class OldTrollduction(object):
             if not required_channels[i] and loaded_channels[i]:
                 to_unload.append(self.global_data.channels[i].name)
 
-        logger.debug('Channels to unload: %s', ', '.join(to_unload))
-        logger.debug('Channels to load: %s', ', '.join(to_load))
-        #print "Loaded_channels:", loaded_channels
-        #print "Required_channels:", required_channels
-        #print "Channels to unload:", to_unload
-        #print "Channels to load:", to_load
+        LOGGER.debug('Channels to unload: %s', ', '.join(to_unload))
+        LOGGER.debug('Channels to load: %s', ', '.join(to_load))
 
         self.global_data.unload(*to_unload)
-        self.global_data.load(to_load, extent)
+        try:
+            self.global_data.load(to_load, area_extent=extent, 
+                                  extent_in_ll=True)
+        except TypeError:
+            # load whole area if extent_in_ll keywoard isn't available
+            # in the instrument reader
+            self.global_data.load(to_load)
 
 
     def check_satellite(self, config):
@@ -1031,12 +1046,7 @@ class OldTrollduction(object):
                     (self.global_data.info['satname'] + \
                          self.global_data.info['satnumber'],
                      config['name'])
-                logger.info(info)
-
-                #print self.global_data.info['satname'] + \
-                #    self.global_data.info['satnumber'], \
-                #    "not in list of valid satellites, skipping " +\
-                #    config['name']
+                LOGGER.info(info)
 
                 return False
 
@@ -1051,12 +1061,7 @@ class OldTrollduction(object):
                     (self.global_data.info['satname'] + \
                          self.global_data.info['satnumber'],
                      config['name'])
-                logger.info(info)
-
-                #print self.global_data.info['satname'] + \
-                #    self.global_data.info['satnumber'], \
-                #    "is in the list of invalid satellites, " + \
-                #    "skipping " + config['name']
+                LOGGER.info(info)
 
                 return False
 
@@ -1105,49 +1110,42 @@ class OldTrollduction(object):
                 img = func()
                 img.save(fname)
 
-                logger.info('Image %s saved.', fname)
+                LOGGER.info('Image %s saved.', fname)
 
-                #print "Image", fname, "saved."
             except AttributeError:
                 # Log incorrect product funcion name
-                logger.error('Incorrect product name: %s for area %s',
+                LOGGER.error('Incorrect product name: %s for area %s',
                              product['name'], area['name'])
-                #print "Incorrect product name:", product['name'], \
-                #    "for area", area['name']
             except KeyError:
                 # log missing channel
-                logger.warning('Missing channel on product %s for area %s',
+                LOGGER.warning('Missing channel on product %s for area %s',
                                product['name'], area['name'])
-                #print "Missing channel on", product['name'], \
-                #    "for area", area['name']
             except:
                 err, val = sys.exc_info()[0]
                 # log other errors
-                logger.error('Error %s on product %s for area %s',
+                LOGGER.error('Error %s on product %s for area %s',
                              val.message,
                              product['name'],
                              area['name'])
-                #print "Error", err, "on", product['name'], \
-                #    "for area", area['name']
 
         # log and publish completion of this area def
-        logger.info('Area %s completed', area['name'])
+        LOGGER.info('Area %s completed', area['name'])
 
 
-    def write_netcdf(self, data_name='global_data', unload=False):
+    def write_netcdf(self, data_name='global_data', area=None, unload=False):
         '''Write the data as netCDF4.
         '''
 
-        logger.info('Saving data to netCDF4')
+        LOGGER.info('Saving data to netCDF4')
         try:
             data = getattr(self, data_name)
         except AttributeError:
-            logger.info('No such data: %s', data_name)
-            #print "No such data", data_name
+            LOGGER.info('No such data: %s', data_name)
             return
 
         # parse filename
-        fname = self.parse_filename(fname_key='netcdf_file')
+        fname = self.parse_filename(area=area, fname_key='netcdf_file')
+        LOGGER.info('netCDF4 filename is %s' % fname)
 
         # Load all the data
         data.load()
@@ -1158,7 +1156,7 @@ class OldTrollduction(object):
             loaded_channels = [ch.name for ch in data.channels]
             data.unload(*loaded_channels)
 
-        logger.info('Data saved to %s', fname)
+        LOGGER.info('Data saved to %s', fname)
 
 
     def parse_filename(self, area=None, product=None, fname_key='filename'):
@@ -1226,31 +1224,27 @@ class OldTrollduction(object):
         as reference point. *xy_loc* overrides *lonlat*.
         '''
 
-        logger.info('Checking Sun zenith angle limits')
+        LOGGER.info('Checking Sun zenith angle limits')
         try:
             data = getattr(self, data_name)
         except AttributeError:
-            logger.error('No such data: %s', data_name)
-            #print "No such data", data_name
+            LOGGER.error('No such data: %s', data_name)
             return False
 
         if area_def is None and xy_loc is None:
-            logger.error('No area definition or pixel location given')
-            #print 'No area definition or coordinates given.'
+            LOGGER.error('No area definition or pixel location given')
             return False
 
         # Check availability of coordinates, load if necessary
         if data.area.lons is None:
-            logger.debug('Load coordinates for %s', data_name)
-            #print "Load coordinates for", data_name
+            LOGGER.debug('Load coordinates for %s', data_name)
             data.area.lons, data.area.lats = data.area.get_lonlats()
 
         # Check availability of Sun zenith angles, calculate if necessary
         try:
             data.__getattribute__('sun_zen')
         except AttributeError:
-            logger.debug('Calculating Sun zenith angles for %s', data_name)
-            #print "Calculate Sun zenith angles for", data_name
+            LOGGER.debug('Calculating Sun zenith angles for %s', data_name)
             data.sun_zen = astronomy.sun_zenith_angle(data.time_slot,
                                                       data.area.lons,
                                                       data.area.lats)
@@ -1272,21 +1266,16 @@ class OldTrollduction(object):
 
         # Check if Sun is too low (day-only products)
         try:
-            logger.debug('Checking Sun zenith-angle limit at '
-                         '(lon, lat) "%3.1f, %3.1f (x, y: %d, %d)',
+            LOGGER.debug('Checking Sun zenith-angle limit at '
+                         '(lon, lat) %3.1f, %3.1f (x, y: %d, %d)',
                          data.area.lons[y_idx, x_idx],
                          data.area.lats[y_idx, x_idx],
                          x_idx, y_idx)
-            #print "Checking Sun zenith-angle limit at (lon, lat) "\
-            #    "%3.1f, %3.1f (x, y: %d, %d)" % (data.area.lons[y_idx, x_idx],
-            #                                    data.area.lats[y_idx, x_idx],
-            #                                    x_idx, y_idx)
 
             if float(config['sunzen_day_maximum']) < \
                     data.sun_zen[y_idx, x_idx]:
-                logger.info('Sun too low for day-time '
+                LOGGER.info('Sun too low for day-time '
                                             'product.')
-                #print 'Sun too low for day-time product.'
                 return False
         except KeyError:
             pass
@@ -1295,9 +1284,8 @@ class OldTrollduction(object):
         try:
             if float(config['sunzen_night_minimum']) > \
                     data.sun_zen[y_idx, x_idx]:
-                logger.info('Sun too low for night-time '
+                LOGGER.info('Sun too low for night-time '
                                             'product.')
-                #print 'Sun too high for night-time product.'
                 return False
         except KeyError:
             pass
@@ -1332,6 +1320,52 @@ def get_maximum_extent(area_def_names):
                 maximum_area_extent[2] = extent.area_extent[2]
             if maximum_area_extent[3] < extent.area_extent[3]:
                 maximum_area_extent[3] = extent.area_extent[3]
+
+    return maximum_area_extent
+
+
+def get_maximum_extent_ll(area_def_names):
+    '''Get maximum extend needed to produce all the defined areas
+    given in *area_def_names*.
+    '''
+    maximum_area_extent = [None, None, None, None]
+
+    for area in area_def_names:
+        area_def = get_area_def(area['definition'])
+
+        # Find the extreme longitude and latitude values within the area
+        # definition
+
+        # upper boundary
+        lonlat = np.array([area_def.get_lonlat(0, i) \
+                           for i in range(area_def.x_size)])
+        up_lat = np.max(lonlat[:, 1])
+        # lower boundary
+        lonlat = np.array([area_def.get_lonlat(area_def.y_size-1, i) \
+                               for i in range(area_def.x_size)])
+        down_lat = np.min(lonlat[:, 1])
+        
+        # left boundary
+        lonlat = np.array([area_def.get_lonlat(i, 0) \
+                               for i in range(area_def.y_size)])
+        left_lon = np.min(lonlat[:, 0])
+        
+        # right boundary
+        lonlat = np.array([area_def.get_lonlat(i, area_def.x_size-1) \
+                               for i in range(area_def.y_size)])
+        right_lon = np.max(lonlat[:, 0])
+
+        if maximum_area_extent[0] is None:
+            maximum_area_extent = [left_lon, down_lat, right_lon, up_lat]
+        else:
+            if maximum_area_extent[0] > left_lon:
+                maximum_area_extent[0] = left_lon
+            if maximum_area_extent[1] > down_lat:
+                maximum_area_extent[1] = down_lat
+            if maximum_area_extent[2] < right_lon:
+                maximum_area_extent[2] = right_lon
+            if maximum_area_extent[3] < up_lat:
+                maximum_area_extent[3] = up_lat
 
     return maximum_area_extent
 
