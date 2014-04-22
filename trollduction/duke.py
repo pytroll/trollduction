@@ -30,7 +30,7 @@ import zmq
 import logging
 import logging.config
 from ConfigParser import ConfigParser
-from subprocess import Popen, PIPE
+from subprocess import Popen
 import argparse
 import os
 import sys
@@ -121,7 +121,7 @@ class DungeonKeeper(object):
         self.procs_config = {}
         self.procs = {}
         self.pid_url = {}
-        #self.watcher = ProcessWatcher(self.respawn)
+        # self.watcher = ProcessWatcher(self.respawn)
         self.watcher = ProcessWatcher(self.poke)
 
     def respawn(self, pid):
@@ -142,8 +142,8 @@ class DungeonKeeper(object):
             if key in self.procs_config:
                 identical = True
                 for key_item, val_item in config[key].iteritems():
-                    if ((key_item not in self.procs_config[key]) or
-                        (self.procs_config[key][key_item] != val_item)):
+                    if ((key_item not in self.procs_config[key]) or \
+                            (self.procs_config[key][key_item] != val_item)):
                         identical = False
                         break
                 # checking from deletion of options in proc
@@ -199,7 +199,7 @@ class DungeonKeeper(object):
                     print msg.data
                     self.pid_url[msg.data["pid"]] = msg.data["url"]
                     self.watcher.reset_timer(msg.data["pid"])
-                    #self.reload_minion(**msg.data)
+                    # self.reload_minion(**msg.data)
 
     def stop(self):
         self.watcher.stop()

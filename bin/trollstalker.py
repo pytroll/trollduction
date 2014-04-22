@@ -30,7 +30,6 @@ import argparse
 from pyinotify import WatchManager, ThreadedNotifier, \
     ProcessEvent, IN_CLOSE_WRITE, IN_MOVED_TO
 import fnmatch
-import sys
 import time
 
 from posttroll.publisher import NoisyPublisher
@@ -38,7 +37,7 @@ from posttroll.message import Message
 from trollduction import xml_read
 import logging
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("trollstalker")
 
 class EventHandler(ProcessEvent):
     """
@@ -55,6 +54,7 @@ class EventHandler(ProcessEvent):
         self.info = {}
         self.msg_type = ''
         self.filepattern_fname = filepattern_fname
+        self.debug = debug
 
     def stop(self):
         '''Stop publisher.
@@ -73,25 +73,26 @@ class EventHandler(ProcessEvent):
     def process_IN_CLOSE_WRITE(self, event):
         """When a file is closed, publish a message.
         """
-        logger.debug("trigger: IN_MOVED_TO")
+        LOGGER.debug("trigger: IN_MOVED_TO")
         self.process(event)
 
 
     def process_IN_MOVED_TO(self, event):
         """When a file is closed, publish a message.
         """
-        logger.debug("trigger: IN_MOVED_TO")
+        LOGGER.debug("trigger: IN_MOVED_TO")
         self.process(event)
 
 
     def process(self, event):
+        '''Process new file'''
         # New file created and closed
         if not event.dir:
             # parse information and create self.info dict{}
             self.parse_file_info(event)
             if self.msg_type != '':
                 message = self.create_message()
-                logger.debug("Publishing message %s", str(message))
+                LOGGER.debug("Publishing message %s", str(message))
                 self.pub.send(str(message))
             self.__clean__()
 
@@ -143,12 +144,16 @@ class EventHandler(ProcessEvent):
         # No match, so the self.info{} will be empty
 
 class NewThreadedNotifier(ThreadedNotifier):
+    '''Threaded notifier class
+    '''
     def stop(self, *args, **kwargs):
         self._default_proc_fun.stop()
         ThreadedNotifier.stop(self, *args, **kwargs)
 
-def create_notifier(file_tags, publish_port, filepattern_fname, *monitored_dirs):
-    #Event handler observes the operations in defined folder
+def create_notifier(file_tags, publish_port, filepattern_fname, 
+                    *monitored_dirs):
+    '''Create new notifier'''
+    # Event handler observes the operations in defined folder
     manager = WatchManager()
     events = IN_CLOSE_WRITE | IN_MOVED_TO # monitored event(s)
 
@@ -163,11 +168,9 @@ def create_notifier(file_tags, publish_port, filepattern_fname, *monitored_dirs)
 
     return notifier
 
-#def main():
-if __name__ == '__main__':
-    
-    '''Main(). Commandline parsing and stalker startup.
-    '''
+
+def main():    
+    '''Main(). Commandline parsing and stalker startup.'''
 
     parser = argparse.ArgumentParser()
 
@@ -207,20 +210,20 @@ if __name__ == '__main__':
         loglevel = logging.INFO
 
 
-    logger = logging.getLogger("")
-    logger.setLevel(loglevel)
+    # LOGGER = logging.getLogger("")
+    LOGGER.setLevel(loglevel)
 
-    ch = logging.StreamHandler()
-    ch.setLevel(loglevel)
+    strhndl = logging.StreamHandler()
+    strhndl.setLevel(loglevel)
     log_format = "[%(asctime)s %(levelname)-8s] %(name)s: %(message)s"
     formatter = logging.Formatter(log_format)
 
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+    strhndl.setFormatter(formatter)
+    LOGGER.addHandler(strhndl)
 
-    logger = logging.getLogger("trollstalker")
-    logger.setLevel(loglevel)
-    logger.debug("started logger")
+    # LOGGER = logging.getLogger("trollstalker")
+    LOGGER.setLevel(loglevel)
+    LOGGER.debug("started logger")
 
     # Parse commandline arguments.  If command line args are given, it
     # overrides the configuration file.
@@ -263,9 +266,9 @@ if __name__ == '__main__':
         while True:
             time.sleep(6000000)
     except KeyboardInterrupt:
-        logger.info("Interupting TrollStalker")
+        LOGGER.info("Interupting TrollStalker")
     finally:
         notifier.stop()
 
-#if __name__ == "__main__":
-#    main()
+if __name__ == "__main__":
+    main()

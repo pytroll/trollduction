@@ -6,6 +6,7 @@
 # Author(s):
 
 #   Martin Raspaud <martin.raspaud@smhi.se>
+#   Panu Lahtinen <panu.lahtinen@fmi.fi>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -171,7 +172,7 @@ class CommandReceiver(object):
             try:
                 getattr(self, request)()
             except Exception as e:
-                self.server.send("failed: " + str(e))
+                self._server.send("failed: " + str(e))
             else:
                 self._server.send("done")
 
@@ -197,10 +198,6 @@ class Minion(CommandReceiver):
         """
         self._heart.stop()
         CommandReceiver.stop(self)
-
-
-
-
 
 
 if __name__ == '__main__':
