@@ -142,8 +142,8 @@ class DungeonKeeper(object):
             if key in self.procs_config:
                 identical = True
                 for key_item, val_item in config[key].iteritems():
-                    if ((key_item not in self.procs_config[key]) or \
-                            (self.procs_config[key][key_item] != val_item)):
+                    if(key_item not in self.procs_config[key] or \
+                           (self.procs_config[key][key_item] != val_item)):
                         identical = False
                         break
                 # checking from deletion of options in proc
