@@ -36,7 +36,7 @@ import os
 import Queue
 import logging
 import logging.handlers
-import helper_functions
+from helper_functions import read_config_file
 
 LOGGER = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class OldTrollduction(object):
         '''
 
         if fname is not None:
-            self.td_config = helper_functions.read_config_file(fname)
+            self.td_config = read_config_file(fname)
         else:
             return
 
@@ -101,7 +101,7 @@ class OldTrollduction(object):
         '''
 
         if fname is not None:
-            product_config = helper_functions.read_config_file(fname)
+            product_config = read_config_file(fname)
         else:
             product_config = None
 
@@ -202,26 +202,16 @@ class OldTrollduction(object):
                 self.global_data.info['instrument'] = msg.data['instrument']
                 self.global_data.info['orbit'] = msg.data['orbit']
 
-                # Find maximum extent that is needed for all the
-                # products to be made.
-
-                maximum_area_extent = \
-                    helper_functions.get_maximum_extent_ll( \
-                    self.product_config['area'])
-
-                LOGGER.debug("Maximum area extent (left, down, right, up): " \
-                                 "%3.1f, %2.1f, %3.1f, %2.1f degrees" % \
-                                 (maximum_area_extent[0],
-                                  maximum_area_extent[1],
-                                  maximum_area_extent[2],
-                                  maximum_area_extent[3]))
+                area_def_names = self.get_area_def_names()
+                if 'disable_data_reduce' in self.td_config:
+                    if self.td_config['disable_data_reduce'].lower() in \
+                            ['true', 'yes', '1']:
+                        area_def_names = None
 
                 # Save unprojected data to netcdf4
                 if 'netcdf_file' in self.product_config['common']:
                     self.global_data.load()
-                    if maximum_area_extent is not None:
-                        unload = True
-                    self.write_netcdf(data_name='global_data', unload=unload)
+                    self.write_netcdf(data_name='global_data', unload=True)
 
                 # Make images for each area
                 for area in self.product_config['area']:
@@ -241,26 +231,27 @@ class OldTrollduction(object):
                     if 'netcdf_file' in area:
                         LOGGER.info('Load all channels for saving.')
                         try:
-                            self.global_data.load(area_extent=\
-                                                      maximum_area_extent, 
-                                                  extent_in_ll=True)
+                            self.global_data.load(area_def_names=\
+                                                      area_def_names)
                         except TypeError:
-                            # load all data if extent_in_ll isn't
-                            # available in instrument reader
+                            # load all data if area_def_names keyword
+                            # isn't available in instrument reader
                             self.global_data.load()
-
                     else:
                         LOGGER.info('Loading required channels.')
                         self.load_unload_channels(area['product'],
-                                                  extent=maximum_area_extent,
-                                                  area_definition_name=\
-                                                      area['definition'])
+                                                  area_def_names=\
+                                                      area_def_names)
 
                     # reproject to local domain
                     LOGGER.info('Reprojecting data for area: %s' % area['name'])
-                    self.local_data = \
-                        self.global_data.project(area['definition'],
-                                                 mode='nearest')
+                    try:
+                        self.local_data = \
+                            self.global_data.project(area['definition'],
+                                                     mode='nearest')
+                    except ValueError:
+                        LOGGER.warning("No data in this area")
+                        continue
 
                     # Save projected data to netcdf4
                     if 'netcdf_file' in area:
@@ -286,13 +277,11 @@ class OldTrollduction(object):
                 pass
 
 
-    def load_unload_channels(self, products, extent=None, 
-                             area_definition_name=None):
-        '''Load channels for *extent* that are required for the given
-        list of *products*. Unload channels that are unnecessary.
+    def load_unload_channels(self, products, area_def_names=None):
+        '''Load channel data required for the given list of *products*
+        for the given area definition name(s) *area_def_names*.
+        Unload channels that are not needed.
         '''
-
-        # Rewritten using global_data.channels[].is_loaded()
 
         loaded_channels = []
         required_channels = []
@@ -330,87 +319,15 @@ class OldTrollduction(object):
         LOGGER.debug('Channels to load: %s', ', '.join(to_load))
 
         self.global_data.unload(*to_unload)
+        
         try:
-            if self.global_data.orbit is not None:
-                raise TypeError
-            self.global_data.load(to_load, area_extent=extent, 
-                                  extent_in_ll=True)
+            self.global_data.load(to_load, area_def_names=area_def_names)
         except TypeError:
-            LOGGER.info('Loading swath data')
-            # load whole area if extent_in_ll keywoard isn't available
+            LOGGER.info('Loading full data')
+            # load whole area if area_def_names keywoard isn't available
             # in the instrument reader
             self.global_data.load(to_load)
 
-            # Remove un-needed data
-            if area_definition_name:
-                area_def = get_area_def(area_definition_name)
-                boundary_lons, boundary_lats = \
-                    helper_functions.get_area_boundaries(area_def)
-                lons, lats, resolution = None, None, None
-                global_coordinates = False
-                coordinate_data_reduced = False
-                idxs = None
-
-                for chan in self.global_data.loaded_channels():
-                    # if resolution is not known, or it changes,
-                    # reload the coordinates
-                    if chan.resolution != resolution:
-                        resolution = chan.resolution
-                        idxs = None # re-calculate indices
-                        try:
-                            lons, lats = chan.area.get_lonlats()
-                        except AttributeError:
-                            lons, lats = self.global_data.area.get_lonlats()
-                            global_coordinates = True
-
-                    if idxs is None:
-                        idxs = \
-                            helper_functions.get_indices_from_boundaries(\
-                            boundary_lons,
-                            boundary_lats,
-                            lons,
-                            lats,
-                            resolution)
-
-                    if not np.all(idxs):
-                        LOGGER.debug('Reducing data size for channel %s' % \
-                                         chan.name)
-                        # slice the channel data to smaller size
-                        self.global_data[chan.name].data = \
-                            self.global_data[chan.name].data[idxs]
-
-                        # coordinates are per channel
-                        if not global_coordinates:
-                            self.global_data[chan.name].area.lons = \
-                                self.global_data[chan.name].area.lons[idxs]
-                            self.global_data[chan.name].area.lats = \
-                                self.global_data[chan.name].area.lats[idxs]
-                            self.global_data[chan.name].area.shape = \
-                                self.global_data[chan.name].area.lons.shape
-                            val = 1
-                            for i in self.global_data[chan.name].area.shape:
-                                val *= i
-                            self.global_data[chan.name].area.size = val
-
-                        # one set of coordinates for all channel data
-                        if global_coordinates and not coordinate_data_reduced:
-                            self.global_data.area.lons = \
-                                self.global_data.area.lons[idxs]
-                            self.global_data.area.lats = \
-                                self.global_data.area.lats[idxs]
-                            self.global_data.area.shape = \
-                                self.global_data.area.lons.shape
-                            val = 1
-                            size_before = self.global_data.area.size
-                            for i in self.global_data.area.shape:
-                                val *= i
-                            self.global_data.area.size = val
-                            size_after = self.global_data.area.size
-                            LOGGER.debug("Data reduced by %.1f %%" % \
-                                             (100*(1-float(size_after)/ \
-                                                       size_before)))
-                            coordinate_data_reduced = True
-                        
 
     def check_satellite(self, config):
         '''Check if the current configuration allows the use of this
@@ -503,7 +420,7 @@ class OldTrollduction(object):
                 LOGGER.warning('Missing channel on product %s for area %s',
                                product['name'], area['name'])
             except:
-                err, val = sys.exc_info()[0]
+                _, val = sys.exc_info()[0]
                 # log other errors
                 LOGGER.error('Error %s on product %s for area %s',
                              val.message,
@@ -674,3 +591,14 @@ class OldTrollduction(object):
 
         return True
 
+
+    def get_area_def_names(self):
+        '''Collect and return area definition names from product
+        config to a list.
+        '''
+
+        def_names = [area['definition'] for area in self.product_config['area']]
+
+        return def_names
+
+    
