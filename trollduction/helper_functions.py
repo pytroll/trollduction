@@ -78,7 +78,38 @@ def get_maximum_extent_ll(area_def_names):
             np.min(lons.side4), \
             np.min(lats.side3), \
             np.max(lons.side2), \
-            np.max(lats.side1)
+            np.max(lats.side1)        
+
+        if maximum_area_extent[0] is None:
+            maximum_area_extent = [left_lon, down_lat, right_lon, up_lat]
+        else:
+            if maximum_area_extent[0] > left_lon:
+                maximum_area_extent[0] = left_lon
+            if maximum_area_extent[1] > down_lat:
+                maximum_area_extent[1] = down_lat
+            if maximum_area_extent[2] < right_lon:
+                maximum_area_extent[2] = right_lon
+            if maximum_area_extent[3] < up_lat:
+                maximum_area_extent[3] = up_lat
+
+    return maximum_area_extent
+
+
+def get_maximum_ll_borders(area_def_names):
+    '''Get maximum extend needed to produce all the defined areas
+    given in *area_def_names*.
+    '''
+    maximum_area_extent = [None, None, None, None]
+
+    for area in area_def_names:
+        area_def = get_area_def(area['definition'])
+
+        lons, lats = get_area_boundaries(area_def)
+        left_lon, down_lat, right_lon, up_lat = \
+            np.min(lons.side4), \
+            np.min(lats.side3), \
+            np.max(lons.side2), \
+            np.max(lats.side1)        
 
         if maximum_area_extent[0] is None:
             maximum_area_extent = [left_lon, down_lat, right_lon, up_lat]
