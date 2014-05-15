@@ -203,12 +203,8 @@ class OldTrollduction(object):
                 self.global_data.info['orbit'] = msg.data['orbit']
 
                 area_def_names = self.get_area_def_names()
-                if 'disable_data_reduce' in self.td_config:
-                    if self.td_config['disable_data_reduce'].lower() in \
-                            ['true', 'yes', '1']:
-                        area_def_names = None
 
-                # Save unprojected data to netcdf4
+                # Save full unprojected data to netcdf4
                 if 'netcdf_file' in self.product_config['common']:
                     self.global_data.load()
                     self.write_netcdf(data_name='global_data', unload=True)
@@ -231,11 +227,15 @@ class OldTrollduction(object):
                     if 'netcdf_file' in area:
                         LOGGER.info('Load all channels for saving.')
                         try:
+                            if msg.data['orbit'] is not None:
+                                raise TypeError
                             self.global_data.load(area_def_names=\
                                                       area_def_names)
                         except TypeError:
                             # load all data if area_def_names keyword
-                            # isn't available in instrument reader
+                            # isn't available in instrument reader or
+                            # the data is swath based
+                            LOGGER.info('Loading full swath data')
                             self.global_data.load()
                     else:
                         LOGGER.info('Loading required channels.')
