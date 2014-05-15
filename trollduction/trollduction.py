@@ -177,25 +177,13 @@ class DataProcessor(object):
         self.global_data.info['instrument'] = msg.data['instrument']
         self.global_data.info['orbit'] = msg.data['orbit']
 
-        # Find maximum extent that is needed for all the
-        # products to be made.
-        maximum_area_extent = \
-            helper_functions.get_maximum_extent_ll(self.product_config['area'])
+        area_def_names = self.get_area_def_names()
 
-        LOGGER.debug("Maximum area extent (left, down, right, up): " \
-                         "%3.1f, %2.1f, %3.1f, %2.1f degrees" % \
-                         (maximum_area_extent[0],
-                          maximum_area_extent[1],
-                          maximum_area_extent[2],
-                          maximum_area_extent[3]))
-
-        # Save unprojected data to netcdf4
+        # Save full unprojected data to netcdf4
         if 'netcdf_file' in self.product_config['common']:
             self.global_data.load()
-            if maximum_area_extent is not None:
-                unload = True
-            self.writer.write(self.write_netcdf, data_name='global_data', 
-                              unload=unload)
+            self.writer.write(self.write_netcdf, data_name='global_data',
+                              unload=True)
 
         # Make images for each area
         for area in self.product_config['area']:
@@ -214,21 +202,29 @@ class DataProcessor(object):
             if 'netcdf_file' in area:
                 LOGGER.info('Load all channels for saving.')
                 try:
-                    self.global_data.load(area_extent=maximum_area_extent, 
-                                          extent_in_ll=True)
+                    if msg.data['orbit'] is not None:
+                        raise TypeError
+                    self.global_data.load(area_def_names=area_def_names)
                 except TypeError:
-                    # load the whole area, if extent_in_ll keywoard
-                    # isn't available in the instrument reader
+                    # load all data if area_def_names keyword isn't
+                    # available in instrument reader or the data is
+                    # swath based
+                    LOGGER.info('Loading full swath data')
                     self.global_data.load()
             else:
+                LOGGER.info('Loading required channels.')
                 self.load_unload_channels(area['product'],
-                                          extent=maximum_area_extent)
+                                          area_def_names=area_def_names)
 
             # reproject to local domain
-            LOGGER.debug("projecting to " + area['name'])
-            self.local_data = \
-                self.global_data.project(area['definition'],
-                                         mode='nearest')
+            LOGGER.debug("Projecting data to area " + area['name'])
+            try:
+                self.local_data = \
+                    self.global_data.project(area['definition'],
+                                             mode='nearest')
+            except ValueError:
+                LOGGER.warning("No data in this area")
+                continue
 
             # Save projected data to netcdf4
             if 'netcdf_file' in area:
@@ -240,14 +236,13 @@ class DataProcessor(object):
 
             LOGGER.info('Area processed in %.1f s', (time.time()-t1b))
 
-        LOGGER.info('File %s processed in %.1f s',
-                    msg.data['uri'],
-                    time.time() - t1a)
-
         # Wait for the writer to finish
         LOGGER.debug("Waiting for the files to be saved")
         self.writer.prod_queue.join()
         LOGGER.debug("All files saved")
+
+        LOGGER.info('File %s processed in %.1f s', msg.data['uri'],
+                    time.time() - t1a)
 
         # Release memory
         del self.local_data
@@ -256,12 +251,11 @@ class DataProcessor(object):
         self.global_data = None
 
 
-    def load_unload_channels(self, products, extent=None):
-        '''Load channels for *extent* that are required for the given
-        list of *products*. Unload channels that are unnecessary.
+    def load_unload_channels(self, products, area_def_names=None):
+        '''Load channel data required for the given list of *products*
+        for the given area definition name(s) *area_def_names*.
+        Unload channels that are not needed.
         '''
-
-        # Rewritten using global_data.channels[].is_loaded()
 
         loaded_channels = []
         required_channels = []
@@ -299,13 +293,24 @@ class DataProcessor(object):
         LOGGER.debug('Channels to load: %s', ', '.join(to_load))
 
         self.global_data.unload(*to_unload)
+
         try:
-            self.global_data.load(to_load, extent, extent_in_ll=True)
+            self.global_data.load(to_load, area_def_names=area_def_names)
         except TypeError:
-            # load the whole area, if extent_in_ll keywoard isn't
-            # available in instrument reader
+            LOGGER.info("Loading full data")
+            # load whole area if area_def_names keywoard isn't
+            # available in the instrument reader
             self.global_data.load(to_load)
-            
+
+
+    def get_area_def_names(self):
+        '''Collect and return area definition names from product
+        config to a list.
+        '''
+
+        def_names = [area['definition'] for area in self.product_config['area']]
+
+        return def_names
 
     def check_satellite(self, config):
         '''Check if the current configuration allows the use of this
@@ -399,7 +404,7 @@ class DataProcessor(object):
                 LOGGER.warning('Missing channel on product %s for area %s',
                                product['name'], area['name'])
             except:
-                err, val = sys.exc_info()[0]
+                _, val = sys.exc_info()[0]
                 # log other errors
                 LOGGER.error('Error %s on product %s for area %s',
                              val.message,
