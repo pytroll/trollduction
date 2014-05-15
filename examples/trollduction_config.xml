@@ -20,9 +20,4 @@
     -->
     <file_log_level>INFO</file_log_level>
     <console_log_level>DEBUG</console_log_level>
-    <!-- It is possible to disable data reduction. For small data
-         sets, eg. AVHRR, reduction takes more time than using the
-         whole data. Data reduction is disable by using
-         (case-insensitive) keywords "yes", "true" or "0" -->
-    <disable_data_reduce>yes</disable_data_reduce>
 </trollduction_config>
