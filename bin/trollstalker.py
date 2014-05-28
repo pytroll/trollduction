@@ -22,45 +22,72 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""./trollstalker.py -d /tmp/data/new/ -p 9000 -m EPI -t HRPT_l1b  or
-   ./trollstalker.py -c /path/to/trollstalker_config.xml
+"""./trollstalker.py -c ../examples/trollstalker_config.cfg -C msg_hrit
 """
 
 import argparse
-from pyinotify import WatchManager, ThreadedNotifier, \
-    ProcessEvent, IN_CLOSE_WRITE, IN_MOVED_TO
+from pyinotify import WatchManager, ThreadedNotifier, ProcessEvent
+import pyinotify
 import fnmatch
 import time
+import subprocess
+from threading import Thread
+import Queue
+import os
 
-from posttroll.publisher import NoisyPublisher
-from posttroll.message import Message
-from trollduction import xml_read
+try:
+    from posttroll.publisher import NoisyPublisher
+    from posttroll.message import Message
+    from trollduction import xml_read
+    USE_MESSAGING = True
+except ImportError:
+    USE_MESSAGING = False
+
 import logging
+from ConfigParser import ConfigParser
 
 LOGGER = logging.getLogger("trollstalker")
+
 
 class EventHandler(ProcessEvent):
     """
     Event handler class for inotify.
+    *file_tags* - tags for published messages
+    *publish_port* - port number to publish the messages on
+    *filepattern_fname* - file containing the information how to parse messages
+    *command* - system command or script to run for each matching file
+    *pattern* - file pattern to which files are compared. If a match,
+                run the associated command
     """
     def __init__(self, file_tags, publish_port=0, filepattern_fname=None,
-                 debug=False):
+                 command=None, pattern=None):
         super(EventHandler, self).__init__()
 
-        self._pub = NoisyPublisher("trollstalker", publish_port, file_tags)
         self.file_tags = file_tags
-        self.pub = self._pub.start()
-        self.subject = ''
-        self.info = {}
-        self.msg_type = ''
-        self.filepattern_fname = filepattern_fname
-        self.debug = debug
+        if USE_MESSAGING:
+            self._pub = NoisyPublisher("trollstalker", publish_port, file_tags)
+            self.pub = self._pub.start()
+            self.subject = ''
+            self.info = {}
+            self.msg_type = ''
+            self.filepattern_fname = filepattern_fname
+        self.command = command
+        if self.command is not None:
+            self.file_queue = Queue.Queue()
+            self.command_thread = Thread(target=self.run_command)
+            self.command_thread.setDaemon(True)
+            self.command_thread.start()
+        self.pattern = pattern
 
     def stop(self):
-        '''Stop publisher.
+        '''Stop publisher, close the file queue and join the command thread.
         '''
-        self._pub.stop()
-
+        self.file_queue.put(None)
+        if USE_MESSAGING:
+            self._pub.stop()
+        if self.command is not None:
+            self.file_queue.join()
+            self.command_thread.join()
 
     def __clean__(self):
         '''Clean instance attributes.
@@ -71,30 +98,89 @@ class EventHandler(ProcessEvent):
 
 
     def process_IN_CLOSE_WRITE(self, event):
-        """When a file is closed, publish a message.
+        """When a file is closed, process the associated event.
         """
         LOGGER.debug("trigger: IN_MOVED_TO")
+        self.process(event)
+
+
+    def process_IN_CLOSE_NOWRITE(self, event):
+        """When a nonwritable file is closed, process the associated event.
+        """
+        LOGGER.debug("trigger: IN_CREATE")
         self.process(event)
 
 
     def process_IN_MOVED_TO(self, event):
-        """When a file is closed, publish a message.
+        """When a file is closed, process the associated event.
         """
         LOGGER.debug("trigger: IN_MOVED_TO")
         self.process(event)
 
 
+    def process_IN_CREATE(self, event):
+        """When a file is created, process the associated event.
+        """
+        LOGGER.debug("trigger: IN_CREATE")
+        self.process(event)
+
+
+    def process_IN_CLOSE_MODIFY(self, event):
+        """When a file is modified and closed, process the associated event.
+        """
+        LOGGER.debug("trigger: IN_CREATE")
+        self.process(event)
+
+
     def process(self, event):
-        '''Process new file'''
-        # New file created and closed
+        '''Process the event'''
+
         if not event.dir:
-            # parse information and create self.info dict{}
-            self.parse_file_info(event)
-            if self.msg_type != '':
-                message = self.create_message()
-                LOGGER.debug("Publishing message %s", str(message))
-                self.pub.send(str(message))
-            self.__clean__()
+            if USE_MESSAGING:
+                # parse information and create self.info dict{}
+                self.parse_file_info(event)
+                if self.msg_type != '':
+                    message = self.create_message()
+                    LOGGER.debug("Publishing message %s", str(message))
+                    self.pub.send(str(message))
+                self.__clean__()
+            if self.command:
+                # Add file path to queue
+                self.file_queue.put(event.pathname)
+
+
+    def run_command(self):
+        '''Run external command'''
+
+        while True:
+            try:
+                filename = self.file_queue.get(timeout=1)
+            except Queue.Empty:
+                continue
+
+            if filename is None:
+                self.file_queue.task_done()
+                break
+
+            if self.pattern is not None:
+                if not fnmatch.fnmatch(os.path.basename(filename),
+                                       self.pattern):
+                    self.file_queue.task_done()
+                    continue
+            proc = subprocess.Popen([self.command, filename],
+                                    shell=False,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+            (stdout, stderr) = proc.communicate()
+            proc.wait()
+
+            if proc.returncode > 0:
+                LOGGER.critical('Command returned failure')
+                LOGGER.critical(stderr)
+            else:
+                LOGGER.info('Command succeeded')
+                LOGGER.info(stdout)
+            self.file_queue.task_done()
 
 
     def create_message(self):
@@ -150,26 +236,37 @@ class NewThreadedNotifier(ThreadedNotifier):
         self._default_proc_fun.stop()
         ThreadedNotifier.stop(self, *args, **kwargs)
 
-def create_notifier(file_tags, publish_port, filepattern_fname, 
-                    *monitored_dirs):
+
+def create_notifier(file_tags, publish_port, filepattern_fname,
+                    event_names, monitored_dirs, command, pattern):
     '''Create new notifier'''
     # Event handler observes the operations in defined folder
     manager = WatchManager()
-    events = IN_CLOSE_WRITE | IN_MOVED_TO # monitored event(s)
+
+    # Collect mask for events that are monitored
+    if type(event_names) is not list:
+        event_names = event_names.split(',')
+    event_mask = 0
+    for event in event_names:
+        try:
+            event_mask |= getattr(pyinotify, event)
+        except AttributeError:
+            LOGGER.warning('Event ' + event + ' not found in pyinotify')
 
     event_handler = EventHandler(file_tags,
                                  publish_port=publish_port,
-                                 filepattern_fname=filepattern_fname)
+                                 filepattern_fname=filepattern_fname,
+                                 command=command, pattern=pattern)
     notifier = NewThreadedNotifier(manager, event_handler)
 
     # Add directories and event masks to watch manager
     for monitored_dir in monitored_dirs:
-        manager.add_watch(monitored_dir, events, rec=True)
+        manager.add_watch(monitored_dir, event_mask, rec=True)
 
     return notifier
 
 
-def main():    
+def main():
     '''Main(). Commandline parsing and stalker startup.'''
 
     parser = argparse.ArgumentParser()
@@ -193,24 +290,111 @@ def main():
 
     parser.add_argument("-c", "--configuration_file",
                         type=str,
-                        help="Name of the xml configuration file")
+                        help="Name of the configuration file")
+
+    parser.add_argument("-C", "--config_item",
+                        type=str,
+                        help="Name of the configuration item to use")
 
     parser.add_argument("-f", "--filepattern_file",
                         type=str,
                         help="Name of the xml filepattern file")
+
+    parser.add_argument("-e", "--event_names",
+                        type=str, default=None,
+                        help="Name of the pyinotify events to monitor")
+
     parser.add_argument("-D", "--debug", default=False,
                         dest="debug", action='store_true',
                         help="Enable debug messages")
+
+    parser.add_argument("-r", "--run_command", default=None,
+                        type=str,
+                        help="Name of the command that is run.")
+
+    parser.add_argument("-l", "--log_config", default=None,
+                        type=str,
+                        help="Name of the file for log config")
+
+    parser.add_argument("-P", "--file_pattern", default=None,
+                        type=str,
+                        help="Filename pattern for matching event-triggering"+\
+                            " files")
+
+    # Parse commandline arguments.  If command line args are given, they
+    # override the configuration file.
 
     args = parser.parse_args()
 
     if args.debug:
         loglevel = logging.DEBUG
     else:
-        loglevel = logging.INFO
+        loglevel = None #logging.INFO
 
+    # Check first commandline arguments
+    monitored_dirs = args.monitored_dirs
+    if monitored_dirs == '':
+        monitored_dirs = None
 
-    # LOGGER = logging.getLogger("")
+    publish_port = args.publish_port or None
+
+    file_tags = args.file_tags
+
+    filepattern_fname = args.filepattern_file
+    if args.filepattern_file == '':
+        filepattern_fname = None
+
+    event_names = args.event_names
+
+    pattern = args.file_pattern
+
+    log_config = args.log_config
+
+    command = args.run_command
+
+    if args.configuration_file is not None:
+        config_fname = args.configuration_file
+        config = ConfigParser()
+        config.read(config_fname)
+        config = dict(config.items(args.config_item))
+        config['name'] = args.configuration_file
+
+        file_tags = file_tags or config['file_tag']
+        monitored_dirs = monitored_dirs or config['directory']
+        try:
+            publish_port = publish_port or int(config['publish_port'])
+        except (KeyError, ValueError):
+            if publish_port is None:
+                publish_port = 0
+        try:
+            filepattern_fname = filepattern_fname or config['filepattern_file']
+        except KeyError:
+            pass
+        try:
+            event_names = event_names or config['event_names']
+        except KeyError:
+            pass
+        try:
+            loglevel = loglevel or getattr(logging, config['loglevel'])
+        except KeyError:
+            pass
+        try:
+            command = command or config['command']
+        except KeyError:
+            pass
+        try:
+            pattern = pattern or config['pattern']
+        except KeyError:
+            pass
+        try:
+            log_config = log_config or config["log_config"]
+        except KeyError:
+            logging.basicConfig()
+        else:
+            logging.config.fileConfig(log_config)
+
+    event_names = event_names or 'IN_CLOSE_WRITE,IN_MOVED_TO'
+
     LOGGER.setLevel(loglevel)
 
     strhndl = logging.StreamHandler()
@@ -221,45 +405,15 @@ def main():
     strhndl.setFormatter(formatter)
     LOGGER.addHandler(strhndl)
 
-    # LOGGER = logging.getLogger("trollstalker")
-    LOGGER.setLevel(loglevel)
-    LOGGER.debug("started logger")
+    LOGGER.debug("Logger started")
 
-    # Parse commandline arguments.  If command line args are given, it
-    # overrides the configuration file.
-
-    # Check first commandline arguments
-    monitored_dirs = args.monitored_dirs
-    if monitored_dirs == '':
-        monitored_dirs = None
-
-    publish_port = args.publish_port
-
-    file_tags = args.file_tags
-
-    filepattern_fname = args.filepattern_file
-    if args.filepattern_file == '':
-        filepattern_fname = None
-
-    if args.configuration_file is not None:
-        config_fname = args.configuration_file
-        config = xml_read.parse_xml(xml_read.get_root(config_fname))
-        file_tags = file_tags or config['file_tag']
-        monitored_dirs = monitored_dirs or config['directory']
-        try:
-            publish_port = publish_port or int(config['publish_port'])
-        except KeyError:
-            if publish_port is None:
-                publish_port = 0
-        try:
-            filepattern_fname = filepattern_fname or config['filepattern_file']
-        except KeyError:
-            pass
-
+    if type(monitored_dirs) is not list:
+        monitored_dirs = [monitored_dirs]
 
     # Start watching for new files
     notifier = create_notifier(file_tags, publish_port,
-                               filepattern_fname, *monitored_dirs)
+                               filepattern_fname, event_names,
+                               monitored_dirs, command, pattern)
     notifier.start()
 
     try:
