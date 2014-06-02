@@ -390,20 +390,19 @@ def main():
             log_config = log_config or config["log_config"]
         except KeyError:
             logging.basicConfig()
+            LOGGER.setLevel(loglevel)
+
+            strhndl = logging.StreamHandler()
+            strhndl.setLevel(loglevel)
+            log_format = "[%(asctime)s %(levelname)-8s] %(name)s: %(message)s"
+            formatter = logging.Formatter(log_format)
+
+            strhndl.setFormatter(formatter)
+            LOGGER.addHandler(strhndl)
         else:
             logging.config.fileConfig(log_config)
 
     event_names = event_names or 'IN_CLOSE_WRITE,IN_MOVED_TO'
-
-    LOGGER.setLevel(loglevel)
-
-    strhndl = logging.StreamHandler()
-    strhndl.setLevel(loglevel)
-    log_format = "[%(asctime)s %(levelname)-8s] %(name)s: %(message)s"
-    formatter = logging.Formatter(log_format)
-
-    strhndl.setFormatter(formatter)
-    LOGGER.addHandler(strhndl)
 
     LOGGER.debug("Logger started")
 
