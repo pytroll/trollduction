@@ -28,7 +28,6 @@
 import argparse
 from pyinotify import WatchManager, ThreadedNotifier, ProcessEvent
 import pyinotify
-import fnmatch
 import sys
 import time
 
@@ -168,8 +167,8 @@ def main():
     '''Main(). Commandline parsing and stalker startup.
     '''
 
-    parser = argparse.ArgumentParser() 
-    
+    parser = argparse.ArgumentParser()
+
     parser.add_argument("-d", "--monitored_dirs", dest="monitored_dirs",
                         nargs='+',
                         type=str,
@@ -177,14 +176,14 @@ def main():
                         help="Names of the monitored directories "\
                             "separated by space")
     parser.add_argument("-p", "--publish_port", dest="publish_port",
-                      default=0, type=int, 
+                      default=0, type=int,
                       help="Local port where messages are published")
     parser.add_argument("-s", "--subject", dest="subject",
                         type=str,
                         default=None,
                         help="Subject of the sent message")
     parser.add_argument("-c", "--configuration_file",
-                        type=str, 
+                        type=str,
                         help="Name of the xml configuration file")
     parser.add_argument("-C", "--config_item",
                         type=str,
@@ -193,7 +192,7 @@ def main():
                         type=str, default=None,
                         help="Name of the pyinotify events to monitor")
     parser.add_argument("-f", "--filepattern",
-                        type=str, 
+                        type=str,
                         help="Filepattern used to parse " \
                             "satellite/orbit/date/etc information")
 
@@ -274,7 +273,7 @@ def main():
     notifier = create_notifier(subject, publish_port, filepattern, event_names,
                                monitored_dirs)
     notifier.start()
-    
+
     try:
         while True:
             time.sleep(6000000)
