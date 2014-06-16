@@ -25,7 +25,7 @@
 """
 
 
-from trollduction.trollduction import OldTrollduction as Trollduction
+from trollduction.old_trollduction import OldTrollduction as Trollduction
 import argparse
 import logging
 import logging.config

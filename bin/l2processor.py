@@ -59,6 +59,7 @@ if __name__ == '__main__':
     td = Trollduction(cfg)
 
     def shutdown(*args):
+        del args
         td.shutdown()
         logging.shutdown()
 
