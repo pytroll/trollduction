@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2012, 2013, 2014 Martin Raspaud
+# Copyright (c) 2014 Martin Raspaud
 
 # Author(s):
 
-#   Panu Lahtinen  <panu.lahtinen@fmi.fi>
 #   Martin Raspaud <martin.raspaud@smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
@@ -21,34 +20,54 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Trollduction entry point.
+"""Build images from l1 data.
 """
 
-
-from trollduction.trollduction import OldTrollduction as Trollduction
+from trollduction.trollduction import Trollduction
 import argparse
 import logging
 import logging.config
+from ConfigParser import ConfigParser, NoOptionError
+import signal
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("config_file")
-    parser.add_argument("-l", "--log-config",
-                        help="log config file to use",
-                        default="./etc/logging.cfg")
+    parser.add_argument("config_file",
+                        help="The file containing configuration parameters.")
+    parser.add_argument("config_item",
+                        help="The item in the file with configuration.")
 
     args = parser.parse_args()
 
+    config = ConfigParser()
+    config.read(args.config_file)
+
+    try:
+        log_config = config.get(args.config_item, "log_config")
+    except NoOptionError:
+        logging.basicConfig()
+    else:
+        logging.config.fileConfig(log_config)
+
     logger = logging.getLogger("trollduction")
-    logging.config.fileConfig(args.log_config)
+
 
     # Create a new Trollduction instance, initialised with the config
-    td = Trollduction(args.config_file)
+    cfg = dict(config.items(args.config_item))
+    cfg["name"] = args.config_item
+    td = Trollduction(cfg)
+
+    def shutdown(*args):
+        td.shutdown()
+        logging.shutdown()
+
+    signal.signal(signal.SIGTERM, shutdown)
+
     # Run Trollduction
     try:
         td.run_single()
     except KeyboardInterrupt:
         logging.shutdown()
 
-    print "Thank you for using pytroll/trollduction! See you soon on pytroll.org."
+    print "Thank you for using pytroll/l2processor! See you soon on pytroll.org."
