@@ -53,8 +53,8 @@ import logging
 import logging.handlers
 from fnmatch import fnmatch
 import helper_functions
-#from pyresample.geometry import Boundary
-#from pyresample.data_reduce import get_valid_index_from_lonlat_boundaries
+from ConfigParser import ConfigParser
+from trollsift import Parser
 
 LOGGER = logging.getLogger(__name__)
 
@@ -68,18 +68,19 @@ class EventHandler(pyinotify.ProcessEvent):
     """Handle events with a generic *fun* function.
     """
 
-    def __init__(self, fun, file_to_watch=None):
+    def __init__(self, fun, file_to_watch=None, item=None):
         pyinotify.ProcessEvent.__init__(self)
         self._file_to_watch = file_to_watch
+        self._item = item
         self._fun = fun
 
     def process_file(self, pathname):
         '''Process event *pathname*
         '''
         if self._file_to_watch is None:
-            self._fun(pathname)
+            self._fun(pathname, self._item)
         elif fnmatch(self._file_to_watch, os.path.basename(pathname)):
-            self._fun(pathname)
+            self._fun(pathname, self._item)
 
     def process_IN_CLOSE_WRITE(self, event):
         """On closing after writing.
@@ -104,11 +105,12 @@ class ConfigWatcher(object):
     """Watch a given config file and run reload_config.
     """
 
-    def __init__(self, config_file, reload_config):
+    def __init__(self, config_file, config_item, reload_config):
         mask = (pyinotify.IN_CLOSE_WRITE |
             pyinotify.IN_MOVED_TO |
             pyinotify.IN_CREATE)
         self.config_file = config_file
+        self.config_item = config_item
         self.watchman = pyinotify.WatchManager()
 
         LOGGER.debug("Setting up watcher for %s", config_file)
@@ -117,7 +119,8 @@ class ConfigWatcher(object):
             pyinotify.ThreadedNotifier(self.watchman,
                                        EventHandler(reload_config,
                                                     os.path.basename(config_file
-                                                                     )
+                                                                     ),
+                                                    self.config_item
                                                     )
                                        )
         self.watchman.add_watch(os.path.dirname(config_file), mask)
@@ -151,30 +154,31 @@ class DataProcessor(object):
 
         self.product_config = product_config
 
-        time_slot = dt.datetime(int(msg.data['year']),
-                                int(msg.data['month']),
-                                int(msg.data['day']),
-                                int(msg.data['hour']),
-                                int(msg.data['minute']))
+        time_slot = msg.data['time']
 
         # orbit is empty string for meteosat, change it to None
-        if msg.data['orbit'] == '':
-            msg.data['orbit'] = None
+        if 'orbit' in msg.data:
+            if msg.data['orbit'] == '':
+                msg.data['orbit'] = None
+            else:
+                msg.data['orbit'] = None
 
         t1a = time.time()
 
         # Create satellite scene
         self.global_data = GF.create_scene(\
-            satname=str(msg.data['satellite']),
+            satname=str(msg.data['platform']),
             satnumber=str(msg.data['satnumber']),
-            instrument=str(msg.data['instrument']),
+#            instrument=str(msg.data['instrument']),
+            instrument=config['instrument'],
             time_slot=time_slot,
             orbit=str(msg.data['orbit']))
 
         # Update missing information to global_data.info{}
-        self.global_data.info['satname'] = msg.data['satellite']
+        self.global_data.info['satname'] = msg.data['platform']
         self.global_data.info['satnumber'] = msg.data['satnumber']
-        self.global_data.info['instrument'] = msg.data['instrument']
+#        self.global_data.info['instrument'] = msg.data['instrument']
+        self.global_data.info['instrument'] = config['instrument']
         self.global_data.info['orbit'] = msg.data['orbit']
 
         area_def_names = self.get_area_def_names()
@@ -440,7 +444,7 @@ class DataProcessor(object):
 
 
     def parse_filename(self, area=None, product=None, fname_key='filename'):
-        '''Parse filename.  Parameter *area* is for area-level
+        '''Parse filename for saving.  Parameter *area* is for area-level
         configuration dictionary, *product* for product-level
         configuration dictionary.  Parameter *fname_key* tells which
         dictionary key holds the filename pattern.
@@ -467,23 +471,34 @@ class DataProcessor(object):
             time_slot = self.local_data.time_slot
         except AttributeError:
             time_slot = self.global_data.time_slot
-        fname = fname.replace('%Y', '%04d' % time_slot.year)
-        fname = fname.replace('%m', '%02d' % time_slot.month)
-        fname = fname.replace('%d', '%02d' % time_slot.day)
-        fname = fname.replace('%H', '%02d' % time_slot.hour)
-        fname = fname.replace('%M', '%02d' % time_slot.minute)
+
+        par = Parser(fname)
+
+        info_dict = {}
+        info_dict['time'] = time_slot
+
         if area is not None:
-            fname = fname.replace('%(areaname)', area['name'])
+            info_dict['areaname'] = area['name']
+        else:
+            info_dict['areaname'] = ''
+
         if product is not None:
-            fname = fname.replace('%(composite)', product['name'])
-        fname = fname.replace('%(satellite)',
-                              self.global_data.info['satname'] + \
-                                  self.global_data.info['satnumber'])
+            info_dict['composite'] = product['name']
+        else:
+            info_dict['composite'] = ''
+
+        info_dict['platform'] = self.global_data.info['satname']
+        info_dict['satnumber'] = self.global_data.info['satnumber']
+
         if self.global_data.info['orbit'] is not None:
-            fname = fname.replace('%(orbit)', self.global_data.info['orbit'])
-        fname = fname.replace('%(instrument)',
-                              self.global_data.info['instrument'])
-        fname = fname.replace('%(ending)', 'png')
+            info_dict['orbit'] = self.global_data.info['orbit']
+        else:
+            info_dict['orbit'] = ''
+
+        info_dict['instrument'] = self.global_data.info['instrument']
+        info_dict['file_ending'] = 'png'
+
+        fname = par.compose(info_dict)
 
         return fname
 
@@ -630,10 +645,11 @@ class Trollduction(Minion):
 
         # read everything from the Trollduction config file
         try:
-            self.update_td_config_from_file(config)
+            self.update_td_config_from_file(config['config'],
+                                            config['config_item'])
             if not managed:
                 self.config_watcher = \
-                    ConfigWatcher(config,
+                    ConfigWatcher(config['config'],
                                   self.update_td_config_from_file)
                 self.config_watcher.start()
 
@@ -646,10 +662,10 @@ class Trollduction(Minion):
         # Minion.start(self)
         # self.thr = Thread(target=self.run_single).start()
 
-    def update_td_config_from_file(self, fname):
+    def update_td_config_from_file(self, fname, config_item=None):
         '''Read Trollduction config file and use the new parameters.
         '''
-        self.td_config = helper_functions.read_config_file(fname)
+        self.td_config = helper_functions.read_config_file(fname, config_item)
         self.update_td_config()
 
     def update_td_config(self):
@@ -659,31 +675,32 @@ class Trollduction(Minion):
         LOGGER.info('Trollduction configuration read successfully.')
 
         # Initialize/restart listener
-        try:
-            if self.listener is None:
-                self.listener = ListenerContainer(\
-                    data_type_list=self.td_config['listener_tag'])
-                LOGGER.info("Listener started")
-            else:
-                self.listener.restart_listener(self.td_config['listener_tag'])
-                LOGGER.info("Listener restarted")
-        except KeyError:
-            LOGGER.critical("Key <listener_tag> is missing from"
-                            " Trollduction config")
+        if self.listener is None:
+            self.listener = ListenerContainer(data_type_list=['file'])
+#            self.listener = ListenerContainer()
+            LOGGER.info("Listener started")
+        else:
+#            self.listener.restart_listener('file')
+            self.listener.restart_listener()
+            LOGGER.info("Listener restarted")
 
         try:
-            self.update_product_config(self.td_config['product_config_file'])
+            self.update_product_config(self.td_config['product_config_file'], \
+                                       self.td_config['config_item'])
         except KeyError:
-            LOGGER.critical("Key <product_config_file> is missing "
-                            "from Trollduction config")
+            LOGGER.critical("Key 'product_config_file' or 'config_item' is "
+                            "missing from Trollduction config")
 
-    def update_product_config(self, fname):
+    def update_product_config(self, fname, config_item):
         '''Update area definitions, associated product names, output
         filename prototypes and other relevant information from the
         given file.
         '''
 
-        product_config = helper_functions.read_config_file(fname)
+        product_config = \
+                         helper_functions.read_config_file(fname,
+                                                           config_item=\
+                                                           config_item)
 
         # add checks, or do we just assume the config to be valid at
         # this point?
@@ -717,7 +734,6 @@ class Trollduction(Minion):
     def shutdown(self):
         '''Shutdown trollduction.
         '''
-
         self.stop()
 
     def run_single(self):
@@ -734,9 +750,13 @@ class Trollduction(Minion):
             except Queue.Empty:
                 continue
 
-            # this should be
-            # if msg.type == "file":
-            if '/NewFileArrived' in msg.subject:
+            print ""
+            print "Message received:", msg
+            print ""
+
+            # what this should be?
+            # if self.td_config['listener_topic'] in msg.subject:
+            if msg.type == "file":
                 self.update_product_config(\
                     self.td_config['product_config_file'])
                 self.data_processor.run(self.product_config, msg)
