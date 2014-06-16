@@ -30,16 +30,24 @@ import xml_read
 from mpop.projector import get_area_def
 from pyresample.geometry import Boundary
 import logging
+from ConfigParser import ConfigParser
 
 LOGGER = logging.getLogger(__name__)
 
-def read_config_file(fname):
+def read_config_file(fname, config_item=None):
     '''Read config file to dictionary.
     '''
-    if os.path.splitext(fname)[1] == ".xml":
+
+    endswith = os.path.splitext(fname)[1]
+    if endswith == ".xml":
         return xml_read.parse_xml(xml_read.get_root(fname))
+    elif endswith in ['.ini', '.cfg']:
+        config = ConfigParser()
+        config.read(fname)
+        return dict(config.items(config_item))
     else:
-        raise NotImplementedError("Can only parse xml config files for now")
+        raise NotImplementedError("Can only parse xml and .ini config files" \
+                                  "for now")
 
 
 def get_maximum_extent(area_def_names):
