@@ -34,17 +34,17 @@ logger = logging.getLogger(__name__)
 class ListenerContainer(object):
     '''Container for listener instance
     '''
-    def __init__(self, data_type_list=None):
+    def __init__(self, service=None):
         self.listener = None
         self.queue = None
         self.thread = None
 
-        if data_type_list is not None:
+        if service is not None:
             # Create queue for the messages
             self.queue = Queue() #Pipe()
 
             # Create a Listener instance
-            self.listener = Listener(data_type_list=data_type_list, 
+            self.listener = Listener(service=service, 
                                      queue=self.queue)
             # Start Listener instance into a new daemonized thread.
             self.thread = Thread(target=self.listener.run)
@@ -52,13 +52,13 @@ class ListenerContainer(object):
             self.thread.start()
 
 
-    def restart_listener(self, data_type_list):
+    def restart_listener(self, service):
         '''Restart listener after configuration update.
         '''
         if self.listener is not None:
             if self.listener.running:
                 self.stop()
-        self.__init__(data_type_list=data_type_list)
+        self.__init__(service=service)
 
 
     def stop(self):
@@ -73,10 +73,10 @@ class Listener(object):
     '''PyTroll listener class for reading messages for Trollduction
     '''
 
-    def __init__(self, data_type_list=None, queue=None):
+    def __init__(self, service=None, queue=None):
         '''Init Listener object
         '''
-        self.data_type_list = data_type_list
+        self.service = service
         self.queue = queue
         self.subscriber = None
         self.recv = None
@@ -89,8 +89,8 @@ class Listener(object):
         message types.
         '''
         if self.subscriber is None:
-            if len(self.data_type_list) > 0:
-                self.subscriber = NSSubscriber(self.data_type_list,
+            if self.service:
+                self.subscriber = NSSubscriber(self.service,
                                                addr_listener=True)
                 self.recv = self.subscriber.start().recv
 

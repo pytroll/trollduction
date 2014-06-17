@@ -160,8 +160,6 @@ class DataProcessor(object):
         if 'orbit' in msg.data:
             if msg.data['orbit'] == '':
                 msg.data['orbit'] = None
-            else:
-                msg.data['orbit'] = None
 
         t1a = time.time()
 
@@ -169,16 +167,14 @@ class DataProcessor(object):
         self.global_data = GF.create_scene(\
             satname=str(msg.data['platform']),
             satnumber=str(msg.data['satnumber']),
-#            instrument=str(msg.data['instrument']),
-            instrument=config['instrument'],
+            instrument=str(msg.data['instrument']),
             time_slot=time_slot,
             orbit=str(msg.data['orbit']))
 
         # Update missing information to global_data.info{}
         self.global_data.info['satname'] = msg.data['platform']
         self.global_data.info['satnumber'] = msg.data['satnumber']
-#        self.global_data.info['instrument'] = msg.data['instrument']
-        self.global_data.info['instrument'] = config['instrument']
+        self.global_data.info['instrument'] = msg.data['instrument']
         self.global_data.info['orbit'] = msg.data['orbit']
 
         area_def_names = self.get_area_def_names()
@@ -676,12 +672,14 @@ class Trollduction(Minion):
 
         # Initialize/restart listener
         if self.listener is None:
-            self.listener = ListenerContainer(data_type_list=['file'])
+            self.listener = \
+                            ListenerContainer(service=\
+                                              self.td_config['listener_service'])
 #            self.listener = ListenerContainer()
             LOGGER.info("Listener started")
         else:
 #            self.listener.restart_listener('file')
-            self.listener.restart_listener()
+            self.listener.restart_listener(self.td_config['listener_service'])
             LOGGER.info("Listener restarted")
 
         try:
@@ -750,13 +748,11 @@ class Trollduction(Minion):
             except Queue.Empty:
                 continue
 
-            print ""
-            print "Message received:", msg
-            print ""
-
-            # what this should be?
-            # if self.td_config['listener_topic'] in msg.subject:
+            # For 'file' type messages, update product config and run
+            # production
             if msg.type == "file":
-                self.update_product_config(\
-                    self.td_config['product_config_file'])
+                self.update_product_config(self.td_config['product_config_file'],
+                                           self.td_config['config_item'])
                 self.data_processor.run(self.product_config, msg)
+#            else:
+#                LOGGER.debug("Message type was %s" % msg.type)
