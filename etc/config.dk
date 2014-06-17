@@ -1,19 +1,15 @@
 [l1b2image-processor]
-script=/local_disk/usr/src/trollduction/bin/l2processor.py
-config=/local_disk/usr/src/trollduction/cfg/trollduction_config.xml
-log_config=/local_disk/usr/src/trollduction/etc/logging.cfg
-listener_tag=HRPT_l1b
+script=/home/lahtinep/Software/pytroll/packages/trollduction/bin/l2processor.py
+config=/home/lahtinep/Software/pytroll/mpop_etc/trollduction_config.cfg
+config_item=noaa_hrpt
+log_config=/home/lahtinep/Software/pytroll/packages/trollduction/etc/logging.cfg
+product_config_file=/home/lahtinep/Software/pytroll/mpop_etc/product_config_hrpt.xml
 publish_port=0
-filepattern_cfg=/local_disk/usr/src/trollduction/etc/filepattern_config.xml
-product_config_file=/local_disk/usr/src/trollduction/cfg/product_config.xml
 
-# [HRPT_l1b-images]
-# origin=file:///tmp/hr/
-# config=/local_disk/usr/src/trollduction/cfg/trollduction_config.xml
-# file_tags=HRPT_l1b
-# publish_port=0
-# filepattern_cfg=/local_disk/usr/src/trollduction/etc/filepattern_config.xml
-# product_file=/local_disk/usr/src/trollduction/cfg/product_config.xml
-
-
-
+[hrit2image-processor]
+script=/home/lahtinep/Software/pytroll/packages/trollduction/bin/l2processor.py
+config=/home/lahtinep/Software/pytroll/mpop_etc/trollduction_config.cfg
+config_item=msg_hrit
+log_config=/home/lahtinep/Software/pytroll/packages/trollduction/etc/logging.cfg
+product_config_file=/home/lahtinep/Software/pytroll/mpop_etc/product_config_hrit.xml
+publish_port=0
