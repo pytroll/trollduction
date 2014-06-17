@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding='utf-8'?>
+
+<!-- This config is used by Trollduction.-->
+
+<product_config>
+  <common>
+    <!-- calibrated, satellite projection -->
+    <!--netcdf_file>{time:%Y%m%d_%H%M}_{orbit}_{platform}{satnumber}_swath.nc</netcdf_file-->
+    <output_dir>/tmp</output_dir>
+  </common>
+ 
+  <area>
+    <name>Europe_large</name>
+    <definition>eurol</definition>
+    <product>
+      <composite>overview</composite>
+	  <name>overview</name>
+      <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+      <!-- Generate the product only if sun is above the horizon at the
+           defined longitude/latitude -->
+      <sunzen_day_maximum>90</sunzen_day_maximum>
+	  <sunzen_lonlat>25,60</sunzen_lonlat>
+    </product>
+    <product>
+      <composite>natural</composite>
+	  <name>natural</name>
+      <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+      <sunzen_day_maximum>90</sunzen_day_maximum>
+	  <sunzen_lonlat>25,60</sunzen_lonlat>
+    </product>
+    <product>
+      <composite>green_snow</composite>
+	  <name>green_snow</name>
+      <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+      <sunzen_day_maximum>90</sunzen_day_maximum>
+	  <sunzen_lonlat>25,60</sunzen_lonlat>
+    </product>
+    <product>
+      <composite>red_snow</composite>
+	  <name>red_snow</name>
+      <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+      <sunzen_day_maximum>90</sunzen_day_maximum>
+	  <sunzen_lonlat>25,60</sunzen_lonlat>
+    </product>
+    
+    <product>
+	  <composite>cloudtop</composite>
+	  <name>cloudtop</name>
+	  <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+    </product>
+
+
+    <product>
+	  <composite>night_overview</composite>
+	  <name>night_overview</name>
+	  <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+      <!-- Generate only if the Sun is below the horizon -->
+	  <sunzen_night_minimum>90</sunzen_night_minimum>
+	  <sunzen_lonlat>25,60</sunzen_lonlat>
+    </product>
+    <product>
+	  <composite>night_fog</composite>
+	  <name>night_fog</name>
+	  <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+	  <sunzen_night_minimum>90</sunzen_night_minimum>
+	  <sunzen_lonlat>25,60</sunzen_lonlat>
+    </product>
+  </area>
+ 
+</product_config>

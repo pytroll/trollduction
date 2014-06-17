@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding='utf-8'?>
+
+<!-- This config is used by Trollduction.-->
+
+<product_config>
+    <common>
+        <!-- calibrated, satellite projection -->
+        <!--netcdf_file>%Y%m%d_%H%M_%(satellite)_full_disc.nc</netcdf_file-->
+        <output_dir>/tmp</output_dir>
+    </common>
+
+     <area>
+        <!-- Area name to filename -->
+        <name>Europe_large</name>
+        <!-- pytroll area definition name -->
+        <definition>eurol</definition>
+        <!-- First product definition -->
+        <product>
+            <composite>overview</composite>
+	        <name>overview</name>
+	        <output_dir>/tmp</output_dir>
+            <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+            <!-- Generate this product only if the Sun is above the
+                 horizon at the defined longitude/latitude-->
+            <sunzen_night_minimum></sunzen_night_minimum>
+            <sunzen_day_maximum>90</sunzen_day_maximum>
+	        <sunzen_xy_loc></sunzen_xy_loc>
+	        <sunzen_lonlat>25,60</sunzen_lonlat>
+        </product>
+
+        <product>
+            <composite>airmass</composite>
+	        <name>airmass</name>
+	        <output_dir>/tmp</output_dir>
+            <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+            <sunzen_night_minimum></sunzen_night_minimum>
+            <sunzen_day_maximum></sunzen_day_maximum>
+	        <sunzen_xy_loc></sunzen_xy_loc>
+	        <sunzen_lonlat></sunzen_lonlat>
+        </product>
