@@ -46,7 +46,7 @@ class EventHandler(ProcessEvent):
      *publish_port* - port number to publish the messages on
      *filepattern* - filepattern for finding information from the filename
     """
-    def __init__(self, subject, publish_port=0, filepattern=None):
+    def __init__(self, subject, instrument, publish_port=0, filepattern=None):
         super(EventHandler, self).__init__()
         
         self._pub = NoisyPublisher("trollstalker", publish_port, subject)
@@ -56,6 +56,7 @@ class EventHandler(ProcessEvent):
         if filepattern is None:
             filepattern = '{filename}'
         self.file_parser = Parser(filepattern)
+        self.instrument = instrument
 
     def stop(self):
         '''Stop publisher.
@@ -122,6 +123,8 @@ class EventHandler(ProcessEvent):
         '''
         try:
             self.info = self.file_parser.parse(event.pathname)
+            self.info['uri'] = event.pathname
+            self.info['instrument'] = self.instrument
         except ValueError:
             # Filename didn't match pattern, so empty the info dict
             self.info = {}
@@ -134,7 +137,7 @@ class NewThreadedNotifier(ThreadedNotifier):
         ThreadedNotifier.stop(self, *args, **kwargs)
 
 
-def create_notifier(subject, publish_port, filepattern,
+def create_notifier(subject, instrument, publish_port, filepattern,
                     event_names, monitored_dirs):
     '''Create new notifier'''
 
@@ -151,7 +154,7 @@ def create_notifier(subject, publish_port, filepattern,
         except AttributeError:
             LOGGER.warning('Event ' + event + ' not found in pyinotify')
 
-    event_handler = EventHandler(subject,
+    event_handler = EventHandler(subject, instrument,
                                  publish_port=publish_port,
                                  filepattern=filepattern)
     notifier = NewThreadedNotifier(manager, event_handler)
@@ -194,6 +197,9 @@ def main():
                         type=str,
                         help="Filepattern used to parse " \
                             "satellite/orbit/date/etc information")
+    parser.add_argument("-i", "--instrument",
+                        type=str, default=None,
+                        help="Instrument name in the satellite")
 
     if len(sys.argv) <= 1:
         parser.print_help()
@@ -212,6 +218,7 @@ def main():
     publish_port = args.publish_port
     subject = args.subject
     event_names = args.event_names
+    instrument = args.instrument
 
     filepattern = args.filepattern
     if args.filepattern == '':
@@ -242,6 +249,10 @@ def main():
         except KeyError:
             pass
         try:
+            instrument = instrument or config['instrument']
+        except KeyError:
+            pass
+        try:
             log_config = config["log_config"]
         except KeyError:
             logging.basicConfig()
@@ -269,8 +280,8 @@ def main():
         monitored_dirs = [monitored_dirs]
 
     # Start watching for new files
-    notifier = create_notifier(subject, publish_port, filepattern, event_names,
-                               monitored_dirs)
+    notifier = create_notifier(subject, instrument, publish_port, filepattern,
+                               event_names, monitored_dirs)
     notifier.start()
 
     try:
