@@ -29,18 +29,14 @@ TODO:
  - write a command receiver (for messages like reload_config/shutdown/restart)
  - implement a command sender also
  - load default config in case some parameters are missing in the config.ini
- - automatically load channels based on which products will be generated
  - allow adding custom options per file for saving (eg format,
    tiles/stripes/tifftags)
- - use config.ini instead of trollduction_config.xml
  - add area-by-area selection for projection method
    (crude/nearest/<something new>)
-
 '''
 
 from listener import ListenerContainer
 from mpop.satellites import GenericFactory as GF
-import datetime as dt
 import time
 from mpop.projector import get_area_def
 import sys
@@ -53,7 +49,6 @@ import logging
 import logging.handlers
 from fnmatch import fnmatch
 import helper_functions
-from ConfigParser import ConfigParser
 from trollsift import Parser
 
 LOGGER = logging.getLogger(__name__)
@@ -641,11 +636,11 @@ class Trollduction(Minion):
 
         # read everything from the Trollduction config file
         try:
-            self.update_td_config_from_file(config['config'],
+            self.update_td_config_from_file(config['config_file'],
                                             config['config_item'])
             if not managed:
                 self.config_watcher = \
-                    ConfigWatcher(config['config'],
+                    ConfigWatcher(config['config_file'],
                                   self.update_td_config_from_file)
                 self.config_watcher.start()
 
@@ -674,18 +669,21 @@ class Trollduction(Minion):
         if self.listener is None:
             self.listener = \
                             ListenerContainer(service=\
-                                              self.td_config['listener_service'])
+                                              self.td_config['service'])
 #            self.listener = ListenerContainer()
             LOGGER.info("Listener started")
         else:
 #            self.listener.restart_listener('file')
-            self.listener.restart_listener(self.td_config['listener_service'])
+            self.listener.restart_listener(self.td_config['service'])
             LOGGER.info("Listener restarted")
 
         try:
             self.update_product_config(self.td_config['product_config_file'], \
                                        self.td_config['config_item'])
         except KeyError:
+            print ""
+            print self.td_config
+            print ""
             LOGGER.critical("Key 'product_config_file' or 'config_item' is "
                             "missing from Trollduction config")
 

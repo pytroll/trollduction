@@ -6,6 +6,7 @@
 # Author(s):
 
 #   Martin Raspaud <martin.raspaud@smhi.se>
+#   Panu Lahtinen <panu.lahtinen@fmi.fi>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,6 +22,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """Build images from l1 data.
+./l2processor.py -c ../examples/master_config.ini -C noaa_hrpt
 """
 
 from trollduction.trollduction import Trollduction
@@ -44,7 +46,7 @@ if __name__ == '__main__':
     config.read(args.config_file)
 
     try:
-        log_config = config.get(args.config_item, "log_config")
+        log_config = config.get(args.config_item, "td_log_config")
     except NoOptionError:
         logging.basicConfig()
     else:
@@ -55,7 +57,8 @@ if __name__ == '__main__':
 
     # Create a new Trollduction instance, initialised with the config
     cfg = dict(config.items(args.config_item))
-    cfg["name"] = args.config_item
+    cfg["config_item"] = args.config_item
+    cfg["config_file"] = args.config_file
     td = Trollduction(cfg)
 
     def shutdown(*args):

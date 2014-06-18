@@ -44,7 +44,10 @@ def read_config_file(fname, config_item=None):
     elif endswith in ['.ini', '.cfg']:
         config = ConfigParser()
         config.read(fname)
-        return dict(config.items(config_item))
+        conf_dict = dict(config.items(config_item))
+        conf_dict["config_file"] = fname
+        conf_dict["config_item"] = config_item
+        return conf_dict
     else:
         raise NotImplementedError("Can only parse xml and .ini config files" \
                                   "for now")
