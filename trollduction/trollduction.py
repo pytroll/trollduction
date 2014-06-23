@@ -24,6 +24,7 @@
 '''Trollduction module
 
 TODO:
+ - adjust docstrings to sphinx (see check_sunzen())
  - change messages to follow the posttroll way of doing
  - save data/images in a separate writer thread to avoid the I/O bottleneck
  - write a command receiver (for messages like reload_config/shutdown/restart)
@@ -373,7 +374,7 @@ class DataProcessor(object):
                     else:
                         lonlat = None
                 if not self.check_sunzen(product, area_def=\
-                                             get_area_def(area['definition']),
+                                         get_area_def(area['definition']),
                                          xy_loc=xy_loc, lonlat=lonlat):
                     # If the return value is False, skip this product
                     continue
@@ -497,17 +498,19 @@ class DataProcessor(object):
     def check_sunzen(self, config, area_def=None, xy_loc=None, lonlat=None,
                      data_name='local_data'):
         '''Check if the data is within Sun zenith angle limits.
-        *config*: configuration options for this product
-        *area_def*: area definition of the data
-        *xy_loc*: pixel location (2-tuple or 2-element list with x-
-                  and y-coordinates) where zenith angle limit is checked
-        *lonlat*: longitude/latitude location (2-tuple or 2-element
-                  list with longitude and latitude) where zenith angle
-                  limit is checked.
-        *data_name*: name of the dataset to get data from
 
-        If both *xy_loc* and *lonlat* are None, image center is used
-        as reference point. *xy_loc* overrides *lonlat*.
+        :param config: configuration options for this product
+        :type config: dict
+        :param area_def: area definition of the data
+        :type area_def: areadef
+        :param xy_loc: pixel location (2-tuple or 2-element list with x- and y-coordinates) where zenith angle limit is checked
+        :type xy_loc: tuple
+        :param lonlat: longitude/latitude location (2-tuple or 2-element list with longitude and latitude) where zenith angle limit is checked.
+        :type lonlat: tuple
+        :param data_name: name of the dataset to get data from
+        :type data_name: str
+
+        If both *xy_loc* and *lonlat* are None, image center is used as reference point. *xy_loc* overrides *lonlat*.
         '''
 
         LOGGER.info('Checking Sun zenith angle limits')

@@ -6,16 +6,14 @@
 Welcome to trollduction's documentation!
 ========================================
 
-Trollduction is a configurable framework for satellite image production.
+Trollduction is a configurable framework for satellite image batch production.
 
-This documentation is a work in progress, so most of the details are missing.  Below you can find short instructions how to get started.
+This documentation is a work in progress, but the most important bits should be present. The missing details will be added once noticed.
 
-The source code of the package can be found at github_
+.. contents::
+   :depth: 3
 
-.. _github: https://github.com/mraspaud/trollduction
-
-
-Setting things up, the simple version
+Setting things up, the short version
 =====================================
 
 1. Install other required packages
@@ -26,6 +24,7 @@ Setting things up, the simple version
     * trollsift_
     * python-lxml
     * python-pyinotify
+    * trollduction_
 2. Configure mpop
     * modify *mpop.cfg* to suit your needs
     * add configurations for satellites you are going to use
@@ -38,7 +37,7 @@ Setting things up, the simple version
     * this will relay the messages sent in the network
     * *./nameserver*
 6. Start *trollduction/bin/trollstalker.py*
-    * file watcher that sends a message of new files
+    * file watcher that sends messages of new files available for processing
     * for example: *./trollstalker.py -c ../examples/master_config.ini noaa_hrpt*
 7. Start Trollduction *trollduction/bin/l2processor.py*
     * *./l2processor.py ../examples/master_config.ini noaa_hrpt*
@@ -52,12 +51,13 @@ Setting things up, the simple version
 .. _posttroll: https://github.com/mraspaud/posttroll
 .. _pyorbital: https://github.com/mraspaud/pyorbital
 .. _trollsift: https://github.com/pnuu/trollsift
+.. _trollduction: https://github.com/mraspaud/trollduction
 
-Contents:
-=========
+Detailed instructions
+=====================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    installation.rst
    configuration.rst
@@ -77,13 +77,6 @@ Trollduction
    :members:
    :undoc-members:
 
-Trollstalker
--------------
-
-.. automodule:: trollduction.trollstalker
-   :members:
-   :undoc-members:
-
 Listener
 -------------
 
@@ -91,9 +84,37 @@ Listener
    :members:
    :undoc-members:
 
-Logger
--------------
+Duke
+----
 
-.. automodule:: trollduction.logger
+.. automodule:: trollduction.duke
+   :members:
+   :undoc-members:
+
+Minion
+------
+
+.. automodule:: trollduction.minion
+   :members:
+   :undoc-members:
+
+XML read
+--------
+
+.. automodule:: trollduction.xml_read
+   :members:
+   :undoc-members:
+
+Helper functions
+----------------
+
+.. automodule:: trollduction.helper_functions
+   :members:
+   :undoc-members:
+
+Custom handler
+--------------
+
+.. automodule:: trollduction.custom_handler
    :members:
    :undoc-members:
