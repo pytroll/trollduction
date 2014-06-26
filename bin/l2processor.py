@@ -22,7 +22,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """Build images from l1 data.
-./l2processor.py -c ../examples/master_config.ini -C noaa_hrpt
+./l2processor.py -c /path/to/master_config.ini -C noaa_hrpt
 """
 
 from trollduction.trollduction import Trollduction
@@ -31,22 +31,45 @@ import logging
 import logging.config
 from ConfigParser import ConfigParser, NoOptionError
 import signal
+import sys
+import os
+import time
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("config_file",
+    parser.add_argument("-c", "--config_file", dest="config_file",
+                        type=str,
+                        default='',
                         help="The file containing configuration parameters.")
-    parser.add_argument("config_item",
+    parser.add_argument("-C", "--config_item", dest="config_item",
+                        type=str,
+                        default='',
                         help="The item in the file with configuration.")
 
     args = parser.parse_args()
+
+    if args.config_file == '':
+        print "Configuration file required! Use command-line switch -c <file>"
+        sys.exit()
+    if args.config_item == '':
+        print "Configuration item required! Use command-line switch -C <item>"
+        sys.exit()
+
+    if 'template' in args.config_file:
+        print "Template file given as master config, aborting!"
+        sys.exit()
 
     config = ConfigParser()
     config.read(args.config_file)
 
     try:
         log_config = config.get(args.config_item, "td_log_config")
+        if 'template' in log_config:
+            print "Template file given as Trollduction logging config," \
+                " aborting!"
+            sys.exit()
+
     except NoOptionError:
         logging.basicConfig()
     else:
@@ -54,24 +77,37 @@ if __name__ == '__main__':
 
     logger = logging.getLogger("trollduction")
 
-
     # Create a new Trollduction instance, initialised with the config
     cfg = dict(config.items(args.config_item))
     cfg["config_item"] = args.config_item
     cfg["config_file"] = args.config_file
-    td = Trollduction(cfg)
+    if "timezone" in cfg:
+        print "Setting timezone to %s" % cfg["timezone"]
+        os.environ["TZ"] = cfg["timezone"]
+        time.tzset()
+    else:
+        print "No timezone given, defaulting to UTC timezone."
+        os.environ["TZ"] = "UTC"
+        time.tzset()
+
+    if "template" in cfg["product_config_file"]:
+        print "Template file given as trollstalker product config, " \
+            "aborting!"
+
+    trd = Trollduction(cfg)
 
     def shutdown(*args):
         del args
-        td.shutdown()
+        trd.shutdown()
         logging.shutdown()
 
     signal.signal(signal.SIGTERM, shutdown)
 
     # Run Trollduction
     try:
-        td.run_single()
+        trd.run_single()
     except KeyboardInterrupt:
         logging.shutdown()
 
-    print "Thank you for using pytroll/l2processor! See you soon on pytroll.org."
+    print "Thank you for using pytroll/l2processor!" \
+        "See you soon on pytroll.org."

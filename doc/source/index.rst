@@ -13,38 +13,43 @@ This documentation is a work in progress, but the most important bits should be 
 .. contents::
    :depth: 3
 
-Setting things up, the short version
-=====================================
+Setting things up cheat sheet
+=============================
 
 1. Install other required packages
-    * mpop_ - *pre-master* branch
+    * mpop_ - select *pre-master* branch
     * pyresample_
-    * posttroll_ - *feature_service* branch
+    * posttroll_ - select *feature_service* branch
     * pyorbital_
     * trollsift_
     * python-lxml
     * python-pyinotify
-    * trollduction_
-2. Configure mpop
+    * trollduction_ - select *develop* branch
+#. Configure mpop
     * modify *mpop.cfg* to suit your needs
     * add configurations for satellites you are going to use
-3. Create Trollduction configuration file
-    * use *examples/master_config.ini* as a template
-4. Create Trollduction product configuration file
-    * use *trollduction/etc/product_config_hrpt.xml* or *trollduction/etc/product_config_hrpt.xml* as a template
-    * save the file to the path defined in your *master_config.ini*
-5. Start *posttroll/bin/nameserver*
+#. Create Trollduction configuration file
+    * use *examples/master_config.ini_template* as a template
+    * save config file to your chosen place without the *_template* ending
+#. Create Trollduction product configuration file
+    * use *trollduction/examples/product_config_hrpt.xml_template* or *trollduction/examples/product_config_hrpt.xml_template* as a template
+    * save the file to the path defined in your *master_config.ini* without the *_template* ending
+#. Create logging configurations for *trollduction* and *trollstalker*
+    * use *trollduction/examples/td_logging.ini_template* and *trollduction/examples/stalker_logging.ini_tempalate* as templates
+    * check the log filename (by default logs go to */tmp/* directory)
+    * save these configs to the path defined in you *master_config.ini* without the *_template* ending
+#. Start *posttroll/bin/nameserver*
     * this will relay the messages sent in the network
     * *./nameserver*
-6. Start *trollduction/bin/trollstalker.py*
+#. Start *trollduction/bin/trollstalker.py*
     * file watcher that sends messages of new files available for processing
-    * for example: *./trollstalker.py -c ../examples/master_config.ini noaa_hrpt*
-7. Start Trollduction *trollduction/bin/l2processor.py*
-    * *./l2processor.py ../examples/master_config.ini noaa_hrpt*
+    * for example: *./trollstalker.py -c /path/to/master_config.ini -C noaa_hrpt*
+#. Start Trollduction *trollduction/bin/l2processor.py*
+    * *./l2processor.py -c /path/to/master_config.ini -C noaa_hrpt*
     * this should print your configuration and stop to wait for new
       messages
-8. Copy a suitable file to your data input directory
-9. Check the output directory for images
+#. Copy a suitable file to your data input directory
+#. Check the output directory for images
 
 .. _mpop: https://github.com/mraspaud/mpop
 .. _pyresample: https://code.google.com/p/pyresample/

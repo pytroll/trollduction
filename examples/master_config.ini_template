@@ -15,13 +15,15 @@ instrument=avhrr
 # products that will be made
 product_config_file=/home/lahtinep/Software/pytroll/mpop_etc/product_config_hrpt.xml
 # logging config for trollstalker
-stalker_log_config=/home/lahtinep/Software/pytroll/mpop_etc/stalker_logging.cfg
+stalker_log_config=/home/lahtinep/Software/pytroll/mpop_etc/stalker_logging.ini
 # logging config for trollduction
-td_log_config=/home/lahtinep/Software/pytroll/packages/trollduction/etc/logging.cfg
+td_log_config=/home/lahtinep/Software/pytroll/mpop_etc/td_logging.ini
 # inotify events that trigger trollstalker to send messages
 event_names=IN_CLOSE_WRITE,IN_MOVED_TO,IN_CREATE
 # port to send the posttroll messages to, optional so use "0"
 posttroll_port=0
+# Timezone to use for logging. If not given, defaults to UTC
+timezone=UTC
 
 [msg_hrit]
 service=/HRIT/L1.5/dev/hki
@@ -29,7 +31,8 @@ directory=/home/lahtinep/data/satellite/new/
 filepattern={path}H-000-{platform_name:3s}{satnumber:1d}__-{platform_name:3s}{satnumber:1d}________-_________-EPI______-{time:%Y%m%d%H%M}-__
 instrument=seviri
 product_config_file=/home/lahtinep/Software/pytroll/mpop_etc/product_config_hrit.xml
-stalker_log_config=/home/lahtinep/Software/pytroll/mpop_etc/stalker_logging.cfg
-td_log_config=/home/lahtinep/Software/pytroll/packages/trollduction/etc/logging.cfg
+stalker_log_config=/home/lahtinep/Software/pytroll/mpop_etc/stalker_logging.ini
+td_log_config=/home/lahtinep/Software/mpop_etc/td_logging.ini
 event_names=IN_CLOSE_WRITE,IN_MOVED_TO,IN_CREATE
 posttroll_port=0
+timezone=UTC

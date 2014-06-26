@@ -5,12 +5,12 @@
 
 Before starting to configure *trollduction*, make sure that your mpop_ has been setup correctly (*mpop.cfg*, *areas.def*, satellite definitions).
 
-To configure *trollduction*, the user needs to supply atleast two configuration files. These files are explained below.
+To configure *trollduction*, the user needs to supply atleast two configuration files. These files are explained below. The configuration file examples are available in *trolldcution/examples/* directory with *_template* ending. To use these, the files need to be renamed so that there is no word "template" within the filename.
 
 Master config
 -------------
 
-The main configuration for *trollduction* processing chain defines the messaging, file patterns, satellite instrument name and configuration file locations for logging and product definitions (see below). The same configuration file is used for both *trollstalker* and *l2processor*. An example that can be used as a template is located in *trollduction/examples/master_config.ini*. Each different production chain can be placed in the same configuration file and are separated by *[chain_name]* header tag.
+The main configuration for *trollduction* processing chain defines the messaging, file patterns, satellite instrument name and configuration file locations for logging and product definitions (see below). The same configuration file is used for both *trollstalker* and *l2processor*. An example that can be used as a template is located in *trollduction/examples/master_config.ini_template*. Each different production chain can be placed in the same configuration file and are separated by *[chain_name]* header tag.
 
 The required keys are:
 
@@ -23,14 +23,17 @@ The required keys are:
     * *time* --- data nominal time with datetime format attached "{time:%Y%m%d_%H%M}"
     * *orbit* --- orbit number of the polar-orbiting satellite
     * *instrument* --- instrument name given to GenericFactory of mpop_
-* *product_config_file* --- full path to product configuration file
+* *product_config_file* --- full path to product configuration file, see the next section for product_ configuration
 
 Optional configuration keys:
 
 * *stalker_log_config* --- full path to logging configuration file for *trollstalker*
+    * the output filename and path for *trollstalker* log files are set here
 * *td_log_config* --- full path to logging configuration file for *trollduction*
+    * the output filename and path for *trollduction* log files are set here
 * *event_names* --- list of pyinotify event names that *trollstalker* will react to
 * *posttroll_port* --- port number where posttroll messages are sent
+* *timezone* --- Timezone that is used in log timestamps. Defaults to UTC.
 
 The field lengths of *filepattern* can, and should when possible, be given::
 
@@ -44,13 +47,14 @@ Here *path* holds everything that comes before "hrpt_", *platform* is a characte
 
 Product configuration file(s)
 -----------------------------
+.. _product:
 
 Two examples for product configuration are supplied in *trollduction/examples/* directory:
 
-* *product_config_hrpt.xml* for NOAA/AVHRR
-* *product_config_hrit.xml* for Meteosat/SEVIRI
+* *product_config_hrpt.xml_template* for NOAA/AVHRR
+* *product_config_hrit.xml_template* for Meteosat/SEVIRI
 
-These files describe, in XML format, which image composites are made. The different parts are explained below. Notice that also the corresponding closing tag is required (eg. *</common>*).
+These files describe, in XML format, which image composites are made. Use these as a starting point for your own configuration, and save the file to the place set in your *master_config.ini* (without the *_template* ending!). The different parts and tags of the product configuration file are explained below. Notice that also *all* the corresponding closing tag is required (eg. *</common>*), and the file needs to be valid XML.
 
 The first part, *<common>*, can be used to give default values that are used, if not overridden, by all the *<product>* definitions. Also, by defining *<netcdf_file>* in this section, the data in original satellite projection will be saved in netCDF4 format to the given filename.
 

@@ -27,6 +27,7 @@ args=(sys.stdout,)
 class=handlers.TimedRotatingFileHandler
 level=DEBUG
 formatter=simpleFormatter
+# Change log filename pattern here!
 args=("/tmp/trollstalker.log", 'midnight', 1, 7, None, True, True)
 
 [formatter_simpleFormatter]

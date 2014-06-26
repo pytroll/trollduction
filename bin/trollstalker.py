@@ -22,7 +22,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""./trollstalker.py -c ../examples/master_config.ini -C noaa_hrpt
+"""./trollstalker.py -c /path/to/master_config.ini -C noaa_hrpt
 """
 
 import argparse
@@ -228,6 +228,11 @@ def main():
 
     if args.configuration_file is not None:
         config_fname = args.configuration_file
+
+        if "template" in config_fname:
+            print "Template file given as trollstalker logging config," \
+                " aborting!"
+            sys.exit()
 
         config = ConfigParser()
         config.read(config_fname)
