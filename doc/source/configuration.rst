@@ -39,7 +39,7 @@ The field lengths of *filepattern* can, and should when possible, be given::
 
 {path}hrpt_{platform:4s}{satnumber:2d}_{time:%Y%m%d_%H%M}_{orbit:05d}.l1b
 
-Here *path* holds everything that comes before "hrpt_", *platform* is a character string of length 4, *satnumber* is a two-digit number, *time* has year, month and day followed by an underscore and hour and minutes, and *orbit* is a zero-padded number with five digits.
+Here *path* holds everything that comes before "hrpt\_", *platform* is a character string of length 4, *satnumber* is a two-digit number, *time* has year, month and day followed by an underscore and hour and minutes, and *orbit* is a zero-padded number with five digits.
 
 .. _trollsift: http://trollsift.readthedocs.org/en/latest/
 .. _mpop: http://mpop.readthedocs.org/en/latest/
