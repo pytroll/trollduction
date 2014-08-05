@@ -572,8 +572,8 @@ class DataProcessor(object):
         try:
             if float(config['sunzen_night_minimum']) > \
                     data.sun_zen[y_idx, x_idx]:
-                LOGGER.info('Sun too low for night-time '
-                                            'product.')
+                LOGGER.info('Sun too high for night-time '
+                            'product.')
                 return False
         except KeyError:
             pass
