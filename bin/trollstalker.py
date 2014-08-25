@@ -47,9 +47,10 @@ class EventHandler(ProcessEvent):
      *posttroll_port* - port number to publish the messages on
      *filepattern* - filepattern for finding information from the filename
     """
-    def __init__(self, service, instrument, posttroll_port=0, filepattern=None):
+    def __init__(self, service, instrument, posttroll_port=0, filepattern=None,
+                 aliases=None):
         super(EventHandler, self).__init__()
-        
+
         self._pub = NoisyPublisher("trollstalker", posttroll_port, service)
         self.pub = self._pub.start()
         self.service = service
@@ -58,6 +59,7 @@ class EventHandler(ProcessEvent):
             filepattern = '{filename}'
         self.file_parser = Parser(filepattern)
         self.instrument = instrument
+        self.aliases = aliases
 
     def stop(self):
         '''Stop publisher.
@@ -126,6 +128,12 @@ class EventHandler(ProcessEvent):
             self.info = self.file_parser.parse(event.pathname)
             self.info['uri'] = event.pathname
             self.info['instrument'] = self.instrument
+
+            # replace values with corresponding aliases, if any are given
+            if self.aliases:
+                for key in self.info:
+                    if key in self.aliases:
+                        self.info[key] = self.aliases[key][str(self.info[key])]
         except ValueError:
             # Filename didn't match pattern, so empty the info dict
             self.info = {}
@@ -139,7 +147,7 @@ class NewThreadedNotifier(ThreadedNotifier):
 
 
 def create_notifier(service, instrument, posttroll_port, filepattern,
-                    event_names, monitored_dirs):
+                    event_names, monitored_dirs, aliases=None):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
@@ -157,7 +165,8 @@ def create_notifier(service, instrument, posttroll_port, filepattern,
 
     event_handler = EventHandler(service, instrument,
                                  posttroll_port=posttroll_port,
-                                 filepattern=filepattern)
+                                 filepattern=filepattern,
+                                 aliases=aliases)
     notifier = NewThreadedNotifier(manager, event_handler)
 
     # Add directories and event masks to watch manager
@@ -166,6 +175,34 @@ def create_notifier(service, instrument, posttroll_port, filepattern,
 
     return notifier
 
+def parse_aliases(config):
+    '''Parse aliases from the config.
+
+    Aliases are given in the config as:
+
+    {'alias_<name>': 'value:alias'}, or
+    {'alias_<name>': 'value1:alias1|value2:alias2'},
+
+    where <name> is the name of the key which value will be
+    replaced. The later form is there to support several possible
+    substitutions (eg. '2' -> '9' and '3' -> '10' in the case of MSG).
+
+    '''
+    aliases = {}
+
+    for key in config:
+        if 'alias' in key:
+            alias = config[key]
+            new_key = key.replace('alias_', '')
+            if '|' in alias or ':' in alias:
+                parts = alias.split('|')
+                aliases2 = {}
+                for part in parts:
+                    key2, val2 = part.split(':')
+                    aliases2[key2] = val2
+                alias = aliases2
+            aliases[new_key] = alias
+    return aliases
 
 def main():
     '''Main(). Commandline parsing and stalker startup.'''
@@ -259,6 +296,7 @@ def main():
             instrument = instrument or config['instrument']
         except KeyError:
             pass
+        aliases = parse_aliases(config)
         try:
             log_config = config["stalker_log_config"]
         except KeyError:
@@ -290,7 +328,7 @@ def main():
 
     # Start watching for new files
     notifier = create_notifier(service, instrument, posttroll_port, filepattern,
-                               event_names, monitored_dirs)
+                               event_names, monitored_dirs, aliases=aliases)
     notifier.start()
 
     try:

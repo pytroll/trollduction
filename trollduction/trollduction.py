@@ -152,10 +152,10 @@ class DataProcessor(object):
 
         time_slot = msg.data['time']
 
-        # orbit is empty string for meteosat, change it to None
-        if 'orbit' in msg.data:
-            if msg.data['orbit'] == '':
-                msg.data['orbit'] = None
+        # orbit is not given for GEO satellites, use None
+
+        if 'orbit' not in msg.data:
+            msg.data['orbit'] = None
 
         t1a = time.time()
 
@@ -256,11 +256,13 @@ class DataProcessor(object):
         loaded_channels = []
         required_channels = []
         wavelengths = []
+        chan_names = []
 
         # Get information which channels are loaded
         for chan in self.global_data.channels:
             required_channels.append(False)
             wavelengths.append(chan.wavelength_range)
+            chan_names.append(chan.name)
             if chan.is_loaded():
                 loaded_channels.append(True)
             else:
@@ -272,10 +274,15 @@ class DataProcessor(object):
                             product['composite']+'.prerequisites')
             for req in reqs:
                 for i in range(len(self.global_data.channels)):
-                    if req >= np.min(wavelengths[i]) and \
-                            req <= np.max(wavelengths[i]):
-                        required_channels[i] = True
-                        break
+                    if isinstance(req, str):
+                        if req is chan_names[i]:
+                            required_channels[i] = True
+                            break
+                    else:
+                        if req >= np.min(wavelengths[i]) and \
+                           req <= np.max(wavelengths[i]):
+                            required_channels[i] = True
+                            break
 
         to_load = []
         to_unload = []

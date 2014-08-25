@@ -27,6 +27,13 @@ The required keys are:
 
 Optional configuration keys:
 
+* *alias_<name>* --- gives a replacement for keyword *<name>*. Useful (and actually required!) with HRIT/MSG files. Has two different formats:
+    * **alias_name=original:replacement**
+        * alias_platform_name=MSG:meteosat
+        * replace value *MSG* of the keyword *platform_name* to *meteosat*
+    * **alias_name=old1:new1|old2:new2|old3:new3** ...
+        * alias_satnumber=1:8|2:9|3:10
+        * depending on the current value, replace the old value of *satnumber* with a new value: '1' -> '8', '2' -> '9' or '3' -> 10
 * *stalker_log_config* --- full path to logging configuration file for *trollstalker*
     * the output filename and path for *trollstalker* log files are set here
 * *td_log_config* --- full path to logging configuration file for *trollduction*
