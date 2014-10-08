@@ -51,6 +51,8 @@ import logging.handlers
 from fnmatch import fnmatch
 import helper_functions
 from trollsift import Parser
+from urlparse import urlparse
+import socket
 
 LOGGER = logging.getLogger(__name__)
 
@@ -133,9 +135,12 @@ class ConfigWatcher(object):
         LOGGER.info("Stop watching %s", self.config_file)
         self.notifier.stop()
 
+
 class DataProcessor(object):
+
     """Process the data.
     """
+
     def __init__(self):
         self.global_data = None
         self.local_data = None
@@ -146,6 +151,16 @@ class DataProcessor(object):
     def run(self, product_config, msg):
         """Process the data
         """
+
+        url = urlparse(msg.data['uri'])
+        local_ip = socket.gethostbyname(socket.gethostname())
+        url_ip = socket.gethostbyname(url.netloc)
+
+        if url_ip != local_ip:
+            LOGGER.info('Data not accessible on this host: %s',
+                        msg.data['uri'])
+            return
+
         LOGGER.info('New data available: %s', msg.data['uri'])
 
         self.product_config = product_config
