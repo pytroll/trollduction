@@ -169,7 +169,9 @@ class DataProcessor(object):
 
         self.product_config = product_config
 
-        time_slot = msg.data['time']
+        time_slot = (msg.data.get('time') or
+                     msg.data.get('start_time') or
+                     msg.data.get('nominal_time'))
 
         # orbit is not given for GEO satellites, use None
 
