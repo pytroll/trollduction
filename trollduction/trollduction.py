@@ -180,17 +180,23 @@ class DataProcessor(object):
 
         t1a = time.time()
 
+        platform = (msg.data.get('platform') or
+                    msg.data.get('satellite').split()[0])
+        satnumber = (msg.data.get('satnumber') or
+                     msg.data.get('satellite').split()[1])
+
         # Create satellite scene
         self.global_data = GF.create_scene(
-            satname=str(msg.data['platform']),
-            satnumber=str(msg.data['satnumber']),
+            satname=str(platform),
+            satnumber=str(satnumber),
             instrument=str(msg.data['instrument']),
             time_slot=time_slot,
             orbit=str(msg.data['orbit']))
 
         # Update missing information to global_data.info{}
-        self.global_data.info['satname'] = msg.data['platform']
-        self.global_data.info['satnumber'] = msg.data['satnumber']
+        # TODO: this should be fixed in mpop.
+        self.global_data.info['satname'] = platform,
+        self.global_data.info['satnumber'] = satnumber,
         self.global_data.info['instrument'] = msg.data['instrument']
         self.global_data.info['orbit'] = msg.data['orbit']
 
