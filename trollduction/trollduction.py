@@ -643,17 +643,14 @@ class DataWriter(Thread):
         LOGGER.info("stopping data writer")
         self._loop = False
 
-from minion import Minion
 
-
-class Trollduction(Minion):
+class Trollduction(object):
 
     """Trollduction takes in messages and generates DataProcessor jobs.
     """
 
     def __init__(self, config, managed=True):
-        LOGGER.debug("Minion should be starting now")
-        Minion.__init__(self)
+        LOGGER.debug("Trollduction starting now")
 
         self.td_config = None
         self.product_config = None
