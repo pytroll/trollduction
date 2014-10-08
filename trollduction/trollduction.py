@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
-# 
+#
 # Copyright (c) 2014
-# 
+#
 # Author(s):
-# 
+#
 #   Panu Lahtinen <panu.lahtinen@fmi.fi>
 #   Martin Raspaud <martin.raspaud@smhi.se>
-# 
-# 
+#
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -62,7 +62,9 @@ import pyinotify
 
 # Generic event handler
 
+
 class EventHandler(pyinotify.ProcessEvent):
+
     """Handle events with a generic *fun* function.
     """
 
@@ -99,14 +101,16 @@ class EventHandler(pyinotify.ProcessEvent):
         """
         self.process_file(event.pathname)
 
+
 class ConfigWatcher(object):
+
     """Watch a given config file and run reload_config.
     """
 
     def __init__(self, config_file, config_item, reload_config):
         mask = (pyinotify.IN_CLOSE_WRITE |
-            pyinotify.IN_MOVED_TO |
-            pyinotify.IN_CREATE)
+                pyinotify.IN_MOVED_TO |
+                pyinotify.IN_CREATE)
         self.config_file = config_file
         self.config_item = config_item
         self.watchman = pyinotify.WatchManager()
@@ -175,7 +179,7 @@ class DataProcessor(object):
         t1a = time.time()
 
         # Create satellite scene
-        self.global_data = GF.create_scene(\
+        self.global_data = GF.create_scene(
             satname=str(msg.data['platform']),
             satnumber=str(msg.data['satnumber']),
             instrument=str(msg.data['instrument']),
@@ -249,7 +253,7 @@ class DataProcessor(object):
             # Draw requested images for this area.
             self.draw_images(area)
 
-            LOGGER.info('Area processed in %.1f s', (time.time()-t1b))
+            LOGGER.info('Area processed in %.1f s', (time.time() - t1b))
 
         # Wait for the writer to finish
         LOGGER.debug("Waiting for the files to be saved")
@@ -288,8 +292,9 @@ class DataProcessor(object):
 
         # Get a list of required channels
         for product in products:
-            reqs = eval('self.global_data.image.'+ \
-                            product['composite']+'.prerequisites')
+            composite = getattr(self.global_data.image, product['composite'])
+            reqs = composite.prerequisites
+
             for req in reqs:
                 for i in range(len(self.global_data.channels)):
                     if isinstance(req, str):
@@ -329,7 +334,8 @@ class DataProcessor(object):
         config to a list.
         '''
 
-        def_names = [area['definition'] for area in self.product_config['area']]
+        def_names = [area['definition']
+                     for area in self.product_config['area']]
 
         return def_names
 
@@ -346,8 +352,8 @@ class DataProcessor(object):
 
                 info = 'Satellite %s not in list of valid ' \
                     'satellites, skipping product %s.' % \
-                    (self.global_data.info['satname'] + \
-                         self.global_data.info['satnumber'],
+                    (self.global_data.info['satname'] +
+                     self.global_data.info['satnumber'],
                      config['name'])
                 LOGGER.info(info)
 
@@ -361,15 +367,14 @@ class DataProcessor(object):
 
                 info = 'Satellite %s is in the list of invalid ' \
                     'satellites, skipping product %s.' % \
-                    (self.global_data.info['satname'] + \
-                         self.global_data.info['satnumber'],
+                    (self.global_data.info['satname'] +
+                     self.global_data.info['satnumber'],
                      config['name'])
                 LOGGER.info(info)
 
                 return False
 
         return True
-
 
     def draw_images(self, area):
         '''Generate images from local data using given area name and
@@ -388,18 +393,17 @@ class DataProcessor(object):
             if 'sunzen_night_minimum' in product or \
                     'sunzen_day_maximum' in product:
                 if 'sunzen_xy_loc' in product:
-                    xy_loc = [int(x) for x in \
-                                  product['sunzen_xy_loc'].split(',')]
+                    xy_loc = [int(x) for x in
+                              product['sunzen_xy_loc'].split(',')]
                     lonlat = None
                 else:
                     xy_loc = None
                     if 'sunzen_lonlat' in product:
-                        lonlat = [float(x) for x in \
-                                      product['sunzen_lonlat'].split(',')]
+                        lonlat = [float(x) for x in
+                                  product['sunzen_lonlat'].split(',')]
                     else:
                         lonlat = None
-                if not self.check_sunzen(product, area_def=\
-                                         get_area_def(area['definition']),
+                if not self.check_sunzen(product, area_def=get_area_def(area['definition']),
                                          xy_loc=xy_loc, lonlat=lonlat):
                     # If the return value is False, skip this product
                     continue
@@ -435,7 +439,6 @@ class DataProcessor(object):
         # log and publish completion of this area def
         LOGGER.info('Area %s completed', area['name'])
 
-
     def write_netcdf(self, data_name='global_data', unload=False):
         '''Write the data as netCDF4.
         '''
@@ -458,7 +461,6 @@ class DataProcessor(object):
             data.unload(*loaded_channels)
 
         LOGGER.info('Data saved to %s', fname)
-
 
     def parse_filename(self, area=None, product=None, fname_key='filename'):
         '''Parse filename for saving.  Parameter *area* is for area-level
@@ -519,7 +521,6 @@ class DataProcessor(object):
 
         return fname
 
-
     def check_sunzen(self, config, area_def=None, xy_loc=None, lonlat=None,
                      data_name='local_data'):
         '''Check if the data is within Sun zenith angle limits.
@@ -569,14 +570,14 @@ class DataProcessor(object):
         else:
             if lonlat is not None and len(lonlat) == 2:
                 # Find the closest pixel to the given coordinates
-                dists = (data.area.lons - lonlat[0])**2 + \
-                    (data.area.lats - lonlat[1])**2
+                dists = (data.area.lons - lonlat[0]) ** 2 + \
+                    (data.area.lats - lonlat[1]) ** 2
                 y_idx, x_idx = np.where(dists == np.min(dists))
                 y_idx, x_idx = int(y_idx), int(x_idx)
             else:
                 # Use image center
-                y_idx = int(area_def.y_size/2)
-                x_idx = int(area_def.x_size/2)
+                y_idx = int(area_def.y_size / 2)
+                x_idx = int(area_def.x_size / 2)
 
         # Check if Sun is too low (day-only products)
         try:
@@ -607,11 +608,13 @@ class DataProcessor(object):
 
 
 class DataWriter(Thread):
+
     """Writes data to disk.
 
-    This is separate from the DataProcessor since it IO takes time and we don't
+    This is separate from the DataProcessor since it takes IO time and we don't
     want to block processing.
     """
+
     def __init__(self):
         Thread.__init__(self)
         self.prod_queue = Queue.Queue()
@@ -642,7 +645,9 @@ class DataWriter(Thread):
 
 from minion import Minion
 
+
 class Trollduction(Minion):
+
     """Trollduction takes in messages and generates DataProcessor jobs.
     """
 
@@ -696,17 +701,16 @@ class Trollduction(Minion):
         # Initialize/restart listener
         if self.listener is None:
             self.listener = \
-                            ListenerContainer(service=\
-                                              self.td_config['service'])
+                ListenerContainer(service=self.td_config['service'])
 #            self.listener = ListenerContainer()
             LOGGER.info("Listener started")
         else:
-#            self.listener.restart_listener('file')
+            #            self.listener.restart_listener('file')
             self.listener.restart_listener(self.td_config['service'])
             LOGGER.info("Listener restarted")
 
         try:
-            self.update_product_config(self.td_config['product_config_file'], \
+            self.update_product_config(self.td_config['product_config_file'],
                                        self.td_config['config_item'])
         except KeyError:
             print ""
@@ -722,9 +726,8 @@ class Trollduction(Minion):
         '''
 
         product_config = \
-                         helper_functions.read_config_file(fname,
-                                                           config_item=\
-                                                           config_item)
+            helper_functions.read_config_file(fname,
+                                              config_item=config_item)
 
         # add checks, or do we just assume the config to be valid at
         # this point?
@@ -747,7 +750,6 @@ class Trollduction(Minion):
             self.config_watcher.stop()
         if self.listener is not None:
             self.listener.stop()
-
 
     def stop(self):
         """Stop running.
