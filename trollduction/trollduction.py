@@ -679,11 +679,6 @@ class Trollduction(object):
         except AttributeError:
             self.td_config = config
             self.update_td_config()
-        Minion.start(self)
-
-    # def start(self):
-        # Minion.start(self)
-        # self.thr = Thread(target=self.run_single).start()
 
     def update_td_config_from_file(self, fname, config_item=None):
         '''Read Trollduction config file and use the new parameters.
@@ -754,7 +749,6 @@ class Trollduction(object):
         """Stop running.
         """
         self.cleanup()
-        Minion.stop(self)
 
     def shutdown(self):
         '''Shutdown trollduction.
