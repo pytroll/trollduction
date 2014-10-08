@@ -188,11 +188,13 @@ class DataProcessor(object):
         self.global_data.info['instrument'] = msg.data['instrument']
         self.global_data.info['orbit'] = msg.data['orbit']
 
+        filename = urlparse(msg.data['uri']).path
+
         area_def_names = self.get_area_def_names()
 
         # Save full unprojected data to netcdf4
         if 'netcdf_file' in self.product_config['common']:
-            self.global_data.load()
+            self.global_data.load(filename=filename)
             self.writer.write(self.write_netcdf, data_name='global_data',
                               unload=True)
 
@@ -215,17 +217,19 @@ class DataProcessor(object):
                 try:
                     if msg.data['orbit'] is not None:
                         raise TypeError
-                    self.global_data.load(area_def_names=area_def_names)
+                    self.global_data.load(filename=filename,
+                                          area_def_names=area_def_names)
                 except TypeError:
                     # load all data if area_def_names keyword isn't
                     # available in instrument reader or the data is
                     # swath based
                     LOGGER.info('Loading full swath data')
-                    self.global_data.load()
+                    self.global_data.load(filename=filename)
             else:
                 LOGGER.info('Loading required channels.')
                 self.load_unload_channels(area['product'],
-                                          area_def_names=area_def_names)
+                                          area_def_names=area_def_names,
+                                          filename=filename)
 
             # reproject to local domain
             LOGGER.debug("Projecting data to area " + area['name'])
@@ -261,8 +265,7 @@ class DataProcessor(object):
         self.local_data = None
         self.global_data = None
 
-
-    def load_unload_channels(self, products, area_def_names=None):
+    def load_unload_channels(self, products, area_def_names=None, filename=None):
         '''Load channel data required for the given list of *products*
         for the given area definition name(s) *area_def_names*.
         Unload channels that are not needed.
@@ -313,13 +316,13 @@ class DataProcessor(object):
         self.global_data.unload(*to_unload)
 
         try:
-            self.global_data.load(to_load, area_def_names=area_def_names)
+            self.global_data.load(to_load, area_def_names=area_def_names,
+                                  filename=filename)
         except TypeError:
             LOGGER.info("Loading full data")
             # load whole area if area_def_names keywoard isn't
             # available in the instrument reader
-            self.global_data.load(to_load)
-
+            self.global_data.load(to_load, filename=filename)
 
     def get_area_def_names(self):
         '''Collect and return area definition names from product
