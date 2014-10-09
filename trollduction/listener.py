@@ -34,31 +34,30 @@ logger = logging.getLogger(__name__)
 class ListenerContainer(object):
     '''Container for listener instance
     '''
-    def __init__(self, service=None):
+    def __init__(self, topic=None):
         self.listener = None
         self.queue = None
         self.thread = None
 
-        if service is not None:
+        if topic is not None:
             # Create queue for the messages
             self.queue = Queue() #Pipe()
 
             # Create a Listener instance
-            self.listener = Listener(service=service, 
-                                     queue=self.queue)
+            self.listener = Listener(topic=topic, queue=self.queue)
             # Start Listener instance into a new daemonized thread.
             self.thread = Thread(target=self.listener.run)
             self.thread.setDaemon(True)
             self.thread.start()
 
 
-    def restart_listener(self, service):
+    def restart_listener(self, topic):
         '''Restart listener after configuration update.
         '''
         if self.listener is not None:
             if self.listener.running:
                 self.stop()
-        self.__init__(service=service)
+        self.__init__(topic=topic)
 
 
     def stop(self):
@@ -73,10 +72,10 @@ class Listener(object):
     '''PyTroll listener class for reading messages for Trollduction
     '''
 
-    def __init__(self, service=None, queue=None):
+    def __init__(self, topic=None, queue=None):
         '''Init Listener object
         '''
-        self.service = service
+        self.topic = topic
         self.queue = queue
         self.subscriber = None
         self.recv = None
@@ -89,8 +88,8 @@ class Listener(object):
         message types.
         '''
         if self.subscriber is None:
-            if self.service:
-                self.subscriber = NSSubscriber(self.service,
+            if self.topic:
+                self.subscriber = NSSubscriber("", self.topic,
                                                addr_listener=True)
                 self.recv = self.subscriber.start().recv
 
