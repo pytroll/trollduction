@@ -714,7 +714,8 @@ class Trollduction(Minion):
         if self.td_config['product_config_file'] != fname:
             self.td_config['product_config_file'] = fname
 
-        LOGGER.info('New product config read from %s', fname)
+        LOGGER.info('Product config read from %s', fname)
+
 
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
