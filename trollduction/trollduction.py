@@ -140,6 +140,7 @@ class DataProcessor(object):
         self.global_data = None
         self.local_data = None
         self.product_config = None
+        self._data_ok = True
         self.writer = DataWriter()
         self.writer.start()
 
@@ -148,6 +149,7 @@ class DataProcessor(object):
         """
         LOGGER.info('New data available: %s', msg.data['uri'])
 
+        self._data_ok = True
         self.product_config = product_config
 
         time_slot = msg.data['time']
@@ -178,8 +180,11 @@ class DataProcessor(object):
         # Save full unprojected data to netcdf4
         if 'netcdf_file' in self.product_config['common']:
             self.global_data.load()
-            self.writer.write(self.write_netcdf, data_name='global_data',
-                              unload=True)
+            try:
+                self.writer.write(self.write_netcdf, data_name='global_data',
+                                  unload=True)
+            except IOError:
+                LOGGER.error("Saving unprojected data to NetCDF failed!")
 
         # Make images for each area
         for area in self.product_config['area']:
@@ -200,17 +205,32 @@ class DataProcessor(object):
                 try:
                     if msg.data['orbit'] is not None:
                         raise TypeError
-                    self.global_data.load(area_def_names=area_def_names)
+                    try:
+                        self.global_data.load(area_def_names=area_def_names)
+                    except IndexError:
+                        LOGGER.error("Incomplete or corrupted input data.")
+                        self._data_ok = False
+                        break
                 except TypeError:
                     # load all data if area_def_names keyword isn't
                     # available in instrument reader or the data is
                     # swath based
                     LOGGER.info('Loading full swath data')
-                    self.global_data.load()
+                    try:
+                        self.global_data.load()
+                    except IndexError:
+                        LOGGER.error("Incomplete or corrupted input data.")
+                        self._data_ok = False
+                        break
             else:
                 LOGGER.info('Loading required channels.')
-                self.load_unload_channels(area['product'],
-                                          area_def_names=area_def_names)
+                try:
+                    self.load_unload_channels(area['product'],
+                                              area_def_names=area_def_names)
+                except IndexError:
+                    LOGGER.error("Incomplete or corrupted input data.")
+                    self._data_ok = False
+                    break
 
             # reproject to local domain
             LOGGER.debug("Projecting data to area " + area['name'])
@@ -224,7 +244,10 @@ class DataProcessor(object):
 
             # Save projected data to netcdf4
             if 'netcdf_file' in area:
-                self.writer.write(self.write_netcdf, 'local_data')
+                try:
+                    self.writer.write(self.write_netcdf, 'local_data')
+                except IOError:
+                    LOGGER.error("Saving projected data to NetCDF failed!")
             LOGGER.info('Data reprojected for area: %s', area['name'])
 
             # Draw requested images for this area.
@@ -233,12 +256,19 @@ class DataProcessor(object):
             LOGGER.info('Area processed in %.1f s', (time.time()-t1b))
 
         # Wait for the writer to finish
-        LOGGER.debug("Waiting for the files to be saved")
+        if self._data_ok:
+            LOGGER.debug("Waiting for the files to be saved")
         self.writer.prod_queue.join()
-        LOGGER.debug("All files saved")
+        if self._data_ok:
+            LOGGER.debug("All files saved")
 
-        LOGGER.info('File %s processed in %.1f s', msg.data['uri'],
-                    time.time() - t1a)
+            LOGGER.info('File %s processed in %.1f s', msg.data['uri'],
+                        time.time() - t1a)
+
+        if not self._data_ok:
+            LOGGER.warning("File %s not processed due to " \
+                           "incomplete/missing/corrupted data." % \
+                           msg.data['uri'])
 
         # Release memory
         del self.local_data
@@ -678,13 +708,13 @@ class Trollduction(Minion):
         # Initialize/restart listener
         if self.listener is None:
             self.listener = \
-                            ListenerContainer(service=\
-                                              self.td_config['service'])
+                            ListenerContainer(topic=\
+                                              self.td_config['topic'])
 #            self.listener = ListenerContainer()
             LOGGER.info("Listener started")
         else:
 #            self.listener.restart_listener('file')
-            self.listener.restart_listener(self.td_config['service'])
+            self.listener.restart_listener(self.td_config['topic'])
             LOGGER.info("Listener restarted")
 
         try:
