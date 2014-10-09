@@ -23,7 +23,7 @@
 '''XML reader for Trollduction system and product configuration files.
 '''
 
-from lxml import etree
+import xml.etree.ElementTree as etree
 import os
 
 def get_root(fname):
@@ -53,24 +53,23 @@ def parse_xml(tree, also_empty=False):
             pass
 
     for child in children:
-        if not isinstance(child, etree._Comment):
-            new_val = parse_xml(child, also_empty=also_empty)
-            if len(new_val) == 0:
-                if also_empty:
-                    xml_dict[child.tag] = ''
-                    continue
-                else:
-                    continue
-            if child.tag in xml_dict:
-                if not isinstance(xml_dict[child.tag], list):
-                    xml_dict[child.tag] = [xml_dict[child.tag]]
-                xml_dict[child.tag].append(new_val)
+        new_val = parse_xml(child, also_empty=also_empty)
+        if len(new_val) == 0:
+            if also_empty:
+                xml_dict[child.tag] = ''
+                continue
             else:
-                if len(new_val) > 0:
-                    if child.tag in listify:
-                        xml_dict[child.tag] = [new_val]
-                    else:
-                        xml_dict[child.tag] = new_val
+                continue
+        if child.tag in xml_dict:
+            if not isinstance(xml_dict[child.tag], list):
+                xml_dict[child.tag] = [xml_dict[child.tag]]
+            xml_dict[child.tag].append(new_val)
+        else:
+            if len(new_val) > 0:
+                if child.tag in listify:
+                    xml_dict[child.tag] = [new_val]
+                else:
+                    xml_dict[child.tag] = new_val
 
     return xml_dict
 
