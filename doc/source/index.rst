@@ -22,7 +22,6 @@ Setting things up cheat sheet
     * posttroll_ - select *feature_service* branch
     * pyorbital_
     * trollsift_
-    * python-lxml
     * python-pyinotify
     * trollduction_ - select *develop* branch
 #. Configure mpop

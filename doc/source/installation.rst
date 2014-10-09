@@ -16,7 +16,6 @@ You need to have the following packages, and their requirements, installed befor
 * posttroll_ - select *feature_service* branch
 * pyorbital_
 * trollsift_
-* python-lxml
 * python-pyinotify
 
 .. _mpop: https://github.com/mraspaud/mpop
