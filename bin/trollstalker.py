@@ -42,18 +42,17 @@ LOGGER = logging.getLogger("trollstalker")
 class EventHandler(ProcessEvent):
     """
     Event handler class for inotify.
-     *service* - service to broadcast and the subject line of the published
-                 messages
+     *topic* - topic of the published messages
      *posttroll_port* - port number to publish the messages on
      *filepattern* - filepattern for finding information from the filename
     """
-    def __init__(self, service, instrument, posttroll_port=0, filepattern=None,
+    def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
                  aliases=None):
         super(EventHandler, self).__init__()
 
-        self._pub = NoisyPublisher("trollstalker", posttroll_port, service)
+        self._pub = NoisyPublisher("trollstalker", posttroll_port, topic)
         self.pub = self._pub.start()
-        self.service = service
+        self.topic = topic
         self.info = {}
         if filepattern is None:
             filepattern = '{filename}'
@@ -117,7 +116,7 @@ class EventHandler(ProcessEvent):
     def create_message(self):
         """Create broadcasted message
         """
-        return Message(self.service, 'file', self.info)
+        return Message(self.topic, 'file', self.info)
 
 
     def parse_file_info(self, event):
@@ -146,7 +145,7 @@ class NewThreadedNotifier(ThreadedNotifier):
         ThreadedNotifier.stop(self, *args, **kwargs)
 
 
-def create_notifier(service, instrument, posttroll_port, filepattern,
+def create_notifier(topic, instrument, posttroll_port, filepattern,
                     event_names, monitored_dirs, aliases=None):
     '''Create new notifier'''
 
@@ -163,7 +162,7 @@ def create_notifier(service, instrument, posttroll_port, filepattern,
         except AttributeError:
             LOGGER.warning('Event ' + event + ' not found in pyinotify')
 
-    event_handler = EventHandler(service, instrument,
+    event_handler = EventHandler(topic, instrument,
                                  posttroll_port=posttroll_port,
                                  filepattern=filepattern,
                                  aliases=aliases)
@@ -218,11 +217,10 @@ def main():
     parser.add_argument("-p", "--posttroll_port", dest="posttroll_port",
                       default=0, type=int,
                       help="Local port where messages are published")
-    parser.add_argument("-s", "--service", dest="service",
+    parser.add_argument("-t", "--topic", dest="topic",
                         type=str,
                         default=None,
-                        help="Service to broadcast. Also the subject of the "\
-                            "sent messages")
+                        help="Topic of the sent messages")
     parser.add_argument("-c", "--configuration_file",
                         type=str,
                         help="Name of the config.ini configuration file")
@@ -255,7 +253,7 @@ def main():
         monitored_dirs = None
 
     posttroll_port = args.posttroll_port
-    service = args.service
+    topic = args.topic
     event_names = args.event_names
     instrument = args.instrument
 
@@ -276,7 +274,7 @@ def main():
         config = dict(config.items(args.config_item))
         config['name'] = args.configuration_file
 
-        service = service or config['service']
+        topic = topic or config['topic']
         monitored_dirs = monitored_dirs or config['directory']
         filepattern = filepattern or config['filepattern']
         try:
@@ -327,7 +325,7 @@ def main():
         monitored_dirs = [monitored_dirs]
 
     # Start watching for new files
-    notifier = create_notifier(service, instrument, posttroll_port, filepattern,
+    notifier = create_notifier(topic, instrument, posttroll_port, filepattern,
                                event_names, monitored_dirs, aliases=aliases)
     notifier.start()
 

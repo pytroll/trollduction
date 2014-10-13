@@ -26,14 +26,16 @@
 #from trollduction.tests import test_listener
 import unittest
 import doctest
+from trollduction.tests import test_trollduction
+
 
 def suite():
     """The global test suite.
     """
     mysuite = unittest.TestSuite()
     # Test the documentation strings
-    #mysuite.addTests(doctest.DocTestSuite(image))
+    # mysuite.addTests(doctest.DocTestSuite(image))
     # Use the unittests also
-    #mysuite.addTests(test_listener.suite())
+    mysuite.addTests(test_trollduction.suite())
 
     return mysuite

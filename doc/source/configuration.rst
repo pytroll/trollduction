@@ -14,7 +14,7 @@ The main configuration for *trollduction* processing chain defines the messaging
 
 The required keys are:
 
-* *service* --- name of the *trollstalker* service providing the messages for each new file. Also used by *l2processor* when subscribing for these messages
+* *topic* --- topic of the (*trollstalker*) messages for each new file. Also used by *l2processor* when subscribing for these messages
 * *directory* --- full path to the directory receiving the new files
 * *filepattern* --- file name pattern for the files, in trollsift_ format. The identifiers that will be parsed by *trollduction* are:
     * *path* --- directory path

@@ -149,13 +149,13 @@ class DataProcessor(object):
         self.global_data = None
         self.local_data = None
         self.product_config = None
+        self._data_ok = True
         self.writer = DataWriter()
         self.writer.start()
 
     def run(self, product_config, msg):
         """Process the data
         """
-
         url = urlparse(msg.data['uri'])
         local_ip = socket.gethostbyname(socket.gethostname())
         url_ip = socket.gethostbyname(url.netloc)
@@ -167,6 +167,7 @@ class DataProcessor(object):
 
         LOGGER.info('New data available: %s', msg.data['uri'])
 
+        self._data_ok = True
         self.product_config = product_config
 
         time_slot = (msg.data.get('time') or
@@ -181,9 +182,10 @@ class DataProcessor(object):
         t1a = time.time()
 
         platform = (msg.data.get('platform') or
-                    msg.data.get('satellite').split()[0])
+                    msg.data.get('satellite').split()[0]).lower()
         satnumber = (msg.data.get('satnumber') or
-                     msg.data.get('satellite').split()[1])
+                     msg.data.get('satellite').split()[1]).lower()
+        LOGGER.info("platform %s, number %s", str(platform), str(satnumber))
 
         # Create satellite scene
         self.global_data = GF.create_scene(
@@ -195,8 +197,8 @@ class DataProcessor(object):
 
         # Update missing information to global_data.info{}
         # TODO: this should be fixed in mpop.
-        self.global_data.info['satname'] = platform,
-        self.global_data.info['satnumber'] = satnumber,
+        self.global_data.info['satname'] = platform
+        self.global_data.info['satnumber'] = satnumber
         self.global_data.info['instrument'] = msg.data['instrument']
         self.global_data.info['orbit'] = msg.data['orbit']
 
@@ -204,72 +206,114 @@ class DataProcessor(object):
 
         area_def_names = self.get_area_def_names()
 
-        # Save full unprojected data to netcdf4
-        if 'netcdf_file' in self.product_config['common']:
-            self.global_data.load(filename=filename)
-            self.writer.write(self.write_netcdf, data_name='global_data',
-                              unload=True)
-
-        # Make images for each area
-        for area in self.product_config['area']:
-
-            # Check if satellite is one that should be processed
-            if not self.check_satellite(area):
-                # if return value is False, skip this loop step
-                continue
-
-            t1b = time.time()
-
-            # Check which channels are needed. Unload unnecessary
-            # channels and load those that are not already available.
-            # If NetCDF4 data is to be saved, use all data, otherwise
-            # unload unnecessary channels.
-            if 'netcdf_file' in area:
-                LOGGER.info('Load all channels for saving.')
+        for area_item in self.product_config.pl:
+            if area_item.tag == "dump":
+                # Save full unprojected data to netcdf4
+                self.global_data.load(filename=filename)
                 try:
-                    if msg.data['orbit'] is not None:
-                        raise TypeError
-                    self.global_data.load(filename=filename,
-                                          area_def_names=area_def_names)
-                except TypeError:
-                    # load all data if area_def_names keyword isn't
-                    # available in instrument reader or the data is
-                    # swath based
-                    LOGGER.info('Loading full swath data')
-                    self.global_data.load(filename=filename)
-            else:
-                LOGGER.info('Loading required channels.')
-                self.load_unload_channels(area['product'],
-                                          area_def_names=area_def_names,
-                                          filename=filename)
+                    for file_item in area_item:
+                        self.writer.write(self.write_netcdf,
+                                          data_name='global_data',
+                                          fileinfo=file_item,
+                                          unload=True)
+                except IOError:
+                    LOGGER.error("Saving unprojected data to NetCDF failed!")
+            if area_item.tag == "area":
+                # Make images for an area
 
-            # reproject to local domain
-            LOGGER.debug("Projecting data to area " + area['name'])
-            try:
-                self.local_data = \
-                    self.global_data.project(area['definition'],
-                                             mode='nearest')
-            except ValueError:
-                LOGGER.warning("No data in this area")
-                continue
+                # TODO
+                # Check if satellite is one that should be processed
+                # if not self.check_satellite(area):
+                    # if return value is False, skip this loop step
+                    # continue
 
-            # Save projected data to netcdf4
-            if 'netcdf_file' in area:
-                self.writer.write(self.write_netcdf, 'local_data')
-            LOGGER.info('Data reprojected for area: %s', area['name'])
+                t1b = time.time()
 
-            # Draw requested images for this area.
-            self.draw_images(area)
+                dump = False
 
-            LOGGER.info('Area processed in %.1f s', (time.time() - t1b))
+                for product_item in area_item:
+                    if product_item.tag == "dump":
+                        dump = True
+                        break
+
+                # Check which channels are needed. Unload unnecessary
+                # channels and load those that are not already available.
+                # If NetCDF4 data is to be saved, use all data, otherwise
+                # unload unnecessary channels.
+                if dump:
+                    # TODO
+                    LOGGER.info('Load all channels for saving.')
+                    try:
+                        if msg.data['orbit'] is not None:
+                            raise TypeError
+                        try:
+                            self.global_data.load(filename=filename,
+                                                  area_def_names=area_def_names)
+                        except IndexError:
+                            LOGGER.error("Incomplete or corrupted input data.")
+                            self._data_ok = False
+                            break
+                    except TypeError:
+                        # load all data if area_def_names keyword isn't
+                        # available in instrument reader or the data is
+                        # swath based
+                        LOGGER.info('Loading full swath data')
+                        try:
+                            self.global_data.load(filename=filename)
+                        except IndexError:
+                            LOGGER.error("Incomplete or corrupted input data.")
+                            self._data_ok = False
+                            break
+                else:
+                    LOGGER.info('Loading required channels.')
+                    try:
+                        self.load_unload_channels(area_item,
+                                                  area_def_names=area_def_names,
+                                                  filename=filename)
+                    except IndexError:
+                        LOGGER.error("Incomplete or corrupted input data.")
+                        self._data_ok = False
+                        break
+
+                # reproject to local domain
+                LOGGER.debug(
+                    "Projecting data to area " + area_item.attrib['name'])
+                try:
+                    self.local_data = \
+                        self.global_data.project(area_item.attrib["id"],
+                                                 mode='nearest')
+                except ValueError:
+                    LOGGER.warning("No data in this area")
+                    continue
+
+                # Save projected data to netcdf4
+                if dump:
+                    try:
+                        self.writer.write(self.write_netcdf, 'local_data')
+                    except IOError:
+                        LOGGER.error("Saving projected data to NetCDF failed!")
+                LOGGER.info(
+                    'Data reprojected for area: %s', area_item.attrib['name'])
+
+                # Draw requested images for this area.
+                self.draw_images(area_item)
+
+                LOGGER.info('Area processed in %.1f s', (time.time() - t1b))
 
         # Wait for the writer to finish
-        LOGGER.debug("Waiting for the files to be saved")
+        if self._data_ok:
+            LOGGER.debug("Waiting for the files to be saved")
         self.writer.prod_queue.join()
-        LOGGER.debug("All files saved")
+        if self._data_ok:
+            LOGGER.debug("All files saved")
 
-        LOGGER.info('File %s processed in %.1f s', msg.data['uri'],
-                    time.time() - t1a)
+            LOGGER.info('File %s processed in %.1f s', msg.data['uri'],
+                        time.time() - t1a)
+
+        if not self._data_ok:
+            LOGGER.warning("File %s not processed due to "
+                           "incomplete/missing/corrupted data." %
+                           msg.data['uri'])
 
         # Release memory
         del self.local_data
@@ -299,29 +343,21 @@ class DataProcessor(object):
                 loaded_channels.append(False)
 
         # Get a list of required channels
+        reqs = set()
         for product in products:
-            composite = getattr(self.global_data.image, product['composite'])
-            reqs = composite.prerequisites
+            if product.tag != "product":
+                continue
+            composite = getattr(self.global_data.image, product.attrib['id'])
+            reqs |= composite.prerequisites
 
-            for req in reqs:
-                for i in range(len(self.global_data.channels)):
-                    if isinstance(req, str):
-                        if req is chan_names[i]:
-                            required_channels[i] = True
-                            break
-                    else:
-                        if req >= np.min(wavelengths[i]) and \
-                           req <= np.max(wavelengths[i]):
-                            required_channels[i] = True
-                            break
+        LOGGER.debug('Channels: %s', str(self.global_data))
 
-        to_load = []
-        to_unload = []
-        for i in range(len(self.global_data.channels)):
-            if required_channels[i] and not loaded_channels[i]:
-                to_load.append(self.global_data.channels[i].name)
-            if not required_channels[i] and loaded_channels[i]:
-                to_unload.append(self.global_data.channels[i].name)
+        to_load = set()
+        to_unload = set([chn.name for chn in self.global_data.channels])
+
+        for chn in reqs:
+            to_load |= set([self.global_data[chn].name])
+            to_unload -= set([self.global_data[chn].name])
 
         LOGGER.debug('Channels to unload: %s', ', '.join(to_unload))
         LOGGER.debug('Channels to load: %s', ', '.join(to_load))
@@ -342,8 +378,9 @@ class DataProcessor(object):
         config to a list.
         '''
 
-        def_names = [area['definition']
-                     for area in self.product_config['area']]
+        def_names = [item.attrib["id"]
+                     for item in self.product_config.pl
+                     if item.tag == "area"]
 
         return def_names
 
@@ -390,62 +427,66 @@ class DataProcessor(object):
         '''
 
         # Create images for each color composite
-        for product in area['product']:
-
-            # Check if satellite is one that should be processed
-            if not self.check_satellite(product):
-                # Skip this product, if the return value is True
+        for product in area:
+            if product.tag != "product":
                 continue
+            # TODO
+            # Check if satellite is one that should be processed
+            # if not self.check_satellite(product):
+                # Skip this product, if the return value is True
+                # continue
 
             # Check if Sun zenith angle limits match this product
-            if 'sunzen_night_minimum' in product or \
-                    'sunzen_day_maximum' in product:
-                if 'sunzen_xy_loc' in product:
+            if 'sunzen_night_minimum' in product.attrib or \
+                    'sunzen_day_maximum' in product.attrib:
+                if 'sunzen_xy_loc' in product.attrib:
                     xy_loc = [int(x) for x in
-                              product['sunzen_xy_loc'].split(',')]
+                              product.attrib['sunzen_xy_loc'].split(',')]
                     lonlat = None
                 else:
                     xy_loc = None
-                    if 'sunzen_lonlat' in product:
+                    if 'sunzen_lonlat' in product.attrib:
                         lonlat = [float(x) for x in
-                                  product['sunzen_lonlat'].split(',')]
+                                  product.attrib['sunzen_lonlat'].split(',')]
                     else:
                         lonlat = None
-                if not self.check_sunzen(product, area_def=get_area_def(area['definition']),
+                if not self.check_sunzen(product.attrib, area_def=get_area_def(area.attrib['id']),
                                          xy_loc=xy_loc, lonlat=lonlat):
                     # If the return value is False, skip this product
                     continue
 
-            # Parse image filename
-            fname = self.parse_filename(area, product)
+            for file_item in product:
+                # Parse image filename
+                fname = self.parse_filename(
+                    file_item, area=area, product=product)
 
-            try:
-                # Check if this combination is defined
-                func = getattr(self.local_data.image, product['composite'])
-                img = func()
-                LOGGER.info('Saving image %s.', fname)
+                try:
+                    # Check if this combination is defined
+                    func = getattr(self.local_data.image, product.attrib['id'])
+                    img = func()
+                    LOGGER.info('Saving image %s.', fname)
 
-                self.writer.write(img.save, fname)
-                logging.info("sent to queue")
+                    self.writer.write(img.save, fname)
+                    logging.info("sent to queue")
 
-            except AttributeError:
-                # Log incorrect product funcion name
-                LOGGER.error('Incorrect product name: %s for area %s',
-                             product['name'], area['name'])
-            except KeyError:
-                # log missing channel
-                LOGGER.warning('Missing channel on product %s for area %s',
-                               product['name'], area['name'])
-            except:
-                _, val = sys.exc_info()[0]
-                # log other errors
-                LOGGER.error('Error %s on product %s for area %s',
-                             val.message,
-                             product['name'],
-                             area['name'])
+                except AttributeError:
+                    # Log incorrect product funcion name
+                    LOGGER.error('Incorrect product name: %s for area %s',
+                                 product.attrib['name'], area.attrib['name'])
+                except KeyError:
+                    # log missing channel
+                    LOGGER.warning('Missing channel on product %s for area %s',
+                                   product.attrib['name'], area.attrib['name'])
+                except:
+                    _, val = sys.exc_info()[0]
+                    # log other errors
+                    LOGGER.error('Error %s on product %s for area %s',
+                                 val.message,
+                                 product.attrib['name'],
+                                 area.attrib['name'])
 
         # log and publish completion of this area def
-        LOGGER.info('Area %s completed', area['name'])
+        LOGGER.info('Area %s completed', area.attrib['name'])
 
     def write_netcdf(self, data_name='global_data', unload=False):
         '''Write the data as netCDF4.
@@ -470,29 +511,26 @@ class DataProcessor(object):
 
         LOGGER.info('Data saved to %s', fname)
 
-    def parse_filename(self, area=None, product=None, fname_key='filename'):
+    def parse_filename(self, file_info, product=None, area=None):
         '''Parse filename for saving.  Parameter *area* is for area-level
         configuration dictionary, *product* for product-level
         configuration dictionary.  Parameter *fname_key* tells which
         dictionary key holds the filename pattern.
         '''
-        try:
-            out_dir = product['output_dir']
-        except (KeyError, TypeError):
-            try:
-                out_dir = area['output_dir']
-            except (KeyError, TypeError):
-                out_dir = self.product_config['common']['output_dir']
 
-        try:
-            fname = product[fname_key]
-        except (KeyError, TypeError):
-            try:
-                fname = area[fname_key]
-            except (KeyError, TypeError):
-                fname = self.product_config['common'][fname_key]
+        out_dir = None
 
-        fname = os.path.join(out_dir, fname)
+        if product is not None:
+            out_dir = product.attrib.get('output_dir', None)
+        if area is not None and out_dir is None:
+            out_dir = area.attrib.get('output_dir', None)
+        if out_dir is None:
+            out_dir = self.product_config.attrib.get('output_dir', None)
+
+        fname = file_info.text
+        print file_info.text
+        if out_dir is not None:
+            fname = os.path.join(out_dir, fname)
 
         try:
             time_slot = self.local_data.time_slot
@@ -505,12 +543,12 @@ class DataProcessor(object):
         info_dict['time'] = time_slot
 
         if area is not None:
-            info_dict['areaname'] = area['name']
+            info_dict['areaname'] = area.attrib['name']
         else:
             info_dict['areaname'] = ''
 
         if product is not None:
-            info_dict['composite'] = product['name']
+            info_dict['composite'] = product.attrib['name']
         else:
             info_dict['composite'] = ''
 
@@ -701,12 +739,12 @@ class Trollduction(object):
         # Initialize/restart listener
         if self.listener is None:
             self.listener = \
-                ListenerContainer(service=self.td_config['service'])
+                ListenerContainer(topic=self.td_config['topic'])
 #            self.listener = ListenerContainer()
             LOGGER.info("Listener started")
         else:
             #            self.listener.restart_listener('file')
-            self.listener.restart_listener(self.td_config['service'])
+            self.listener.restart_listener(self.td_config['topic'])
             LOGGER.info("Listener restarted")
 
         try:
@@ -724,18 +762,20 @@ class Trollduction(object):
         filename prototypes and other relevant information from the
         given file.
         '''
+        import xml_read
+        self.product_config = xml_read.ProductList(fname)
 
-        product_config = \
-            helper_functions.read_config_file(fname,
-                                              config_item=config_item)
+        # product_config = \
+        #    helper_functions.read_config_file(fname,
+        # config_item=config_item)
 
         # add checks, or do we just assume the config to be valid at
         # this point?
-        self.product_config = product_config
+        #self.product_config = product_config
         if self.td_config['product_config_file'] != fname:
             self.td_config['product_config_file'] = fname
 
-        LOGGER.info('New product config read from %s', fname)
+        LOGGER.info('Product config read from %s', fname)
 
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
@@ -769,7 +809,6 @@ class Trollduction(object):
             try:
                 msg = self.listener.queue.get(True, 5)
             except KeyboardInterrupt:
-                LOGGER.info('Keyboard interrupt detected')
                 self.stop()
                 raise
             except Queue.Empty:
@@ -777,9 +816,10 @@ class Trollduction(object):
 
             # For 'file' type messages, update product config and run
             # production
-            if msg.type == "file":
+            if msg.type == "file" and msg.data["instrument"] == self.td_config['instrument']:
                 self.update_product_config(self.td_config['product_config_file'],
                                            self.td_config['config_item'])
                 self.data_processor.run(self.product_config, msg)
+
 #            else:
 #                LOGGER.debug("Message type was %s" % msg.type)

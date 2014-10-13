@@ -23,8 +23,41 @@
 '''XML reader for Trollduction system and product configuration files.
 '''
 
-from lxml import etree
+import xml.etree.ElementTree as etree
 import os
+
+
+class InfoObject(object):
+
+    def __init__(self, **attributes):
+        self.info = attributes
+
+    def __getattr__(self, name):
+        try:
+            return self.info[name]
+        except KeyError:
+            raise AttributeError
+
+
+class ProductList(object):
+
+    def __init__(self, fname):
+        self.fname = fname
+
+        tree = etree.parse(fname)
+        self._xml = tree.getroot()
+        self.pl = None
+        self.attrib = {}
+        self.parse()
+
+    def parse(self):
+        for item in self._xml:
+            if item.tag == "product_list":
+                self.pl = item
+            elif item.tag == "common":
+                for citem in item:
+                    self.attrib[citem.tag] = citem.text
+
 
 def get_root(fname):
     '''Read XML file and return the root tree.
@@ -42,7 +75,7 @@ def parse_xml(tree, also_empty=False):
     xml_dict = {}
 
     # this tags will always be lists, if they are present and non-empty
-    listify = ['area', 'product', 'valid_satellite', 'invalid_satellite', 
+    listify = ['area', 'product', 'valid_satellite', 'invalid_satellite',
                'pattern', 'file_tag', 'directory']
     children = list(tree)
 
@@ -53,24 +86,23 @@ def parse_xml(tree, also_empty=False):
             pass
 
     for child in children:
-        if not isinstance(child, etree._Comment):
-            new_val = parse_xml(child, also_empty=also_empty)
-            if len(new_val) == 0:
-                if also_empty:
-                    xml_dict[child.tag] = ''
-                    continue
-                else:
-                    continue
-            if child.tag in xml_dict:
-                if not isinstance(xml_dict[child.tag], list):
-                    xml_dict[child.tag] = [xml_dict[child.tag]]
-                xml_dict[child.tag].append(new_val)
+        new_val = parse_xml(child, also_empty=also_empty)
+        if len(new_val) == 0:
+            if also_empty:
+                xml_dict[child.tag] = ''
+                continue
             else:
-                if len(new_val) > 0:
-                    if child.tag in listify:
-                        xml_dict[child.tag] = [new_val]
-                    else:
-                        xml_dict[child.tag] = new_val
+                continue
+        if child.tag in xml_dict:
+            if not isinstance(xml_dict[child.tag], list):
+                xml_dict[child.tag] = [xml_dict[child.tag]]
+            xml_dict[child.tag].append(new_val)
+        else:
+            if len(new_val) > 0:
+                if child.tag in listify:
+                    xml_dict[child.tag] = [new_val]
+                else:
+                    xml_dict[child.tag] = new_val
 
     return xml_dict
 
@@ -81,7 +113,7 @@ def get_filepattern_config(fname=None):
     *fname* can be used to specify the file.  If *fname* is None, the
     systemwide file is read.
     '''
-    
+
     if fname is None:
         fname = os.path.realpath(__file__).split(os.path.sep)[:-2]
         fname.append('etc')
