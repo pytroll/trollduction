@@ -95,21 +95,31 @@ msg = 'pytroll://AAPP-HRPT/1b/norrköping/utv/polar/direct_readout/ file safusr.
 
 from StringIO import StringIO
 
-from trollduction.producer import DataProcessor
-from trollduction.xml_read import ProductList
 from posttroll.message import Message
-from mock import MagicMock
+from mock import MagicMock, patch
+import time
+from datetime import datetime
 
 
 class TestDataProcessor(unittest.TestCase):
 
-    def test_run(self):
+    @patch('mpop.satellites.GenericFactory')
+    def test_run(self, GF):
+        from trollduction.producer import DataProcessor
+        from trollduction.xml_read import ProductList
         pconfig = ProductList(StringIO(xmlstuff))
         dproc = DataProcessor()
         dproc.writer.stop()
+        time.sleep(1)
         dproc.writer = MagicMock()
         dproc.draw_images = MagicMock()
         dproc.run(pconfig,  Message(rawstr=msg))
+        GF.create_scene.assert_called_once_with(instrument='avhrr',
+                                                satname='noaa',
+                                                time_slot=datetime(
+                                                    2014, 10, 8, 10, 50, 37, 848000),
+                                                orbit='29197',
+                                                satnumber='19')
 
 
 def suite():
