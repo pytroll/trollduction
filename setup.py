@@ -44,6 +44,6 @@ setup(name="trollduction",
       scripts=['bin/trollstalker.py', 'bin/l2processor.py'],
       data_files=[],
       zip_safe=False,
-      install_requires=['pyinotify', 'mpop'],
+      install_requires=['pyinotify', 'mpop', 'posttroll'],
       test_suite='trollduction.tests.suite',
       )
