@@ -24,7 +24,6 @@
 """
 from setuptools import setup
 import imp
-import os
 
 version = imp.load_source('trollduction.version', 'trollduction/version.py')
 
@@ -45,6 +44,6 @@ setup(name="trollduction",
       scripts=['bin/trollstalker.py', 'bin/l2processor.py'],
       data_files=[],
       zip_safe=False,
-      install_requires=['pyinotify'],
+      install_requires=['pyinotify', 'mpop'],
       test_suite='trollduction.tests.suite',
       )
