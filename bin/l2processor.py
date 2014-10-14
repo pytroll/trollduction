@@ -25,7 +25,7 @@
 ./l2processor.py -c /path/to/master_config.ini -C noaa_hrpt
 """
 
-from trollduction.trollduction import Trollduction
+from trollduction.producer import Trollduction
 import argparse
 import logging
 import logging.config
