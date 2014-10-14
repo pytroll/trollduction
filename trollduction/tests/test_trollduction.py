@@ -103,8 +103,9 @@ from datetime import datetime
 
 class TestDataProcessor(unittest.TestCase):
 
+    @patch('trollsift.Parser')
     @patch('mpop.satellites.GenericFactory')
-    def test_run(self, GF):
+    def test_run(self, GF, parser):
         from trollduction.producer import DataProcessor
         from trollduction.xml_read import ProductList
         pconfig = ProductList(StringIO(xmlstuff))
