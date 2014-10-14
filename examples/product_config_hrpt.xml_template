@@ -1,70 +1,63 @@
 <?xml version="1.0" encoding='utf-8'?>
+<?xml-stylesheet type="text/xsl" href="prodlist2.xsl"?>
 
 <!-- This config is used by Trollduction.-->
 
 <product_config>
+  <metadata>
+    <platform>noaa</platform>
+    <number>15</number>
+  </metadata>
+
   <common>
-    <!-- calibrated, satellite projection -->
-    <!--netcdf_file>{time:%Y%m%d_%H%M}_{orbit}_{platform}{satnumber}_swath.nc</netcdf_file-->
     <output_dir>/tmp</output_dir>
   </common>
- 
-  <area>
-    <name>Europe_large</name>
-    <definition>eurol</definition>
-    <product>
-      <composite>overview</composite>
-	  <name>overview</name>
-      <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+
+  <variables>
+    <path id="local_sir">/local_disk/data/sir</path>
+    <path id="sir">/local_disk/data/out/sir</path>
+    <path id="rgb">/local_disk/data/out/rgb</path>
+    <path id="tmp">/tmp</path>
+  </variables>
+
+  <product_list>
+    <!-- dump to netcdf -->
+    <!-- calibrated, satellite projection -->
+    <dump>
+      <file format="netcdf4">{time:%Y%m%d_%H%M}_{platform}{satnumber}.nc</file>
+    </dump>
+    <area id="eurol" name="Europe_large">
       <!-- Generate the product only if sun is above the horizon at the
            defined longitude/latitude -->
-      <sunzen_day_maximum>90</sunzen_day_maximum>
-	  <sunzen_lonlat>25,60</sunzen_lonlat>
-    </product>
-    <product>
-      <composite>natural</composite>
-	  <name>natural</name>
-      <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
-      <sunzen_day_maximum>90</sunzen_day_maximum>
-	  <sunzen_lonlat>25,60</sunzen_lonlat>
-    </product>
-    <product>
-      <composite>green_snow</composite>
-	  <name>green_snow</name>
-      <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
-      <sunzen_day_maximum>90</sunzen_day_maximum>
-	  <sunzen_lonlat>25,60</sunzen_lonlat>
-    </product>
-    <product>
-      <composite>red_snow</composite>
-	  <name>red_snow</name>
-      <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
-      <sunzen_day_maximum>90</sunzen_day_maximum>
-	  <sunzen_lonlat>25,60</sunzen_lonlat>
-    </product>
-    
-    <product>
-	  <composite>cloudtop</composite>
-	  <name>cloudtop</name>
-	  <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
-    </product>
+      <product id="overview" name="overview" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
+        <file output_dir="tmp">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+      </product>
 
+      <product id="natural" name="dnc" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
+        <file>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+      </product>
 
-    <product>
-	  <composite>night_overview</composite>
-	  <name>night_overview</name>
-	  <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
+      <product id="green_snow" name="green_snow" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
+        <file>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+      </product>
+
+      <product id="red_snow" name="red_snow" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
+        <file format="png">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+      </product>
+
+      <product id="cloudtop" name="cloudtop">
+        <file format="png">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+      </product>
+
       <!-- Generate only if the Sun is below the horizon -->
-	  <sunzen_night_minimum>90</sunzen_night_minimum>
-	  <sunzen_lonlat>25,60</sunzen_lonlat>
-    </product>
-    <product>
-	  <composite>night_fog</composite>
-	  <name>night_fog</name>
-	  <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
-	  <sunzen_night_minimum>90</sunzen_night_minimum>
-	  <sunzen_lonlat>25,60</sunzen_lonlat>
-    </product>
-  </area>
- 
+      <product id="night_overview" name="night_overview" sunzen_night_minimum="90" sunzen_lonlat="25, 60">
+        <file format="png">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+      </product>
+
+      <product id="night_fog" name="night_fog" sunzen_night_minimum="90" sunzen_lonlat="25, 60">
+        <file>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+      </product>
+
+    </area>
+  </product_list>
 </product_config>

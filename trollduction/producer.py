@@ -156,14 +156,17 @@ class DataProcessor(object):
     def run(self, product_config, msg):
         """Process the data
         """
-        url = urlparse(msg.data['uri'])
-        local_ip = socket.gethostbyname(socket.gethostname())
-        url_ip = socket.gethostbyname(url.netloc)
+        try:
+            url = urlparse(msg.data['uri'])
+            local_ip = socket.gethostbyname(socket.gethostname())
+            url_ip = socket.gethostbyname(url.netloc)
 
-        if url_ip != local_ip:
-            LOGGER.info('Data not accessible on this host: %s',
-                        msg.data['uri'])
-            return
+            if url_ip != local_ip:
+                LOGGER.info('Data not accessible on this host: %s',
+                            msg.data['uri'])
+                return
+        except socket.gaierror:
+            LOGGER.warning("Couldn't check file location, running anyway")
 
         LOGGER.info('New data available: %s', msg.data['uri'])
 
@@ -213,8 +216,8 @@ class DataProcessor(object):
                 try:
                     for file_item in area_item:
                         self.writer.write(self.write_netcdf,
+                                          file_item,
                                           data_name='global_data',
-                                          fileinfo=file_item,
                                           unload=True)
                 except IOError:
                     LOGGER.error("Saving unprojected data to NetCDF failed!")
@@ -233,7 +236,7 @@ class DataProcessor(object):
 
                 for product_item in area_item:
                     if product_item.tag == "dump":
-                        dump = True
+                        dump = product_item
                         break
 
                 # Check which channels are needed. Unload unnecessary
@@ -289,7 +292,9 @@ class DataProcessor(object):
                 # Save projected data to netcdf4
                 if dump:
                     try:
-                        self.writer.write(self.write_netcdf, 'local_data')
+                        for file_item in dump:
+                            self.writer.write(
+                                self.write_netcdf, file_item, 'local_data')
                     except IOError:
                         LOGGER.error("Saving projected data to NetCDF failed!")
                 LOGGER.info(
@@ -488,7 +493,7 @@ class DataProcessor(object):
         # log and publish completion of this area def
         LOGGER.info('Area %s completed', area.attrib['name'])
 
-    def write_netcdf(self, data_name='global_data', unload=False):
+    def write_netcdf(self, finfo, data_name='global_data', unload=False):
         '''Write the data as netCDF4.
         '''
 
@@ -500,7 +505,7 @@ class DataProcessor(object):
             return
 
         # parse filename
-        fname = self.parse_filename(fname_key='netcdf_file')
+        fname = self.parse_filename(finfo)
 
         # Save the data
         data.save(fname, to_format='netcdf4')
@@ -528,7 +533,7 @@ class DataProcessor(object):
             out_dir = self.product_config.attrib.get('output_dir', None)
 
         fname = file_info.text
-        print file_info.text
+
         if out_dir is not None:
             fname = os.path.join(out_dir, fname)
 
