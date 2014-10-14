@@ -46,6 +46,7 @@ setup(name="trollduction",
       zip_safe=False,
       install_requires=['pyinotify', 'mpop', 'posttroll',
                         'pyresample', 'pykdtree',
-                        'trollimage', 'pyorbital'],
+                        'trollimage', 'pyorbital',
+                        'trollsift'],
       test_suite='trollduction.tests.suite',
       )
