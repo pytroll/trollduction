@@ -179,8 +179,8 @@ class DataProcessor(object):
 
         # orbit is not given for GEO satellites, use None
 
-        if 'orbit' not in msg.data:
-            msg.data['orbit'] = None
+        if 'orbit_number' not in msg.data:
+            msg.data['orbit_number'] = None
 
         t1a = time.time()
 
@@ -196,14 +196,14 @@ class DataProcessor(object):
             satnumber=str(satnumber),
             instrument=str(msg.data['instrument']),
             time_slot=time_slot,
-            orbit=str(msg.data['orbit']))
+            orbit=str(msg.data['orbit_number']))
 
         # Update missing information to global_data.info{}
         # TODO: this should be fixed in mpop.
         self.global_data.info['satname'] = platform
         self.global_data.info['satnumber'] = satnumber
         self.global_data.info['instrument'] = msg.data['instrument']
-        self.global_data.info['orbit'] = msg.data['orbit']
+        self.global_data.info['orbit_number'] = msg.data['orbit_number']
 
         filename = urlparse(msg.data['uri']).path
 
