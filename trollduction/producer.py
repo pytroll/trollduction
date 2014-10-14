@@ -247,7 +247,7 @@ class DataProcessor(object):
                     # TODO
                     LOGGER.info('Load all channels for saving.')
                     try:
-                        if msg.data['orbit'] is not None:
+                        if msg.data['orbit_number'] is not None:
                             raise TypeError
                         try:
                             self.global_data.load(filename=filename,
@@ -560,10 +560,10 @@ class DataProcessor(object):
         info_dict['platform'] = self.global_data.info['satname']
         info_dict['satnumber'] = self.global_data.info['satnumber']
 
-        if self.global_data.info['orbit'] is not None:
-            info_dict['orbit'] = self.global_data.info['orbit']
+        if self.global_data.info['orbit_number'] is not None:
+            info_dict['orbit_number'] = self.global_data.info['orbit_number']
         else:
-            info_dict['orbit'] = ''
+            info_dict['orbit_number'] = ''
 
         info_dict['instrument'] = self.global_data.info['instrument']
         info_dict['file_ending'] = 'png'
