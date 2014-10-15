@@ -40,7 +40,6 @@ from listener import ListenerContainer
 from mpop.satellites import GenericFactory as GF
 import time
 from mpop.projector import get_area_def
-import sys
 from threading import Thread
 from pyorbital import astronomy
 import numpy as np
@@ -50,11 +49,10 @@ import logging
 import logging.handlers
 from fnmatch import fnmatch
 import helper_functions
-from trollsift import Parser
+from trollsift import compose
 from urlparse import urlparse
 import socket
 from mpop.satout.cfscene import CFScene
-from mpop.satout.netcdf4 import netcdf_cf_writer
 
 LOGGER = logging.getLogger(__name__)
 
@@ -186,7 +184,8 @@ class DataProcessor(object):
 
         # Update missing information to global_data.info{}
         # TODO: this should be fixed in mpop.
-        global_data.info['satname'] = platform
+        global_data.info['time'] = time_slot
+        global_data.info['platform'] = platform
         global_data.info['satnumber'] = satnumber
         global_data.info['instrument'] = msg.data['instrument']
         global_data.info['orbit_number'] = msg.data['orbit_number']
@@ -211,25 +210,19 @@ class DataProcessor(object):
 
         return url.path
 
-    def save_to_netcdf(self, data, area=None, product=None):
+    def save_to_netcdf(self, data, item, params):
         LOGGER.debug("Save full data to netcdf4")
         try:
             data.add_to_history(
                 "Saved as netcdf4/cf by pytroll/mpop.")
             cfscene = CFScene(data)
 
-            for file_item in (product or area):
-                self.writer.write(netcdf_cf_writer,
-                                  self.parse_filename(
-                                      file_item,
-                                      area=area,
-                                      product=product),
-                                  cfscene)
-                LOGGER.info("Sent netcdf/cf scene to writer.")
+            self.writer.write(cfscene, item, params)
+            LOGGER.info("Sent netcdf/cf scene to writer.")
         except IOError:
             LOGGER.error("Saving unprojected data to NetCDF failed!")
         finally:
-            if area.attrib.get("unload_after_saving", "False") == "True":
+            if item.attrib.get("unload_after_saving", "False") == "True":
                 loaded_channels = [ch.name
                                    for ch in data.channels]
                 LOGGER.info("Unloading data after netcdf4 conversion.")
@@ -261,7 +254,9 @@ class DataProcessor(object):
         for area_item in self.product_config.pl:
             if area_item.tag == "dump":
                 self.global_data.load(filename=filename)
-                self.save_to_netcdf(self.global_data, area=area_item)
+                self.save_to_netcdf(self.global_data,
+                                    area_item,
+                                    self.get_parameters(area_item))
             if area_item.tag == "area":
                 # Make images for an area
 
@@ -459,17 +454,33 @@ class DataProcessor(object):
 
         return True
 
+    def get_parameters(self, item):
+        """Get the parameters for filename sifting.
+        """
+
+        params = self.product_config.attrib.copy()
+
+        params.update(self.global_data.info)
+        for key, attrib in item.attrib.items():
+            params["".join((item.tag, key))] = attrib
+        params.update(item.attrib)
+        return params
+
     def draw_images(self, area):
         '''Generate images from local data using given area name and
         product definitions.
         '''
 
+        params = self.get_parameters(area)
+
         # Create images for each color composite
         for product in area:
+            params.update(self.get_parameters(product))
             if product.tag == "dump":
                 try:
                     self.save_to_netcdf(self.local_data,
-                                        area=area, product=product)
+                                        product,
+                                        params)
                 except IOError:
                     LOGGER.error("Saving projected data to NetCDF failed!")
                 continue
@@ -500,92 +511,29 @@ class DataProcessor(object):
                     # If the return value is False, skip this product
                     continue
 
-            for file_item in product:
-                # Parse image filename
-                fname = self.parse_filename(
-                    file_item, area=area, product=product)
+            try:
+                # Check if this combination is defined
+                func = getattr(self.local_data.image, product.attrib['id'])
+                img = func()
 
-                try:
-                    # Check if this combination is defined
-                    func = getattr(self.local_data.image, product.attrib['id'])
-                    img = func()
-                    LOGGER.info('Saving image %s.', fname)
-
-                    self.writer.write(img.save, fname)
-                    logging.info("sent to queue")
-
-                except AttributeError:
-                    # Log incorrect product funcion name
-                    LOGGER.error('Incorrect product name: %s for area %s',
-                                 product.attrib['name'], area.attrib['name'])
-                except KeyError as err:
-                    # log missing channel
-                    LOGGER.warning('Missing channel on product %s for area %s: %s',
-                                   product.attrib['name'], area.attrib['name'], str(err))
-                except Exception:
-                    # log other errors
-                    LOGGER.exception('Error on product %s for area %s',
-                                     product.attrib['name'],
-                                     area.attrib['name'])
+            except AttributeError:
+                # Log incorrect product funcion name
+                LOGGER.error('Incorrect product name: %s for area %s',
+                             product.attrib['name'], area.attrib['name'])
+            except KeyError as err:
+                # log missing channel
+                LOGGER.warning('Missing channel on product %s for area %s: %s',
+                               product.attrib['name'], area.attrib['name'], str(err))
+            except Exception:
+                # log other errors
+                LOGGER.exception('Error on product %s for area %s',
+                                 product.attrib['name'],
+                                 area.attrib['name'])
+            else:
+                self.writer.write(img, product, params)
 
         # log and publish completion of this area def
         LOGGER.info('Area %s completed', area.attrib['name'])
-
-    def parse_filename(self, file_info, product=None, area=None):
-        '''Parse filename for saving.  Parameter *area* is for area-level
-        configuration dictionary, *product* for product-level
-        configuration dictionary.  Parameter *fname_key* tells which
-        dictionary key holds the filename pattern.
-        '''
-
-        out_dir = None
-
-        if product is not None:
-            out_dir = product.attrib.get('output_dir', None)
-        if area is not None and out_dir is None:
-            out_dir = area.attrib.get('output_dir', None)
-        if out_dir is None:
-            out_dir = self.product_config.attrib.get('output_dir', None)
-
-        fname = file_info.text
-
-        if out_dir is not None:
-            fname = os.path.join(out_dir, fname)
-
-        try:
-            time_slot = self.local_data.time_slot
-        except AttributeError:
-            time_slot = self.global_data.time_slot
-
-        par = Parser(fname)
-
-        info_dict = {}
-        info_dict['time'] = time_slot
-
-        if area is not None:
-            info_dict['areaname'] = area.attrib.get('name', '')
-        else:
-            info_dict['areaname'] = ''
-
-        if product is not None:
-            info_dict['composite'] = product.attrib.get('name', '')
-        else:
-            info_dict['composite'] = ''
-
-        info_dict['platform'] = self.global_data.info['satname']
-        info_dict['satnumber'] = self.global_data.info['satnumber']
-
-        if self.global_data.info['orbit_number'] is not None:
-            info_dict['orbit_number'] = self.global_data.info['orbit_number']
-        else:
-            info_dict['orbit_number'] = ''
-
-        info_dict['instrument'] = self.global_data.info['instrument']
-        info_dict['file_ending'] = 'png'
-
-        fname = par.compose(info_dict)
-
-        return fname
 
     def check_sunzen(self, config, area_def=None, xy_loc=None, lonlat=None,
                      data_name='local_data'):
@@ -691,17 +639,21 @@ class DataWriter(Thread):
         """
         while self._loop:
             try:
-                fun, args, kwargs = self.prod_queue.get(True, 1)
+                obj, file_items, params = self.prod_queue.get(True, 1)
             except Queue.Empty:
                 pass
             else:
-                fun(*args, **kwargs)
+                for item in file_items:
+                    fname = os.path.join(params["output_dir"],
+                                         compose(item.text, params))
+                    obj.save(fname)
+                    LOGGER.info("Saved %s to %s", str(obj), fname)
                 self.prod_queue.task_done()
 
-    def write(self, fun, *args, **kwargs):
+    def write(self, obj, item, params):
         '''Write to queue.
         '''
-        self.prod_queue.put((fun, args, kwargs))
+        self.prod_queue.put((obj, list(item), params.copy()))
 
     def stop(self):
         '''Stop the data writer.
