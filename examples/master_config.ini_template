@@ -9,7 +9,7 @@ topic=/HRPT/L1b/dev/hki
 # input directory that trollstalker watches
 directory=/home/lahtinep/data/satellite/new/
 # filepattern of the input files for trollstalker
-filepattern={path}hrpt_{platform:4s}{satnumber:2d}_{time:%Y%m%d_%H%M}_{orbit:05d}.l1b
+filepattern={path}hrpt_{platform:4s}{satnumber:2d}_{time:%Y%m%d_%H%M}_{orbit_number:05d}.l1b
 # instrument name for mpop
 instrument=avhrr
 # products that will be made
