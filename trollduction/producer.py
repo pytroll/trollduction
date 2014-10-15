@@ -203,7 +203,7 @@ class DataProcessor(object):
             local_ip = socket.gethostbyname(socket.gethostname())
             url_ip = socket.gethostbyname(url.netloc)
 
-            if url_ip != local_ip:
+            if url_ip != local_ip and url.netloc != '':
                 raise IOError("Data file %s unaccessible from this host" % uri)
 
         except socket.gaierror:
