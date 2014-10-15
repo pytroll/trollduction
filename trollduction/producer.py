@@ -170,7 +170,11 @@ class DataProcessor(object):
         platform = (msg.data.get('platform') or
                     msg.data.get('satellite').split()[0]).lower()
         satnumber = (msg.data.get('satnumber') or
-                     msg.data.get('satellite').split()[1]).lower()
+                     msg.data.get('satellite').split()[1])
+        try:
+            satnumber = int(satnumber)
+        except ValueError:
+            satnumber = satnumber.lower()
         LOGGER.info("platform %s, number %s", str(platform), str(satnumber))
 
         # Create satellite scene
