@@ -50,9 +50,12 @@ import logging.handlers
 from fnmatch import fnmatch
 import helper_functions
 from trollsift import compose
-from urlparse import urlparse
+from urlparse import urlparse, urlunsplit
 import socket
+import shutil
 from mpop.satout.cfscene import CFScene
+from posttroll.publisher import Publish
+from posttroll.message import Message
 
 LOGGER = logging.getLogger(__name__)
 
@@ -184,6 +187,7 @@ class DataProcessor(object):
 
         # Update missing information to global_data.info{}
         # TODO: this should be fixed in mpop.
+        global_data.info.update(msg.data)
         global_data.info['time'] = time_slot
         global_data.info['platform'] = platform
         global_data.info['satnumber'] = satnumber
@@ -213,6 +217,8 @@ class DataProcessor(object):
     def save_to_netcdf(self, data, item, params):
         LOGGER.debug("Save full data to netcdf4")
         try:
+            params["time_slot"] = data.time_slot
+            params["area"] = data.area
             data.add_to_history(
                 "Saved as netcdf4/cf by pytroll/mpop.")
             cfscene = CFScene(data)
@@ -515,6 +521,8 @@ class DataProcessor(object):
                 # Check if this combination is defined
                 func = getattr(self.local_data.image, product.attrib['id'])
                 img = func()
+                img.info["product_name"] = product.attrib.get("name",
+                                                              product.attrib["id"])
 
             except AttributeError:
                 # Log incorrect product funcion name
@@ -621,6 +629,63 @@ class DataProcessor(object):
         return True
 
 
+def _create_message(obj, filename, uri, params):
+    to_send = obj.info.copy()
+
+    to_send["nominal_time"] = getattr(obj, "time_slot", params["time_slot"])
+    area = getattr(obj, "area", params["area"])
+
+    to_send["area"] = {}
+    to_send["area"]["name"] = area.name
+    to_send["area"]["id"] = area.area_id
+    try:
+        to_send["area"]["proj_id"] = area.proj_id
+        to_send["area"]["proj4"] = area.proj4_string
+        to_send["area"]["area_extent"] = area.area_extent
+        to_send["area"]["shape"] = area.x_size, obj.area.y_size
+    except AttributeError:
+        pass
+
+    # FIXME: fishy: what if the uri already has a scheme ?
+    to_send["uri"] = urlunsplit(("file", "", uri, "", ""))
+    to_send["filename"] = os.path.basename(filename)
+    # we should have more info on format...
+    fformat = os.path.splitext(filename)[1][1:]
+    if fformat.startswith("tif"):
+        fformat = "GeoTIFF"
+    elif fformat.startswith("png"):
+        fformat = "PNG"
+    elif fformat.startswith("jp"):
+        fformat = "JPEG"
+    elif fformat.startswith("nc"):
+        fformat = "NetCDF"
+    to_send["type"] = fformat
+    if fformat != "NetCDF":
+        to_send["format"] = "raster"
+        to_send["level"] = "2"
+        to_send["product_name"] = obj.info["product_name"]
+    else:
+        to_send["format"] = "CF"
+        to_send["level"] = "1b"
+        to_send["product_name"] = "dump"
+
+    subject = "/".join(("",
+                        to_send["format"],
+                        to_send["level"]))
+
+    msg = Message(subject,
+                  "file",
+                  to_send)
+    return msg
+
+
+def link_or_copy(src, dst):
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy(src, dst)
+
+
 class DataWriter(Thread):
 
     """Writes data to disk.
@@ -637,18 +702,25 @@ class DataWriter(Thread):
     def run(self):
         """Run the thread.
         """
-        while self._loop:
-            try:
-                obj, file_items, params = self.prod_queue.get(True, 1)
-            except Queue.Empty:
-                pass
-            else:
-                for item in file_items:
-                    fname = os.path.join(params["output_dir"],
-                                         compose(item.text, params))
-                    obj.save(fname)
-                    LOGGER.info("Saved %s to %s", str(obj), fname)
-                self.prod_queue.task_done()
+        with Publish("l2producer") as pub:
+            while self._loop:
+                try:
+                    obj, file_items, params = self.prod_queue.get(True, 1)
+                except Queue.Empty:
+                    pass
+                else:
+                    # TODO: copy file instead of saving it twice.
+                    # Check that the format is the same though...
+                    for item in file_items:
+                        fname = os.path.join(params["output_dir"],
+                                             compose(item.text, params))
+                        obj.save(fname)
+                        LOGGER.info("Saved %s to %s", str(obj), fname)
+                        msg = _create_message(obj, os.path.basename(fname),
+                                              fname, params)
+                        pub.send(str(msg))
+                        LOGGER.debug("Sent message %s", str(msg))
+                    self.prod_queue.task_done()
 
     def write(self, obj, item, params):
         '''Write to queue.
