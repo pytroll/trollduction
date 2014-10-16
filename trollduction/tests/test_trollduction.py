@@ -103,11 +103,18 @@ from datetime import datetime
 
 class TestDataProcessor(unittest.TestCase):
 
-    @patch('mpop.satout.netcdf4.netcdf_cf_writer')
+    def setUp(self):
+        self.mock = MagicMock()
+        self.module_patcher = patch.dict('sys.modules', {'netCDF4': self.mock})
+        self.module_patcher.start()
+
+    def tearDown(self):
+        self.module_patcher.stop()
+
     @patch('mpop.satout.cfscene.CFScene')
     @patch('trollsift.Parser')
     @patch('mpop.satellites.GenericFactory')
-    def test_run(self, GF, parser, cfs, ncw):
+    def test_run(self, GF, parser, cfs):
         from trollduction.producer import DataProcessor
         from trollduction.xml_read import ProductList
         pconfig = ProductList(StringIO(xmlstuff))
@@ -123,6 +130,8 @@ class TestDataProcessor(unittest.TestCase):
                                                     2014, 10, 8, 10, 50, 37, 848000),
                                                 orbit='29197',
                                                 satnumber='19')
+
+        cfs.assert_any_call(GF.create_scene.return_value)
 
 
 def suite():
