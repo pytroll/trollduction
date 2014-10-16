@@ -48,7 +48,15 @@ class ProductList(object):
         self._xml = tree.getroot()
         self.pl = None
         self.attrib = {}
+        self.vars = {}
         self.parse()
+        self.insert_vars()
+
+    def insert_vars(self):
+        for item in self.pl.getiterator():
+            for key in self.vars:
+                if key in item.attrib and item.attrib[key] in self.vars[key]:
+                    item.set(key, self.vars[key][item.attrib[key]])
 
     def parse(self):
         for item in self._xml:
@@ -57,6 +65,10 @@ class ProductList(object):
             elif item.tag == "common":
                 for citem in item:
                     self.attrib[citem.tag] = citem.text
+            elif item.tag == "variables":
+                for var in item:
+                    self.vars.setdefault(
+                        var.tag, {})[var.attrib["id"]] = var.text
 
 
 def get_root(fname):

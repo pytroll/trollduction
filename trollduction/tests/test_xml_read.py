@@ -20,7 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Test trollduction.py
+"""Test xml_read.py
 """
 
 import unittest
@@ -41,23 +41,23 @@ xmlstuff = """<?xml version="1.0" encoding='utf-8'?>
   </common>
 
   <variables>
-    <path id="local_sir">/local_disk/data/sir</path>
-    <path id="sir">/local_disk/data/out/sir</path>
-    <path id="rgb">/local_disk/data/out/rgb</path>
-    <path id="tmp">/tmp</path>
+    <output_dir id="local_sir">/local_disk/data/sir</output_dir>
+    <output_dir id="sir">/local_disk/data/out/sir</output_dir>
+    <output_dir id="rgb">/local_disk/data/out/rgb</output_dir>
+    <output_dir id="tmp">/tmp</output_dir>
   </variables>
 
   <product_list>
     <!-- dump to netcdf -->
     <!-- calibrated, satellite projection -->
     <dump>
-      <file format="netcdf4">{time:%Y%m%d_%H%M}_{platform}{satnumber}.nc</file>
+      <file output_dir="sir" format="netcdf4">{time:%Y%m%d_%H%M}_{platform}{satnumber}.nc</file>
     </dump>
     <area id="eurol" name="Europe_large">
       <!-- Generate the product only if sun is above the horizon at the
            defined longitude/latitude -->
       <product id="overview" name="overview" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
-        <file output_dir="tmp">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+        <file>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
       </product>
 
       <product id="natural" name="dnc" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
@@ -90,55 +90,29 @@ xmlstuff = """<?xml version="1.0" encoding='utf-8'?>
 </product_config>
 """
 
-msg = 'pytroll://AAPP-HRPT/1b/norrköping/utv/polar/direct_readout/ file safusr.u@lxserv248.smhi.se 2014-10-08T11:06:36.185553 v1.01 application/json {"satellite": "NOAA 19", "format": "AAPP-HRPT", "start_time": "2014-10-08T10:50:37.848000", "level": "1b", "orbit_number": "29197", "uri": "ssh://c20035.ad.smhi.se//local_disk/data/satellite/polar/noaa19_20100224_1129_05402/hrpt_noaa19_20100224_1129_05402.l1b", "filename": "hrpt_noaa19_20100224_1129_05402.l1", "instrument": "avhrr", "end_time": "2014-10-08T11:04:37.848000", "type": "Binary"}'
-
-
+from trollduction.xml_read import ProductList
 from StringIO import StringIO
 
-from posttroll.message import Message
-from mock import MagicMock, patch
-import time
-from datetime import datetime
 
+class TestProductList(unittest.TestCase):
 
-class TestDataProcessor(unittest.TestCase):
-
-    def setUp(self):
-        self.mock = MagicMock()
-        self.module_patcher = patch.dict('sys.modules', {'netCDF4': self.mock})
-        self.module_patcher.start()
-
-    def tearDown(self):
-        self.module_patcher.stop()
-
-    @patch('mpop.satout.cfscene.CFScene')
-    @patch('trollsift.Parser')
-    @patch('mpop.satellites.GenericFactory')
-    def test_run(self, GF, parser, cfs):
-        from trollduction.producer import DataProcessor
-        from trollduction.xml_read import ProductList
+    def test_vars(self):
         pconfig = ProductList(StringIO(xmlstuff))
-        dproc = DataProcessor()
-        dproc.writer.stop()
-        time.sleep(1)
-        dproc.writer = MagicMock()
-        dproc.draw_images = MagicMock()
-        dproc.run(pconfig,  Message(rawstr=msg))
-        GF.create_scene.assert_called_once_with(instrument='avhrr',
-                                                satname='noaa',
-                                                time_slot=datetime(
-                                                    2014, 10, 8, 10, 50, 37, 848000),
-                                                orbit='29197',
-                                                satnumber='19')
-
-        cfs.assert_any_call(GF.create_scene.return_value)
+        self.assertEquals(pconfig.vars,
+                          {'output_dir': {'local_sir': '/local_disk/data/sir',
+                                          'rgb': '/local_disk/data/out/rgb',
+                                          'sir': '/local_disk/data/out/sir',
+                                          'tmp': '/tmp'}})
+        dump_item = pconfig.pl.findall('./dump/file')[0]
+        self.assertEquals(dump_item.attrib["output_dir"],
+                          '/local_disk/data/out/sir')
 
 
 def suite():
-    """The suite for test_trollduction
+    """The suite for test_xml_read
     """
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()
-    mysuite.addTest(loader.loadTestsFromTestCase(TestDataProcessor))
+    mysuite.addTest(loader.loadTestsFromTestCase(TestProductList))
 
     return mysuite

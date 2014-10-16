@@ -26,7 +26,7 @@
 #from trollduction.tests import test_listener
 import unittest
 import doctest
-from trollduction.tests import test_trollduction
+from trollduction.tests import test_trollduction, test_xml_read
 
 
 def suite():
@@ -37,5 +37,6 @@ def suite():
     # mysuite.addTests(doctest.DocTestSuite(image))
     # Use the unittests also
     mysuite.addTests(test_trollduction.suite())
+    mysuite.addTests(test_xml_read.suite())
 
     return mysuite
