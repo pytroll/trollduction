@@ -53,6 +53,7 @@ from trollsift import compose
 from urlparse import urlparse, urlunsplit
 import socket
 import shutil
+from mpop.scene import assemble_segments
 from mpop.satout.cfscene import CFScene
 from posttroll.publisher import Publish
 from posttroll.message import Message
@@ -156,43 +157,63 @@ class DataProcessor(object):
         self.writer = DataWriter()
         self.writer.start()
 
+    def create_scene_from_collection(self, collection):
+        """Parse the *collection* and return a corresponding MPOP scene.
+        """
+        return self.create_scene_from_mda(collection.data[0])
+
     def create_scene_from_message(self, msg):
         """Parse the message *msg* and return a corresponding MPOP scene.
         """
-        time_slot = (msg.data.get('time') or
-                     msg.data.get('start_time') or
-                     msg.data.get('nominal_time'))
+        return self.create_scene_from_mda(msg.data)
+
+    def create_scene_from_mda(self, mda):
+        """Read the metadata *mda* and return a corresponding MPOP scene.
+        """
+        time_slot = (mda.get('time') or
+                     mda.get('start_time') or
+                     mda.get('nominal_time'))
 
         # orbit is not given for GEO satellites, use None
 
-        if 'orbit_number' not in msg.data:
-            msg.data['orbit_number'] = None
+        if 'orbit_number' not in mda:
+            mda['orbit_number'] = None
 
-        platform = (msg.data.get('platform') or
-                    msg.data.get('satellite').split()[0]).lower()
-        satnumber = (msg.data.get('satnumber') or
-                     msg.data.get('satellite').split()[1])
+        platform = None
+        satnumber = None
+
+        if 'satellite' in mda:
+            platform = mda.get('satellite').split()[0]
+            satnumber = mda.get('satellite').split()[1]
+
+        platform = mda.get('platform', platform).lower()
+        satnumber = mda.get('satnumber', mda.get('number', satnumber))
+
         try:
             satnumber = int(satnumber)
         except ValueError:
             satnumber = satnumber.lower()
-        LOGGER.info("platform %s, number %s", str(platform), str(satnumber))
+        except TypeError:
+            satnumber = ""
+        LOGGER.info("platform %s, number %s, time %s",
+                    str(platform), str(satnumber), str(time_slot))
 
         # Create satellite scene
         global_data = GF.create_scene(satname=str(platform),
                                       satnumber=str(satnumber),
-                                      instrument=str(msg.data['instrument']),
+                                      instrument=str(mda['instrument']),
                                       time_slot=time_slot,
-                                      orbit=str(msg.data['orbit_number']))
+                                      orbit=str(mda['orbit_number']),
+                                      variant=mda.get('variant', ''))
 
         # Update missing information to global_data.info{}
         # TODO: this should be fixed in mpop.
-        global_data.info.update(msg.data)
+        global_data.info.update(mda)
         global_data.info['time'] = time_slot
         global_data.info['platform'] = platform
         global_data.info['satnumber'] = satnumber
-        global_data.info['instrument'] = msg.data['instrument']
-        global_data.info['orbit_number'] = msg.data['orbit_number']
+        global_data.info['instrument'] = mda['instrument']
+        global_data.info['orbit_number'] = mda['orbit_number']
 
         return global_data
 
@@ -201,6 +222,9 @@ class DataProcessor(object):
         """Check that the provided *uri* is on the local host and return the
         file path.
         """
+        if isinstance(uri, (list, set, tuple)):
+            paths = [DataProcessor.check_uri(ressource) for ressource in uri]
+            return paths
         url = urlparse(uri)
         try:
             local_ip = socket.gethostbyname(socket.gethostname())
@@ -238,7 +262,10 @@ class DataProcessor(object):
         """Process the data
         """
 
-        uri = msg.data['uri']
+        if msg.type == "file":
+            uri = msg.data['uri']
+        else:
+            uri = [mda['uri'] for mda in msg.data]
 
         LOGGER.info('New data available: %s', uri)
         t1a = time.time()
@@ -250,7 +277,10 @@ class DataProcessor(object):
             LOGGER.info("Skipping...")
             return
 
-        self.global_data = self.create_scene_from_message(msg)
+        if msg.type == "file":
+            self.global_data = self.create_scene_from_message(msg)
+        elif msg.type == "collection":
+            self.global_data = self.create_scene_from_collection(msg)
 
         self._data_ok = True
         self.product_config = product_config
@@ -395,8 +425,11 @@ class DataProcessor(object):
         to_unload = set([chn.name for chn in self.global_data.channels])
 
         for chn in reqs:
-            to_load |= set([self.global_data[chn].name])
-            to_unload -= set([self.global_data[chn].name])
+            try:
+                to_load |= set([self.global_data[chn].name])
+                to_unload -= set([self.global_data[chn].name])
+            except KeyError:
+                pass
 
         LOGGER.debug('Channels to unload: %s', ', '.join(to_unload))
         LOGGER.debug('Channels to load: %s', ', '.join(to_load))
@@ -519,6 +552,7 @@ class DataProcessor(object):
 
             try:
                 # Check if this combination is defined
+                LOGGER.debug("Generating %s", product.attrib['id'])
                 func = getattr(self.local_data.image, product.attrib['id'])
                 img = func()
                 img.info["product_name"] = product.attrib.get("name",
@@ -526,8 +560,8 @@ class DataProcessor(object):
 
             except AttributeError:
                 # Log incorrect product funcion name
-                LOGGER.error('Incorrect product name: %s for area %s',
-                             product.attrib['name'], area.attrib['name'])
+                LOGGER.error('Incorrect product id: %s for area %s',
+                             product.attrib['id'], area.attrib['name'])
             except KeyError as err:
                 # log missing channel
                 LOGGER.warning('Missing channel on product %s for area %s: %s',
@@ -632,19 +666,23 @@ class DataProcessor(object):
 def _create_message(obj, filename, uri, params):
     to_send = obj.info.copy()
 
-    to_send["nominal_time"] = getattr(obj, "time_slot", params["time_slot"])
+    to_send["nominal_time"] = getattr(obj, "time_slot",
+                                      params.get("time_slot"))
     area = getattr(obj, "area", params["area"])
 
     to_send["area"] = {}
-    to_send["area"]["name"] = area.name
-    to_send["area"]["id"] = area.area_id
     try:
-        to_send["area"]["proj_id"] = area.proj_id
-        to_send["area"]["proj4"] = area.proj4_string
-        to_send["area"]["area_extent"] = area.area_extent
-        to_send["area"]["shape"] = area.x_size, obj.area.y_size
+        to_send["area"]["name"] = area.name
+        to_send["area"]["id"] = area.area_id
+        try:
+            to_send["area"]["proj_id"] = area.proj_id
+            to_send["area"]["proj4"] = area.proj4_string
+            to_send["area"]["area_extent"] = area.area_extent
+            to_send["area"]["shape"] = area.x_size, obj.area.y_size
+        except AttributeError:
+            pass
     except AttributeError:
-        pass
+        del to_send["area"]
 
     # FIXME: fishy: what if the uri already has a scheme ?
     to_send["uri"] = urlunsplit(("file", "", uri, "", ""))
@@ -861,6 +899,11 @@ class Trollduction(object):
             # For 'file' type messages, update product config and run
             # production
             if msg.type == "file" and msg.data["instrument"] == self.td_config['instrument']:
+                self.update_product_config(self.td_config['product_config_file'],
+                                           self.td_config['config_item'])
+                self.data_processor.run(self.product_config, msg)
+
+            elif msg.type == "collection" and msg.data[0]["instrument"] == self.td_config['instrument']:
                 self.update_product_config(self.td_config['product_config_file'],
                                            self.td_config['config_item'])
                 self.data_processor.run(self.product_config, msg)
