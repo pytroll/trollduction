@@ -416,8 +416,13 @@ class DataProcessor(object):
         for product in products:
             if product.tag != "product":
                 continue
-            composite = getattr(self.global_data.image, product.attrib['id'])
-            reqs |= composite.prerequisites
+            try:
+                composite = getattr(
+                    self.global_data.image, product.attrib['id'])
+                reqs |= composite.prerequisites
+            except AttributeError:
+                LOGGER.info("Composite %s not available",
+                            product.attrib['id'])
 
         LOGGER.debug('Channels: %s', str(self.global_data))
 
