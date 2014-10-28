@@ -57,7 +57,7 @@ from mpop.scene import assemble_segments
 from mpop.satout.cfscene import CFScene
 from posttroll.publisher import Publish
 from posttroll.message import Message
-
+from pyresample.utils import AreaNotFound
 LOGGER = logging.getLogger(__name__)
 
 # Config watcher stuff
