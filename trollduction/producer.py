@@ -211,8 +211,8 @@ class DataProcessor(object):
         global_data.info['platform'] = platform
         global_data.info['number'] = satnumber
         global_data.info['instrument'] = mda['instrument']
-        global_data.info['orbit_number'] = mda['orbit_number']
-        global_data.info['orbit'] = mda['orbit_number']
+        global_data.info['orbit_number'] = str(mda['orbit_number'])
+        global_data.info['orbit'] = str(mda['orbit_number'])
 
         return global_data
 
