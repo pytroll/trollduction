@@ -157,15 +157,13 @@ class DataProcessor(object):
         self.writer = DataWriter()
         self.writer.start()
 
-    def create_scene_from_collection(self, collection):
-        """Parse the *collection* and return a corresponding MPOP scene.
-        """
-        return self.create_scene_from_mda(collection.data[0])
-
     def create_scene_from_message(self, msg):
         """Parse the message *msg* and return a corresponding MPOP scene.
         """
-        return self.create_scene_from_mda(msg.data)
+        if msg.type == "file":
+            return self.create_scene_from_mda(msg.data)
+        if msg.type == "collection":
+            return self.create_scene_from_mda(msg.data[0])
 
     def create_scene_from_mda(self, mda):
         """Read the metadata *mda* and return a corresponding MPOP scene.
@@ -211,9 +209,10 @@ class DataProcessor(object):
         global_data.info.update(mda)
         global_data.info['time'] = time_slot
         global_data.info['platform'] = platform
-        global_data.info['satnumber'] = satnumber
+        global_data.info['number'] = satnumber
         global_data.info['instrument'] = mda['instrument']
         global_data.info['orbit_number'] = mda['orbit_number']
+        global_data.info['orbit'] = mda['orbit_number']
 
         return global_data
 
@@ -277,10 +276,7 @@ class DataProcessor(object):
             LOGGER.info("Skipping...")
             return
 
-        if msg.type == "file":
-            self.global_data = self.create_scene_from_message(msg)
-        elif msg.type == "collection":
-            self.global_data = self.create_scene_from_collection(msg)
+        self.global_data = self.create_scene_from_message(msg)
 
         self._data_ok = True
         self.product_config = product_config
@@ -673,7 +669,7 @@ def _create_message(obj, filename, uri, params):
 
     to_send["nominal_time"] = getattr(obj, "time_slot",
                                       params.get("time_slot"))
-    area = getattr(obj, "area", params["area"])
+    area = getattr(obj, "area", params.get("area"))
 
     to_send["area"] = {}
     try:
@@ -753,11 +749,19 @@ class DataWriter(Thread):
                     pass
                 else:
                     # TODO: copy file instead of saving it twice.
-                    # Check that the format is the same though...
+                    # Check that the format and overlay are the same though...
                     for item in file_items:
-                        fname = os.path.join(params["output_dir"],
+                        output_dir = item.attrib.get("output_dir",
+                                                     params["output_dir"])
+                        fname = os.path.join(output_dir,
                                              compose(item.text, params))
-                        obj.save(fname)
+                        if item.attrib.get("overlay") == "true":
+                            obj.add_overlay()
+                        fformat = item.attrib.get("format")
+                        if fformat == "geotiff":
+                            fformat = "tif"
+                        obj.save(fname, fformat=fformat,
+                                 compression=item.attrib.get("compression", 6))
                         LOGGER.info("Saved %s to %s", str(obj), fname)
                         msg = _create_message(obj, os.path.basename(fname),
                                               fname, params)
