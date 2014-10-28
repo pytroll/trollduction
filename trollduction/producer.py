@@ -356,6 +356,10 @@ class DataProcessor(object):
                 except ValueError:
                     LOGGER.warning("No data in this area")
                     continue
+                except AreaNotFound:
+                    LOGGER.warning("Area not %s defined, skipping!",
+                                   area_item.attrib['id'])
+                    continue
 
                 LOGGER.info(
                     'Data reprojected for area: %s', area_item.attrib['name'])
