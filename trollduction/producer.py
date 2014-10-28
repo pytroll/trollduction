@@ -168,36 +168,45 @@ class DataProcessor(object):
     def create_scene_from_mda(self, mda):
         """Read the metadata *mda* and return a corresponding MPOP scene.
         """
-        time_slot = (mda.get('time') or
-                     mda.get('start_time') or
-                     mda.get('nominal_time'))
+
+        platforms = {"metop-a": ("metop", "a"),
+                     "metop-b": ("metop", "b"),
+                     "metop02": ("metop", "a"),
+                     "metop01": ("metop", "b"),
+                     "noaa 19": ("noaa", "19"),
+                     "noaa 18": ("noaa", "18"),
+                     "noaa 15": ("noaa", "15")}
+
+        time_slot = (mda.get('start_time') or
+                     mda.get('nominal_time') or
+                     mda.get('end_time'))
 
         # orbit is not given for GEO satellites, use None
 
         if 'orbit_number' not in mda:
             mda['orbit_number'] = None
 
-        platform = None
+        satellite = None
         satnumber = None
 
+        # FIXME: fix this when we follow the metadata standard
         if 'satellite' in mda:
-            platform = mda.get('satellite').split()[0]
-            satnumber = mda.get('satellite').split()[1]
+            platform = mda["satellite"]
+        if 'platform' in mda:
+            platform = mda["platform"]
+        if 'satnumber' in mda:
+            satellite = platform
+            satnumber = str(mda['satnumber'])
+            platform = ' '.join((satellite, satnumber))
+        else:
+            satellite, satnumber = platforms.get(platform.lower(),
+                                                 (platform, ''))
 
-        platform = mda.get('platform', platform).lower()
-        satnumber = mda.get('satnumber', mda.get('number', satnumber))
-
-        try:
-            satnumber = int(satnumber)
-        except ValueError:
-            satnumber = satnumber.lower()
-        except TypeError:
-            satnumber = ""
-        LOGGER.info("platform %s, number %s, time %s",
-                    str(platform), str(satnumber), str(time_slot))
+        LOGGER.info("platform %s time %s",
+                    str(platform), str(time_slot))
 
         # Create satellite scene
-        global_data = GF.create_scene(satname=str(platform),
+        global_data = GF.create_scene(satname=str(satellite),
                                       satnumber=str(satnumber),
                                       instrument=str(mda['instrument']),
                                       time_slot=time_slot,
@@ -209,10 +218,8 @@ class DataProcessor(object):
         global_data.info.update(mda)
         global_data.info['time'] = time_slot
         global_data.info['platform'] = platform
-        global_data.info['number'] = satnumber
         global_data.info['instrument'] = mda['instrument']
-        global_data.info['orbit_number'] = str(mda['orbit_number'])
-        global_data.info['orbit'] = str(mda['orbit_number'])
+        global_data.info['orbit_number'] = int(mda['orbit_number'])
 
         return global_data
 
@@ -691,7 +698,7 @@ def _create_message(obj, filename, uri, params):
 
     # FIXME: fishy: what if the uri already has a scheme ?
     to_send["uri"] = urlunsplit(("file", "", uri, "", ""))
-    to_send["filename"] = os.path.basename(filename)
+    to_send["uid"] = os.path.basename(filename)
     # we should have more info on format...
     fformat = os.path.splitext(filename)[1][1:]
     if fformat.startswith("tif"):
