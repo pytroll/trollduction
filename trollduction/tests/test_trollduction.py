@@ -126,6 +126,7 @@ class TestDataProcessor(unittest.TestCase):
         dproc.run(pconfig,  Message(rawstr=msg))
         GF.create_scene.assert_called_once_with(instrument='avhrr',
                                                 satname='noaa',
+                                                variant='',
                                                 time_slot=datetime(
                                                     2014, 10, 8, 10, 50, 37, 848000),
                                                 orbit='29197',
