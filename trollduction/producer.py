@@ -53,7 +53,6 @@ from trollsift import compose
 from urlparse import urlparse, urlunsplit
 import socket
 import shutil
-from mpop.scene import assemble_segments
 from mpop.satout.cfscene import CFScene
 from posttroll.publisher import Publish
 from posttroll.message import Message
@@ -296,75 +295,38 @@ class DataProcessor(object):
                 self.save_to_netcdf(self.global_data,
                                     area_item,
                                     self.get_parameters(area_item))
-            if area_item.tag == "area":
-                # Make images for an area
 
-                # TODO
-                # Check if satellite is one that should be processed
-                # if not self.check_satellite(area):
-                    # if return value is False, skip this loop step
-                    # continue
+        for group in self.product_config.groups:
+            area_def_names = self.get_area_def_names(group)
+            products = []
+            for area_item in group:
+                for product in area_item:
+                    products.append(product)
 
-                t1b = time.time()
+            try:
+                self.global_data.load(self.get_req_channels(products),
+                                      filename=filename,
+                                      area_def_names=area_def_names)
+            except IndexError:
+                LOGGER.error("Incomplete or corrupted input data.")
+                self._data_ok = False
+                break
 
-                dump = False
-
-                for product_item in area_item:
-                    if product_item.tag == "dump":
-                        dump = product_item
-                        break
-
-                # Check which channels are needed. Unload unnecessary
-                # channels and load those that are not already available.
-                # If NetCDF4 data is to be saved, use all data, otherwise
-                # unload unnecessary channels.
-                if dump:
-                    # TODO
-                    LOGGER.info('Load all channels for dump.')
-                    try:
-                        if msg.data['orbit_number'] is not None:
-                            raise TypeError
-                        try:
-                            self.global_data.load(filename=filename,
-                                                  area_def_names=area_def_names)
-                        except IndexError:
-                            LOGGER.error("Incomplete or corrupted input data.")
-                            self._data_ok = False
-                            break
-                    except TypeError:
-                        # load all data if area_def_names keyword isn't
-                        # available in instrument reader or the data is
-                        # swath based
-                        LOGGER.info('Loading full swath data')
-                        try:
-                            self.global_data.load(filename=filename)
-                        except IndexError:
-                            LOGGER.error("Incomplete or corrupted input data.")
-                            self._data_ok = False
-                            break
-                else:
-                    LOGGER.info('Loading required channels.')
-                    try:
-                        self.load_unload_channels(area_item,
-                                                  area_def_names=area_def_names,
-                                                  filename=filename)
-                    except IndexError:
-                        LOGGER.error("Incomplete or corrupted input data.")
-                        self._data_ok = False
-                        break
-
+            for area_item in group:
                 # reproject to local domain
                 LOGGER.debug(
                     "Projecting data to area " + area_item.attrib['name'])
                 try:
                     self.local_data = \
-                        self.global_data.project(area_item.attrib["id"],
-                                                 mode='nearest')
+                        self.global_data.project(
+                            area_item.attrib["id"],
+                            channels=self.get_req_channels(area_item),
+                            mode='nearest')
                 except ValueError:
                     LOGGER.warning("No data in this area")
                     continue
                 except AreaNotFound:
-                    LOGGER.warning("Area not %s defined, skipping!",
+                    LOGGER.warning("Area %s not defined, skipping!",
                                    area_item.attrib['id'])
                     continue
 
@@ -373,8 +335,6 @@ class DataProcessor(object):
 
                 # Draw requested images for this area.
                 self.draw_images(area_item)
-
-                LOGGER.info('Area processed in %.1f s', (time.time() - t1b))
 
         # Wait for the writer to finish
         if self._data_ok:
@@ -397,32 +357,12 @@ class DataProcessor(object):
         self.local_data = None
         self.global_data = None
 
-    def load_unload_channels(self, products, area_def_names=None, filename=None):
-        '''Load channel data required for the given list of *products*
-        for the given area definition name(s) *area_def_names*.
-        Unload channels that are not needed.
-        '''
-
-        loaded_channels = []
-        required_channels = []
-        wavelengths = []
-        chan_names = []
-
-        # Get information which channels are loaded
-        for chan in self.global_data.channels:
-            required_channels.append(False)
-            wavelengths.append(chan.wavelength_range)
-            chan_names.append(chan.name)
-            if chan.is_loaded():
-                loaded_channels.append(True)
-            else:
-                loaded_channels.append(False)
-
+    def get_req_channels(self, products):
         # Get a list of required channels
         reqs = set()
         for product in products:
-            if product.tag != "product":
-                continue
+            if product.tag == "dump":
+                return None
             try:
                 composite = getattr(
                     self.global_data.image, product.attrib['id'])
@@ -430,37 +370,14 @@ class DataProcessor(object):
             except AttributeError:
                 LOGGER.info("Composite %s not available",
                             product.attrib['id'])
+        return reqs
 
-        LOGGER.debug('Channels: %s', str(self.global_data))
-
-        to_load = set()
-        to_unload = set([chn.name for chn in self.global_data.channels])
-
-        for chn in reqs:
-            try:
-                to_load |= set([self.global_data[chn].name])
-                to_unload -= set([self.global_data[chn].name])
-            except KeyError:
-                pass
-
-        LOGGER.debug('Channels to unload: %s', ', '.join(to_unload))
-        LOGGER.debug('Channels to load: %s', ', '.join(to_load))
-
-        self.global_data.unload(*to_unload)
-
-        try:
-            self.global_data.load(to_load, area_def_names=area_def_names,
-                                  filename=filename)
-        except TypeError:
-            LOGGER.info("Loading full data")
-            # load whole area if area_def_names keywoard isn't
-            # available in the instrument reader
-            self.global_data.load(to_load, filename=filename)
-
-    def get_area_def_names(self):
+    def get_area_def_names(self, group=None):
         '''Collect and return area definition names from product
         config to a list.
         '''
+
+        pl = group or self.product_config.pl
 
         def_names = [item.attrib["id"]
                      for item in self.product_config.pl
@@ -853,9 +770,6 @@ class Trollduction(object):
             self.update_product_config(self.td_config['product_config_file'],
                                        self.td_config['config_item'])
         except KeyError:
-            print ""
-            print self.td_config
-            print ""
             LOGGER.critical("Key 'product_config_file' or 'config_item' is "
                             "missing from Trollduction config")
 
