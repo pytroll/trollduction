@@ -522,7 +522,7 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
     """From a posttroll message start the modis lvl1 processing"""
 
     LOG.info("")
-    LOG.info("Aqua/Terra files: " + str(eos_files))
+    LOG.info("EOS files: " + str(eos_files))
     LOG.info("\tMessage:")
     LOG.info(message)
     urlobj = urlparse(message.data['uri'])
@@ -530,7 +530,7 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
     if urlobj.netloc != SERVERNAME:
         return eos_files
     LOG.info("Ok... " + str(urlobj.netloc))
-    LOG.info("Sat and Instrument: " + str(message.data['satellite']) + " "
+    LOG.info("Sat and Instrument: " + str(message.data['platform_name']) + " "
              + str(message.data['instrument']))
 
     if 'start_time' in message.data:
@@ -545,12 +545,9 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
         LOG.warning("No end time in message!")
         end_time = None
 
-    if (message.data['satellite'] == "TERRA" and
-            message.data['instrument'] == 'modis'):
-        try:
-            orbnum = int(message.data['orbit_number'])
-        except KeyError:
-            orbnum = None
+    if (message.data['platform_name'] == "EOS-Terra" and
+            message.data['sensor'] == 'modis'):
+        orbnum = message.data.get('orbit_number', None)
 
         path, fname = os.path.split(urlobj.path)
         if fname.find(modisfile_terra_prfx) == 0 and fname.endswith('001.PDS'):
@@ -580,33 +577,27 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
                 LOG.info("Orb = %d" % orbnum)
             LOG.info("File = " + str(urlobj.path))
             result_files = run_terra_l0l1(urlobj.path)
+
+            LOG.info("Result files: " + str(result_files))
+
             # Assume everything has gone well!
             # Add intelligence to run-function. FIXME!
             # Now publish:
             for resfile in result_files:
-                to_send = {}
+                to_send = message.data.copy()
                 filename = result_files[resfile]
-                to_send['uri'] = ('ssh://safe.smhi.se/' + filename)
-                if orbnum:
-                    to_send['orbit_number'] = orbnum
-                to_send['filename'] = os.path.basename(filename)
-                to_send['instrument'] = 'modis'
-                to_send['satellite'] = 'TERRA'
+                to_send['uri'] = ('file://' + filename)
+                to_send['uid'] = os.path.basename(filename)
                 to_send['format'] = 'EOS'
-                to_send['level'] = '1'
+                to_send['data_processing_level'] = '1'
                 to_send['type'] = 'HDF4'
-                to_send['start_time'] = start_time
-                to_send['end_time'] = end_time
 
                 send_message(mypublisher, to_send)
 
-    elif (message.data['satellite'] == "AQUA" and
-          (message.data['instrument'] == 'modis' or
-           message.data['instrument'] == 'gbad')):
-        try:
-            orbnum = int(message.data['orbit_number'])
-        except KeyError:
-            orbnum = None
+    elif (message.data['platform_name'] == "AQUA" and
+          (message.data['sensor'] == 'modis' or
+           message.data['sensor'] == 'gbad')):
+        orbnum = message.data.get('orbit_number')
 
         if start_time:
             scene_id = start_time.strftime('%Y%m%d%H%M')
@@ -669,24 +660,21 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             LOG.info("File = " + str(modisfile))
             result_files = run_aqua_l0l1(modisfile)
 
+            LOG.info("Result files: " + str(result_files))
             # Clean register: aqua_files dict
             LOG.info('Clean the internal aqua_files register')
             eos_files = {}
 
             # Now publish:
             for resfile in result_files:
-                to_send = {}
+                to_send = message.data.copy()
                 filename = result_files[resfile]
-                to_send['uri'] = ('ssh://safe.smhi.se/' + filename)
-                if orbnum:
-                    to_send['orbit_number'] = orbnum
-                to_send['filename'] = filename
-                to_send['instrument'] = 'modis'
-                to_send['satellite'] = 'AQUA'
+                to_send['uri'] = ('file://' + filename)
+                to_send['uid'] = filename
+                to_send['sensor'] = 'modis'
                 to_send['format'] = 'EOS'
-                to_send['level'] = '1'
+                to_send['data_processing_level'] = '1'
                 to_send['type'] = 'HDF4'
-                to_send['start_time'] = start_time
 
                 send_message(mypublisher, to_send)
 
