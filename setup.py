@@ -27,7 +27,7 @@ import imp
 
 version = imp.load_source('trollduction.version', 'trollduction/version.py')
 
-setup(name="trollduction",
+setup(name="SMHI-SAF-trollduction",
       version=version.__version__,
       description='Pytroll batch production library',
       author='Martin Raspaud',
