@@ -27,7 +27,7 @@ import imp
 
 version = imp.load_source('trollduction.version', 'trollduction/version.py')
 
-setup(name="SMHI-SAF-trollduction",
+setup(name="trollduction",
       version=version.__version__,
       description='Pytroll batch production library',
       author='Martin Raspaud',
@@ -46,8 +46,7 @@ setup(name="SMHI-SAF-trollduction",
                'bin/modis_dr_runner.sh',
                'bin/l2processor.py',
                'bin/scisys_receiver.py'],
-      data_files=[('etc', ['etc/modis_dr_config.cfg']),
-                  ],
+      data_files=[],
       zip_safe=False,
       install_requires=['pyinotify', 'mpop', 'posttroll',
                         'pyresample', 'pykdtree',
