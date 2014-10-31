@@ -36,7 +36,7 @@ TODO:
    (crude/nearest/<something new>)
 '''
 
-from listener import ListenerContainer
+from .listener import ListenerContainer
 from mpop.satellites import GenericFactory as GF
 import time
 from mpop.projector import get_area_def
@@ -48,7 +48,7 @@ import Queue
 import logging
 import logging.handlers
 from fnmatch import fnmatch
-import helper_functions
+from trollduction import helper_functions
 from trollsift import compose
 from urlparse import urlparse, urlunsplit
 import socket
@@ -57,6 +57,7 @@ from mpop.satout.cfscene import CFScene
 from posttroll.publisher import Publish
 from posttroll.message import Message
 from pyresample.utils import AreaNotFound
+
 LOGGER = logging.getLogger(__name__)
 
 # Config watcher stuff
@@ -170,11 +171,11 @@ class DataProcessor(object):
 
         platforms = {"metop-a": ("metop", "a"),
                      "metop-b": ("metop", "b"),
-                     "metop02": ("metop", "a"),
-                     "metop01": ("metop", "b"),
-                     "noaa 19": ("noaa", "19"),
-                     "noaa 18": ("noaa", "18"),
-                     "noaa 15": ("noaa", "15")}
+                     "noaa-19": ("noaa", "19"),
+                     "noaa-18": ("noaa", "18"),
+                     "noaa-15": ("noaa", "15"),
+                     "eos-terra": ('terra', ''),
+                     "eos-aqua": ('aqua', '')}
 
         time_slot = (mda.get('start_time') or
                      mda.get('nominal_time') or
@@ -188,18 +189,9 @@ class DataProcessor(object):
         satellite = None
         satnumber = None
 
-        # FIXME: fix this when we follow the metadata standard
-        if 'satellite' in mda:
-            platform = mda["satellite"]
-        if 'platform' in mda:
-            platform = mda["platform"]
-        if 'satnumber' in mda:
-            satellite = platform
-            satnumber = str(mda['satnumber'])
-            platform = ' '.join((satellite, satnumber))
-        else:
-            satellite, satnumber = platforms.get(platform.lower(),
-                                                 (platform, ''))
+        platform = mda["platform_name"]
+        satellite, satnumber = platforms.get(platform.lower(),
+                                             (platform, ''))
 
         LOGGER.info("platform %s time %s",
                     str(platform), str(time_slot))
@@ -207,7 +199,7 @@ class DataProcessor(object):
         # Create satellite scene
         global_data = GF.create_scene(satname=str(satellite),
                                       satnumber=str(satnumber),
-                                      instrument=str(mda['instrument']),
+                                      instrument=str(mda['sensor']),
                                       time_slot=time_slot,
                                       orbit=str(mda['orbit_number']),
                                       variant=mda.get('variant', ''))
@@ -216,8 +208,8 @@ class DataProcessor(object):
         # TODO: this should be fixed in mpop.
         global_data.info.update(mda)
         global_data.info['time'] = time_slot
-        global_data.info['platform'] = platform
-        global_data.info['instrument'] = mda['instrument']
+        global_data.info['platform_name'] = platform
+        global_data.info['sensor'] = mda['sensor']
         global_data.info['orbit_number'] = int(mda['orbit_number'])
 
         return global_data
@@ -629,16 +621,16 @@ def _create_message(obj, filename, uri, params):
     to_send["type"] = fformat
     if fformat != "NetCDF":
         to_send["format"] = "raster"
-        to_send["level"] = "2"
+        to_send["data_processing_level"] = "2"
         to_send["product_name"] = obj.info["product_name"]
     else:
         to_send["format"] = "CF"
-        to_send["level"] = "1b"
+        to_send["data_processing_level"] = "1b"
         to_send["product_name"] = "dump"
 
     subject = "/".join(("",
                         to_send["format"],
-                        to_send["level"]))
+                        to_send["data_processing_level"]))
 
     msg = Message(subject,
                   "file",
