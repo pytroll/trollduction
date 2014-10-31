@@ -505,16 +505,41 @@ def run_aqua_l0l1(pdsfile):
     return retv
 
 
-def send_message(this_publisher, msg, environment=MODE):
+def send_message(this_publisher, msg):
     """Send a message for down-stream processing"""
 
-    message = Message('/' + str(msg['format']) + '/' + str(msg['level']) +
-                      '/norrköping/' + environment + '/polar/direct_readout/',
-                      "file", msg).encode()
-    LOG.debug("sending: " + str(message))
-    this_publisher.send(message)
+    LOG.debug("sending: " + str(msg))
+    this_publisher.send(msg)
 
     return
+
+
+def create_message(mda, filename, level):
+    to_send = mda.copy()
+    if isinstance(filename, (list, tuple, set)):
+        del to_send['uri']
+        del to_send['uid']
+        to_send['dataset'] = [{'uri': 'file://' + fname,
+                               'uid': os.path.basename(fname)}
+                              for fname in filename]
+        mtype = 'dataset'
+    else:
+        to_send['uri'] = ('file://' + filename)
+        to_send['uid'] = os.path.basename(filename)
+        mtype = 'file'
+    to_send['format'] = 'EOS'
+    to_send['data_processing_level'] = level
+    to_send['type'] = 'HDF4'
+
+    message = Message('/'.join(('',
+                                str(to_send['format']),
+                                str(to_send['data_processing_level']),
+                                'norrköping',
+                                MODE,
+                                'polar'
+                                'direct_readout')),
+                      mtype, to_send).encode()
+    return message
 
 
 def start_modis_lvl1_processing(level1b_home, eos_files,
@@ -583,16 +608,20 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             # Assume everything has gone well!
             # Add intelligence to run-function. FIXME!
             # Now publish:
-            for resfile in result_files:
-                to_send = message.data.copy()
-                filename = result_files[resfile]
-                to_send['uri'] = ('file://' + filename)
-                to_send['uid'] = os.path.basename(filename)
-                to_send['format'] = 'EOS'
-                to_send['data_processing_level'] = '1'
-                to_send['type'] = 'HDF4'
 
-                send_message(mypublisher, to_send)
+            l1b_files = [result_files[key] for key in ['geo_file',
+                                                       'mod021km_file',
+                                                       'mod02hkm_file',
+                                                       'mod02qkm_file']]
+            send_message(mypublisher, create_message(l1b_files,
+                                                     message.data,
+                                                     "1b"))
+
+            l1a_file = result_files['level1a_file']
+
+            send_message(mypublisher, create_message(l1a_file,
+                                                     message.data,
+                                                     "1a"))
 
     elif (message.data['platform_name'] == "AQUA" and
           (message.data['sensor'] == 'modis' or
@@ -666,17 +695,19 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             eos_files = {}
 
             # Now publish:
-            for resfile in result_files:
-                to_send = message.data.copy()
-                filename = result_files[resfile]
-                to_send['uri'] = ('file://' + filename)
-                to_send['uid'] = filename
-                to_send['sensor'] = 'modis'
-                to_send['format'] = 'EOS'
-                to_send['data_processing_level'] = '1'
-                to_send['type'] = 'HDF4'
+            l1b_files = [result_files[key] for key in ['geo_file',
+                                                       'mod021km_file',
+                                                       'mod02hkm_file',
+                                                       'mod02qkm_file']]
+            send_message(mypublisher, create_message(l1b_files,
+                                                     message.data,
+                                                     "1b"))
 
-                send_message(mypublisher, to_send)
+            l1a_file = result_files['level1a_file']
+
+            send_message(mypublisher, create_message(l1a_file,
+                                                     message.data,
+                                                     "1a"))
 
     else:
         return eos_files
