@@ -824,12 +824,12 @@ class Trollduction(object):
 
             # For 'file' type messages, update product config and run
             # production
-            if msg.type == "file" and msg.data["instrument"] == self.td_config['instrument']:
+            if msg.type == "file" and msg.data["sensor"] == self.td_config['instrument']:
                 self.update_product_config(self.td_config['product_config_file'],
                                            self.td_config['config_item'])
                 self.data_processor.run(self.product_config, msg)
 
-            elif msg.type == "collection" and msg.data[0]["instrument"] == self.td_config['instrument']:
+            elif msg.type == "collection" and msg.data[0]["sensor"] == self.td_config['instrument']:
                 self.update_product_config(self.td_config['product_config_file'],
                                            self.td_config['config_item'])
                 self.data_processor.run(self.product_config, msg)
