@@ -36,7 +36,7 @@ TODO:
    (crude/nearest/<something new>)
 '''
 
-from listener import ListenerContainer
+from .listener import ListenerContainer
 from mpop.satellites import GenericFactory as GF
 import time
 from mpop.projector import get_area_def
@@ -48,15 +48,15 @@ import Queue
 import logging
 import logging.handlers
 from fnmatch import fnmatch
-import helper_functions
+from trollduction import helper_functions
 from trollsift import compose
 from urlparse import urlparse, urlunsplit
 import socket
 import shutil
-from mpop.scene import assemble_segments
 from mpop.satout.cfscene import CFScene
 from posttroll.publisher import Publish
 from posttroll.message import Message
+from pyresample.utils import AreaNotFound
 
 LOGGER = logging.getLogger(__name__)
 
@@ -157,51 +157,49 @@ class DataProcessor(object):
         self.writer = DataWriter()
         self.writer.start()
 
-    def create_scene_from_collection(self, collection):
-        """Parse the *collection* and return a corresponding MPOP scene.
-        """
-        return self.create_scene_from_mda(collection.data[0])
-
     def create_scene_from_message(self, msg):
         """Parse the message *msg* and return a corresponding MPOP scene.
         """
-        return self.create_scene_from_mda(msg.data)
+        if msg.type == "file":
+            return self.create_scene_from_mda(msg.data)
+        if msg.type == "collection":
+            return self.create_scene_from_mda(msg.data[0])
 
     def create_scene_from_mda(self, mda):
         """Read the metadata *mda* and return a corresponding MPOP scene.
         """
-        time_slot = (mda.get('time') or
-                     mda.get('start_time') or
-                     mda.get('nominal_time'))
+
+        platforms = {"metop-a": ("metop", "a"),
+                     "metop-b": ("metop", "b"),
+                     "noaa-19": ("noaa", "19"),
+                     "noaa-18": ("noaa", "18"),
+                     "noaa-15": ("noaa", "15"),
+                     "eos-terra": ('terra', ''),
+                     "eos-aqua": ('aqua', '')}
+
+        time_slot = (mda.get('start_time') or
+                     mda.get('nominal_time') or
+                     mda.get('end_time'))
 
         # orbit is not given for GEO satellites, use None
 
         if 'orbit_number' not in mda:
             mda['orbit_number'] = None
 
-        platform = None
+        satellite = None
         satnumber = None
 
-        if 'satellite' in mda:
-            platform = mda.get('satellite').split()[0]
-            satnumber = mda.get('satellite').split()[1]
+        platform = mda["platform_name"]
+        satellite, satnumber = platforms.get(platform.lower(),
+                                             (platform, ''))
 
-        platform = mda.get('platform', platform).lower()
-        satnumber = mda.get('satnumber', mda.get('number', satnumber))
-
-        try:
-            satnumber = int(satnumber)
-        except ValueError:
-            satnumber = satnumber.lower()
-        except TypeError:
-            satnumber = ""
-        LOGGER.info("platform %s, number %s, time %s",
-                    str(platform), str(satnumber), str(time_slot))
+        LOGGER.info("platform %s time %s",
+                    str(platform), str(time_slot))
 
         # Create satellite scene
-        global_data = GF.create_scene(satname=str(platform),
+        global_data = GF.create_scene(satname=str(satellite),
                                       satnumber=str(satnumber),
-                                      instrument=str(mda['instrument']),
+                                      instrument=str(mda['sensor']),
                                       time_slot=time_slot,
                                       orbit=str(mda['orbit_number']),
                                       variant=mda.get('variant', ''))
@@ -210,10 +208,9 @@ class DataProcessor(object):
         # TODO: this should be fixed in mpop.
         global_data.info.update(mda)
         global_data.info['time'] = time_slot
-        global_data.info['platform'] = platform
-        global_data.info['satnumber'] = satnumber
-        global_data.info['instrument'] = mda['instrument']
-        global_data.info['orbit_number'] = mda['orbit_number']
+        global_data.info['platform_name'] = platform
+        global_data.info['sensor'] = mda['sensor']
+        global_data.info['orbit_number'] = int(mda['orbit_number'])
 
         return global_data
 
@@ -277,10 +274,7 @@ class DataProcessor(object):
             LOGGER.info("Skipping...")
             return
 
-        if msg.type == "file":
-            self.global_data = self.create_scene_from_message(msg)
-        elif msg.type == "collection":
-            self.global_data = self.create_scene_from_collection(msg)
+        self.global_data = self.create_scene_from_message(msg)
 
         self._data_ok = True
         self.product_config = product_config
@@ -293,72 +287,39 @@ class DataProcessor(object):
                 self.save_to_netcdf(self.global_data,
                                     area_item,
                                     self.get_parameters(area_item))
-            if area_item.tag == "area":
-                # Make images for an area
 
-                # TODO
-                # Check if satellite is one that should be processed
-                # if not self.check_satellite(area):
-                    # if return value is False, skip this loop step
-                    # continue
+        for group in self.product_config.groups:
+            area_def_names = self.get_area_def_names(group)
+            products = []
+            for area_item in group:
+                for product in area_item:
+                    products.append(product)
 
-                t1b = time.time()
+            try:
+                self.global_data.load(self.get_req_channels(products),
+                                      filename=filename,
+                                      area_def_names=area_def_names)
+            except IndexError:
+                LOGGER.error("Incomplete or corrupted input data.")
+                self._data_ok = False
+                break
 
-                dump = False
-
-                for product_item in area_item:
-                    if product_item.tag == "dump":
-                        dump = product_item
-                        break
-
-                # Check which channels are needed. Unload unnecessary
-                # channels and load those that are not already available.
-                # If NetCDF4 data is to be saved, use all data, otherwise
-                # unload unnecessary channels.
-                if dump:
-                    # TODO
-                    LOGGER.info('Load all channels for dump.')
-                    try:
-                        if msg.data['orbit_number'] is not None:
-                            raise TypeError
-                        try:
-                            self.global_data.load(filename=filename,
-                                                  area_def_names=area_def_names)
-                        except IndexError:
-                            LOGGER.error("Incomplete or corrupted input data.")
-                            self._data_ok = False
-                            break
-                    except TypeError:
-                        # load all data if area_def_names keyword isn't
-                        # available in instrument reader or the data is
-                        # swath based
-                        LOGGER.info('Loading full swath data')
-                        try:
-                            self.global_data.load(filename=filename)
-                        except IndexError:
-                            LOGGER.error("Incomplete or corrupted input data.")
-                            self._data_ok = False
-                            break
-                else:
-                    LOGGER.info('Loading required channels.')
-                    try:
-                        self.load_unload_channels(area_item,
-                                                  area_def_names=area_def_names,
-                                                  filename=filename)
-                    except IndexError:
-                        LOGGER.error("Incomplete or corrupted input data.")
-                        self._data_ok = False
-                        break
-
+            for area_item in group:
                 # reproject to local domain
                 LOGGER.debug(
                     "Projecting data to area " + area_item.attrib['name'])
                 try:
                     self.local_data = \
-                        self.global_data.project(area_item.attrib["id"],
-                                                 mode='nearest')
+                        self.global_data.project(
+                            area_item.attrib["id"],
+                            channels=self.get_req_channels(area_item),
+                            mode='nearest')
                 except ValueError:
                     LOGGER.warning("No data in this area")
+                    continue
+                except AreaNotFound:
+                    LOGGER.warning("Area %s not defined, skipping!",
+                                   area_item.attrib['id'])
                     continue
 
                 LOGGER.info(
@@ -366,8 +327,6 @@ class DataProcessor(object):
 
                 # Draw requested images for this area.
                 self.draw_images(area_item)
-
-                LOGGER.info('Area processed in %.1f s', (time.time() - t1b))
 
         # Wait for the writer to finish
         if self._data_ok:
@@ -390,65 +349,27 @@ class DataProcessor(object):
         self.local_data = None
         self.global_data = None
 
-    def load_unload_channels(self, products, area_def_names=None, filename=None):
-        '''Load channel data required for the given list of *products*
-        for the given area definition name(s) *area_def_names*.
-        Unload channels that are not needed.
-        '''
-
-        loaded_channels = []
-        required_channels = []
-        wavelengths = []
-        chan_names = []
-
-        # Get information which channels are loaded
-        for chan in self.global_data.channels:
-            required_channels.append(False)
-            wavelengths.append(chan.wavelength_range)
-            chan_names.append(chan.name)
-            if chan.is_loaded():
-                loaded_channels.append(True)
-            else:
-                loaded_channels.append(False)
-
+    def get_req_channels(self, products):
         # Get a list of required channels
         reqs = set()
         for product in products:
-            if product.tag != "product":
-                continue
-            composite = getattr(self.global_data.image, product.attrib['id'])
-            reqs |= composite.prerequisites
-
-        LOGGER.debug('Channels: %s', str(self.global_data))
-
-        to_load = set()
-        to_unload = set([chn.name for chn in self.global_data.channels])
-
-        for chn in reqs:
+            if product.tag == "dump":
+                return None
             try:
-                to_load |= set([self.global_data[chn].name])
-                to_unload -= set([self.global_data[chn].name])
-            except KeyError:
-                pass
+                composite = getattr(
+                    self.global_data.image, product.attrib['id'])
+                reqs |= composite.prerequisites
+            except AttributeError:
+                LOGGER.info("Composite %s not available",
+                            product.attrib['id'])
+        return reqs
 
-        LOGGER.debug('Channels to unload: %s', ', '.join(to_unload))
-        LOGGER.debug('Channels to load: %s', ', '.join(to_load))
-
-        self.global_data.unload(*to_unload)
-
-        try:
-            self.global_data.load(to_load, area_def_names=area_def_names,
-                                  filename=filename)
-        except TypeError:
-            LOGGER.info("Loading full data")
-            # load whole area if area_def_names keywoard isn't
-            # available in the instrument reader
-            self.global_data.load(to_load, filename=filename)
-
-    def get_area_def_names(self):
+    def get_area_def_names(self, group=None):
         '''Collect and return area definition names from product
         config to a list.
         '''
+
+        pl = group or self.product_config.pl
 
         def_names = [item.attrib["id"]
                      for item in self.product_config.pl
@@ -668,7 +589,7 @@ def _create_message(obj, filename, uri, params):
 
     to_send["nominal_time"] = getattr(obj, "time_slot",
                                       params.get("time_slot"))
-    area = getattr(obj, "area", params["area"])
+    area = getattr(obj, "area", params.get("area"))
 
     to_send["area"] = {}
     try:
@@ -686,7 +607,7 @@ def _create_message(obj, filename, uri, params):
 
     # FIXME: fishy: what if the uri already has a scheme ?
     to_send["uri"] = urlunsplit(("file", "", uri, "", ""))
-    to_send["filename"] = os.path.basename(filename)
+    to_send["uid"] = os.path.basename(filename)
     # we should have more info on format...
     fformat = os.path.splitext(filename)[1][1:]
     if fformat.startswith("tif"):
@@ -700,16 +621,16 @@ def _create_message(obj, filename, uri, params):
     to_send["type"] = fformat
     if fformat != "NetCDF":
         to_send["format"] = "raster"
-        to_send["level"] = "2"
+        to_send["data_processing_level"] = "2"
         to_send["product_name"] = obj.info["product_name"]
     else:
         to_send["format"] = "CF"
-        to_send["level"] = "1b"
+        to_send["data_processing_level"] = "1b"
         to_send["product_name"] = "dump"
 
     subject = "/".join(("",
                         to_send["format"],
-                        to_send["level"]))
+                        to_send["data_processing_level"]))
 
     msg = Message(subject,
                   "file",
@@ -748,11 +669,19 @@ class DataWriter(Thread):
                     pass
                 else:
                     # TODO: copy file instead of saving it twice.
-                    # Check that the format is the same though...
+                    # Check that the format and overlay are the same though...
                     for item in file_items:
-                        fname = os.path.join(params["output_dir"],
+                        output_dir = item.attrib.get("output_dir",
+                                                     params["output_dir"])
+                        fname = os.path.join(output_dir,
                                              compose(item.text, params))
-                        obj.save(fname)
+                        if item.attrib.get("overlay") == "true":
+                            obj.add_overlay()
+                        fformat = item.attrib.get("format")
+                        if fformat == "geotiff":
+                            fformat = "tif"
+                        obj.save(fname, fformat=fformat,
+                                 compression=item.attrib.get("compression", 6))
                         LOGGER.info("Saved %s to %s", str(obj), fname)
                         msg = _create_message(obj, os.path.basename(fname),
                                               fname, params)
@@ -833,9 +762,6 @@ class Trollduction(object):
             self.update_product_config(self.td_config['product_config_file'],
                                        self.td_config['config_item'])
         except KeyError:
-            print ""
-            print self.td_config
-            print ""
             LOGGER.critical("Key 'product_config_file' or 'config_item' is "
                             "missing from Trollduction config")
 

@@ -25,6 +25,9 @@
 
 import xml.etree.ElementTree as etree
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class InfoObject(object):
@@ -49,7 +52,10 @@ class ProductList(object):
         self.pl = None
         self.attrib = {}
         self.vars = {}
+        self.groups = []
         self.parse()
+        self.check_groups()
+
         self.insert_vars()
 
     def insert_vars(self):
@@ -58,6 +64,38 @@ class ProductList(object):
                 if key in item.attrib and item.attrib[key] in self.vars[key]:
                     item.set(key, self.vars[key][item.attrib[key]])
 
+    def check_groups(self):
+
+        # create the "rest" group
+        last_group = []
+        for area in self.pl:
+            assigned = False
+            for group in self.groups:
+                if area.attrib["id"] in group:
+                    assigned = True
+                    break
+            if not assigned:
+                last_group.append(area.attrib["id"])
+        if last_group:
+            self.groups.append(last_group)
+
+        # replace area ids with actual xml area items
+        groups = []
+        for group in self.groups:
+            new_group = []
+            for area_id in group:
+                assigned = False
+                for area in self.pl:
+                    if area.attrib["id"] == area_id:
+                        new_group.append(area)
+                        assigned = True
+                        break
+                if not assigned:
+                    logger.warning("Couldn't find area %s in product list",
+                                   area_id)
+            groups.append(new_group)
+        self.groups = groups
+
     def parse(self):
         for item in self._xml:
             if item.tag == "product_list":
@@ -65,6 +103,9 @@ class ProductList(object):
             elif item.tag == "common":
                 for citem in item:
                     self.attrib[citem.tag] = citem.text
+            elif item.tag == "groups":
+                for group in item:
+                    self.groups.append(group.text.split(","))
             elif item.tag == "variables":
                 for var in item:
                     self.vars.setdefault(

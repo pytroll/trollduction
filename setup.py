@@ -29,7 +29,7 @@ version = imp.load_source('trollduction.version', 'trollduction/version.py')
 
 setup(name="SMHI-SAF-trollduction",
       version=version.__version__,
-      description='Production tools for Pytroll',
+      description='Pytroll batch production library',
       author='Martin Raspaud',
       author_email='martin.raspaud@smhi.se',
       classifiers=["Development Status :: 3 - Alpha",

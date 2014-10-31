@@ -31,9 +31,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class ListenerContainer(object):
+
     '''Container for listener instance
     '''
+
     def __init__(self, topic=None):
         self.listener = None
         self.queue = None
@@ -41,7 +44,7 @@ class ListenerContainer(object):
 
         if topic is not None:
             # Create queue for the messages
-            self.queue = Queue() #Pipe()
+            self.queue = Queue()  # Pipe()
 
             # Create a Listener instance
             self.listener = Listener(topic=topic, queue=self.queue)
@@ -49,7 +52,6 @@ class ListenerContainer(object):
             self.thread = Thread(target=self.listener.run)
             self.thread.setDaemon(True)
             self.thread.start()
-
 
     def restart_listener(self, topic):
         '''Restart listener after configuration update.
@@ -59,7 +61,6 @@ class ListenerContainer(object):
                 self.stop()
         self.__init__(topic=topic)
 
-
     def stop(self):
         '''Stop listener.'''
         logger.debug("Stopping listener…")
@@ -68,7 +69,9 @@ class ListenerContainer(object):
         self.thread = None
         logger.debug("Listener stopped.")
 
+
 class Listener(object):
+
     '''PyTroll listener class for reading messages for Trollduction
     '''
 
@@ -82,7 +85,6 @@ class Listener(object):
         self.create_subscriber()
         self.running = False
 
-
     def create_subscriber(self):
         '''Create a subscriber instance using specified addresses and
         message types.
@@ -93,12 +95,10 @@ class Listener(object):
                                                addr_listener=True)
                 self.recv = self.subscriber.start().recv
 
-
     def add_to_queue(self, msg):
         '''Add message to queue
         '''
         self.queue.put(msg)
-
 
     def run(self):
         '''Run listener
@@ -114,7 +114,6 @@ class Listener(object):
                     break
 
             self.add_to_queue(msg)
-            
 
     def stop(self):
         '''Stop subscriber and delete the instance
