@@ -613,14 +613,14 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
                                                        'mod021km_file',
                                                        'mod02hkm_file',
                                                        'mod02qkm_file']]
-            send_message(mypublisher, create_message(l1b_files,
-                                                     message.data,
+            send_message(mypublisher, create_message(message.data,
+                                                     l1b_files,
                                                      "1b"))
 
             l1a_file = result_files['level1a_file']
 
-            send_message(mypublisher, create_message(l1a_file,
-                                                     message.data,
+            send_message(mypublisher, create_message(message.data,
+                                                     l1a_file,
                                                      "1a"))
 
     elif (message.data['platform_name'] == "AQUA" and
