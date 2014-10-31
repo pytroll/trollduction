@@ -65,6 +65,15 @@ fildis_m01 = '<message timestamp="2014-10-28T08:45:27" sequence="203535" severit
 msg_m01 = {"platform_name": "Metop-B", "format": "EPS", "start_time": datetime.datetime(2014, 10, 28, 8, 30, 3), "data_processing_level": "0", "orbit_number": 10948, "uri": "ssh://nimbus/archive/metop/MHSx_HRP_00_M01_20141028083003Z_20141028084510Z_N_O_20141028083010Z",
            "uid": "MHSx_HRP_00_M01_20141028083003Z_20141028084510Z_N_O_20141028083010Z", "sensor": "mhs", "end_time": datetime.datetime(2014, 10, 28, 8, 45, 10), "type": "binary"}
 
+startrc_npp2 = '<message timestamp="2014-10-31T08:53:52" sequence="9096" severity="INFO" messageID="0" type="2met.message" sourcePU="SMHI-Linux" sourceSU="POESAcquisition" sourceModule="POES" sourceInstance="1"><body>STRTRC Start reception: Satellite: NPP, Orbit number: 15591, Risetime: 2014-10-31 08:53:52, Falltime: 2014-10-31 09:06:28</body></message>'
+
+stoprc_npp2 = '<message timestamp="2014-10-31T09:06:28" sequence="9340" severity="INFO" messageID="0" type="2met.message" sourcePU="SMHI-Linux" sourceSU="POESAcquisition" sourceModule="POES" sourceInstance="1"><body>STOPRC Stop reception: Satellite: NPP, Orbit number: 15591, Risetime: 2014-10-31 08:53:52, Falltime: 2014-10-31 09:06:28</body></message>'
+
+fildis_npp2 = '<message timestamp="2014-10-31T09:06:25" sequence="216010" severity="INFO" messageID="8250" type="2met.filehandler.sink.success" sourcePU="SMHI-Linux" sourceSU="GMCSERVER" sourceModule="GMCSERVER" sourceInstance="1"><body>FILDIS File Dispatch: /data/npp/RCRIS-RNSCA_npp_d20141031_t0905166_e0905484_b00001_c20141031090623200000_nfts_drl.h5 ftp://safusr.t@pps2.smhi.se:21//san1/polar_in/direct_readout/npp/lvl0</body></message>'
+
+msg_npp2 = {"orbit_number": 15591, "uid": "RCRIS-RNSCA_npp_d20141031_t0905166_e0905484_b00001_c20141031090623200000_nfts_drl.h5", "format": "RDR", "sensor": "cris", "start_time": datetime.datetime(2014, 10, 31, 9, 5, 16), "uri":
+            "ssh://pps2.smhi.se//san1/polar_in/direct_readout/npp/lvl0/RCRIS-RNSCA_npp_d20141031_t0905166_e0905484_b00001_c20141031090623200000_nfts_drl.h5", "platform_name": "Suomi-NPP", "end_time": datetime.datetime(2014, 10, 31, 9, 5, 48), "type": "HDF5", "data_processing_level": "0"}
+
 
 class ScisysReceiverTest(unittest.TestCase):
 
@@ -84,6 +93,24 @@ class ScisysReceiverTest(unittest.TestCase):
         string = TwoMetMessage(input_dispatch_atms)
         to_send = msg_rec.receive(string)
         self.assertTrue(to_send == atms)
+
+        # NPP with start
+
+        string = TwoMetMessage(startrc_npp2)
+        to_send = msg_rec.receive(string)
+        self.assertTrue(to_send is None)
+
+        string = TwoMetMessage(fildis_npp2)
+        to_send = msg_rec.receive(string)
+        self.assertTrue(to_send == msg_npp2)
+
+        string = TwoMetMessage(stoprc_npp2)
+        to_send = msg_rec.receive(string)
+        self.assertTrue(to_send is None)
+
+        string = TwoMetMessage(fildis_npp2)
+        to_send = msg_rec.receive(string)
+        self.assertTrue(to_send == msg_npp2)
 
         # Terra
 

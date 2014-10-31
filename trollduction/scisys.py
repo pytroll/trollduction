@@ -134,7 +134,6 @@ class MessageReceiver(object):
         pass_info = {}
         for key, val in info.items():
             pass_info[key.lower()] = val
-
         pass_info["start_time"] = datetime.strptime(pass_info["risetime"],
                                                     "%Y-%m-%d %H:%M:%S")
         del pass_info['risetime']
@@ -357,12 +356,13 @@ class MessageReceiver(object):
     def receive(self, message):
         """Receive the messages and triage them.
         """
-        metadata_prefix = "STOPRC Stop reception: "
+        metadata_stop = "STOPRC Stop reception: "
+        metadata_start = "STRTRC Start reception: Satellite"
         dispatch_prefix = "FILDIS File Dispatch: "
-        if message.body.startswith(metadata_prefix):
-            self.add_pass(message.body[len(metadata_prefix):])
+        if (message.body.startswith(metadata_stop) or
+                message.body.startswith(metadata_start)):
+            self.add_pass(message.body.split(":", 1)[1].strip())
             return None
-
         elif message.body.startswith(dispatch_prefix):
             return self.handle_distrib(message.body[len(dispatch_prefix):])
 
