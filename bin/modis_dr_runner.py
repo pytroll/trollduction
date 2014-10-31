@@ -531,7 +531,7 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
         return eos_files
     LOG.info("Ok... " + str(urlobj.netloc))
     LOG.info("Sat and Instrument: " + str(message.data['platform_name']) + " "
-             + str(message.data['instrument']))
+             + str(message.data['sensor']))
 
     if 'start_time' in message.data:
         start_time = message.data['start_time']
