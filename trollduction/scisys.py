@@ -278,7 +278,10 @@ class MessageReceiver(object):
             pname = pass_name(start_time, "NPP")
 
             swath = self._received_passes.get(pname, {}).copy()
-            del swath["satellite"]
+            try:
+                del swath["satellite"]
+            except KeyError:
+                pass
             swath["platform_name"] = satellite
             swath["start_time"] = start_time
             swath['end_time'] = end_time
