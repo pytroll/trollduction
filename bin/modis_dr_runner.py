@@ -515,6 +515,7 @@ def send_message(this_publisher, msg):
 
 
 def create_message(mda, filename, level):
+    LOG.debug("type(mda): " + str(type(mda)))
     to_send = mda.copy()
     if isinstance(filename, (list, tuple, set)):
         del to_send['uri']
@@ -613,6 +614,10 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
                                                        'mod021km_file',
                                                        'mod02hkm_file',
                                                        'mod02qkm_file']]
+            LOG.debug("Mesage:")
+            LOG.debug(message)
+            LOG.debug("Message data: " + str(message.data))
+
             send_message(mypublisher, create_message(message.data,
                                                      l1b_files,
                                                      "1b"))
