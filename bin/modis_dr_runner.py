@@ -719,10 +719,8 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
 
     return eos_files
 
-# ---------------------------------------------------------------------------
 
-
-def modis_runner():
+def modis_live_runner():
     """Listens and triggers processing"""
 
     lvl1b_home = OPTIONS['level1b_home']
@@ -743,7 +741,7 @@ def modis_runner():
 
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    modis_runner()
+    modis_live_runner()
 
     #aqua_modis_file = '/san1/polar_in/direct_readout/modis/P1540064AAAAAAAAAAAAAA12298130323001.PDS'
 
