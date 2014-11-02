@@ -532,6 +532,7 @@ def create_message(mda, filename, level):
     to_send['format'] = 'EOS'
     to_send['data_processing_level'] = level
     to_send['type'] = 'HDF4'
+    to_send['sensor'] = 'modis'
 
     message = Message('/'.join(('',
                                 str(to_send['format']),
@@ -544,7 +545,7 @@ def create_message(mda, filename, level):
     return message
 
 
-def start_modis_lvl1_processing(level1b_home, eos_files,
+def start_modis_lvl1_processing(eos_files,
                                 mypublisher, message):
     """From a posttroll message start the modis lvl1 processing"""
 
@@ -730,7 +731,6 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
 def modis_live_runner():
     """Listens and triggers processing"""
 
-    lvl1b_home = OPTIONS['level1b_home']
     # Roll over log files at application start:
     try:
         LOG.handlers[0].doRollover()
@@ -741,8 +741,7 @@ def modis_live_runner():
         with Publish('modis_dr_runner', 0) as publisher:
             aquafiles = {}
             for msg in subscr.recv():
-                aquafiles = start_modis_lvl1_processing(lvl1b_home,
-                                                        aquafiles,
+                aquafiles = start_modis_lvl1_processing(aquafiles,
                                                         publisher, msg)
 
 
