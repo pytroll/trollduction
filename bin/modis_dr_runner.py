@@ -628,7 +628,7 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
                                                      l1a_file,
                                                      "1a"))
 
-    elif (message.data['platform_name'] == "AQUA" and
+    elif (message.data['platform_name'] == "EOS-Aqua" and
           (message.data['sensor'] == 'modis' or
            message.data['sensor'] == 'gbad')):
         orbnum = message.data.get('orbit_number')
