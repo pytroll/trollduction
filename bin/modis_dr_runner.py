@@ -515,6 +515,7 @@ def send_message(this_publisher, msg):
 
 
 def create_message(mda, filename, level):
+    LOG.debug("mda: = " + str(mda))
     LOG.debug("type(mda): " + str(type(mda)))
     to_send = mda.copy()
     if isinstance(filename, (list, tuple, set)):
@@ -614,7 +615,7 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
                                                        'mod021km_file',
                                                        'mod02hkm_file',
                                                        'mod02qkm_file']]
-            LOG.debug("Mesage:")
+            LOG.debug("Message:")
             LOG.debug(message)
             LOG.debug("Message data: " + str(message.data))
             send_message(mypublisher, create_message(message.data,
@@ -665,7 +666,7 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             aquanames = [os.path.basename(s) for s in eos_files[scene_id]]
             LOG.info('aquanames: ' + str(aquanames))
 
-            LOG.debug("Mesage:")
+            LOG.debug("Message:")
             LOG.debug(message)
             LOG.debug("Message data: " + str(message.data))
 
@@ -703,7 +704,7 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             LOG.info('Clean the internal aqua_files register')
             eos_files = {}
 
-            LOG.debug("Mesage:")
+            LOG.debug("Message:")
             LOG.debug(message)
             LOG.debug("Message data: " + str(message.data))
             # Now publish:
