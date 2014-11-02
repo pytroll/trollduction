@@ -79,9 +79,9 @@ LOG.setLevel(logging.DEBUG)
 LOG.addHandler(handler)
 
 
-packetfile_aqua_prfx = "P154095715409581540959"
-modisfile_aqua_prfx = "P1540064AAAAAAAAAAAAAA"
-modisfile_terra_prfx = "P0420064AAAAAAAAAAAAAA"
+PACKETFILE_AQUA_PRFX = "P154095715409581540959"
+MODISFILE_AQUA_PRFX = "P1540064AAAAAAAAAAAAAA"
+MODISFILE_TERRA_PRFX = "P0420064AAAAAAAAAAAAAA"
 
 
 from urlparse import urlparse
@@ -576,7 +576,7 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
         orbnum = message.data.get('orbit_number', None)
 
         path, fname = os.path.split(urlobj.path)
-        if fname.find(modisfile_terra_prfx) == 0 and fname.endswith('001.PDS'):
+        if fname.find(MODISFILE_TERRA_PRFX) == 0 and fname.endswith('001.PDS'):
             # Check if the file exists:
             if not os.path.exists(urlobj.path):
                 LOG.warning("File is reported to be dispatched " +
@@ -640,8 +640,9 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             return eos_files
 
         path, fname = os.path.split(urlobj.path)
-        if ((fname.find(modisfile_aqua_prfx) == 0 or
-             fname.find(packetfile_aqua_prfx) == 0) and
+        LOG.debug("Path and filename: " + str(path) + ' ' + str(fname))
+        if ((fname.find(MODISFILE_AQUA_PRFX) == 0 or
+             fname.find(PACKETFILE_AQUA_PRFX) == 0) and
                 fname.endswith('001.PDS')):
             # Check if the file exists:
             if not os.path.exists(urlobj.path):
@@ -665,11 +666,11 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             aquanames = [os.path.basename(s) for s in eos_files[scene_id]]
             LOG.info('aquanames: ' + str(aquanames))
 
-            if (aquanames[0].find(modisfile_aqua_prfx) == 0 and
-                    aquanames[1].find(packetfile_aqua_prfx) == 0):
+            if (aquanames[0].find(MODISFILE_AQUA_PRFX) == 0 and
+                    aquanames[1].find(PACKETFILE_AQUA_PRFX) == 0):
                 modisfile = eos_files[scene_id][0]
-            elif (aquanames[1].find(modisfile_aqua_prfx) == 0 and
-                  aquanames[0].find(packetfile_aqua_prfx) == 0):
+            elif (aquanames[1].find(MODISFILE_AQUA_PRFX) == 0 and
+                  aquanames[0].find(PACKETFILE_AQUA_PRFX) == 0):
                 modisfile = eos_files[scene_id][1]
             else:
                 LOG.error("Either MODIS file or packet file not there!?")
