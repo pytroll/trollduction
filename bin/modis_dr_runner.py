@@ -617,7 +617,6 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             LOG.debug("Mesage:")
             LOG.debug(message)
             LOG.debug("Message data: " + str(message.data))
-
             send_message(mypublisher, create_message(message.data,
                                                      l1b_files,
                                                      "1b"))
@@ -666,6 +665,10 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             aquanames = [os.path.basename(s) for s in eos_files[scene_id]]
             LOG.info('aquanames: ' + str(aquanames))
 
+            LOG.debug("Mesage:")
+            LOG.debug(message)
+            LOG.debug("Message data: " + str(message.data))
+
             if (aquanames[0].find(MODISFILE_AQUA_PRFX) == 0 and
                     aquanames[1].find(PACKETFILE_AQUA_PRFX) == 0):
                 modisfile = eos_files[scene_id][0]
@@ -700,6 +703,9 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             LOG.info('Clean the internal aqua_files register')
             eos_files = {}
 
+            LOG.debug("Mesage:")
+            LOG.debug(message)
+            LOG.debug("Message data: " + str(message.data))
             # Now publish:
             l1b_files = [result_files[key] for key in ['geo_file',
                                                        'mod021km_file',
