@@ -1,0 +1,31 @@
+[offline]
+level1_dir = /local_disk/data/pps/import/PPS_data/source
+
+
+[prod]
+level1_dir = /san1/pps/import/PPS_data/source
+pps_log_file = /var/log/satellit/pps_runner.log
+
+servername = pps.smhi.se
+log_rotation_days = 1
+log_rotation_backup = 10
+
+[test]
+level1_dir = /san1/pps/import/PPS_data/source
+pps_log_file = /var/log/satellit/pps_runner.log
+
+servername = pps2.smhi.se
+log_rotation_days = 1
+log_rotation_backup = 10
+
+[utv]
+level1_dir = /san1/pps/import/PPS_data/source
+pps_log_file = /var/log/satellit/pps_runner.log
+#pps_outdir = /san1/pps/export
+pps_outdir = /data/proj/safutv/data/polar_out/direct_readout
+
+servername = safe.smhi.se
+log_rotation_days = 1
+log_rotation_backup = 10
+
+ncpus = 4

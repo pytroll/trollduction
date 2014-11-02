@@ -605,7 +605,6 @@ def start_modis_lvl1_processing(eos_files,
                 LOG.info("Orb = %d" % orbnum)
             LOG.info("File = " + str(urlobj.path))
             result_files = run_terra_l0l1(urlobj.path)
-
             LOG.info("Result files: " + str(result_files))
 
             # Assume everything has gone well!
