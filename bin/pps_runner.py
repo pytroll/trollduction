@@ -61,7 +61,8 @@ EOS_NAME = {'EOS-Aqua': 'eos2', "EOS-Terra": 'eos1'}
 GEOLOC_PREFIX = {'EOS-Aqua': 'MYD03', 'EOS-Terra': 'MOD03'}
 DATA1KM_PREFIX = {'EOS-Aqua': 'MYD021km', 'EOS-Terra': 'MOD021km'}
 
-PPS_INSTRUMENTS = ['amsua', 'amsub', 'mhs', 'avhrr', 'viirs', 'modis']
+PPS_SENSORS = ['amsu-a', 'amsu-b', 'mhs', 'avhrr/3', 'viirs', 'modis']
+NOAA_METOP_PPS_SENSORNAMES = ['avhrr/3', 'amsu-a', 'amsu-b', 'mhs']
 
 METOP_NAME_LETTER = {'metop01': 'metopb', 'metop02': 'metopa'}
 METOP_NAME = {'metop01': 'Metop-B', 'metop02': 'Metop-A'}
@@ -74,8 +75,8 @@ SATELLITE_NAME = {'NOAA-19': 'noaa19', 'NOAA-18': 'noaa18',
                   'Suomi-NPP': 'npp',
                   'EOS-Aqua': 'eos2', 'EOS-Terra': 'eos1'}
 
-METOP_INSTRUMENT = {'amsu-a': 'amsua', 'avhrr/3': 'avhrr',
-                    'amsu-b': 'amsub', 'hirs/4': 'hirs'}
+METOP_SENSOR = {'amsu-a': 'amsua', 'avhrr/3': 'avhrr',
+                'amsu-b': 'amsub', 'hirs/4': 'hirs'}
 METOP_NUMBER = {'b': '01', 'a': '02'}
 
 
@@ -250,7 +251,7 @@ class FilePublisher(threading.Thread):
                 publish_level2(publisher, result_files,
                                scene['satid'],
                                scene['orbit_number'],
-                               # scene['instrument'],
+                               # scene['sensor'],
                                None,
                                scene['starttime'],
                                scene['endtime'])
@@ -268,7 +269,7 @@ def publish_level2(publisher, result_files, sat, orb, instr, start_t, end_t):
         to_send = {}
         to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
         to_send['filename'] = filename
-        #to_send['instrument'] = instr
+        #to_send['sensor'] = instr
         to_send['platform_name'] = sat
         to_send['orbit_number'] = orb
         to_send['format'] = 'PPS'
@@ -300,16 +301,28 @@ def ready2run(msg, files4pps, job_register):
 
     LOG.debug("Ready to run...")
     LOG.info("Got message: " + str(msg))
-    urlobj = urlparse(msg.data['uri'])
-    server = urlobj.netloc
+
+    if 'dataset' in msg.data:
+        LOG.info('Dataset: ' + str(msg.data['dataset']))
+        LOG.info('\t...thus we can assume we have everything we need for PPS')
+        urls = []
+        filenames = []
+        for obj in msg.data['dataset']:
+            urls.append(urlparse(obj['uri']))
+            filenames.append(obj['uid'])
+        server = urls[0].netloc  # Assume server is the same for all uri's!
+    else:
+        urlobj = urlparse(msg.data['uri'])
+        server = urlobj.netloc
+
     LOG.debug("Server = " + str(server))
     if server != SERVERNAME:
         LOG.warning("Server %s not the current one: %s" % (str(server),
                                                            SERVERNAME))
         return False
-    LOG.info("Sat and Instrument: " + str(msg.data['platform_name'])
+    LOG.info("Sat and Sensor: " + str(msg.data['platform_name'])
              + " " + str(msg.data['sensor']))
-    if msg.data['sensor'] not in PPS_INSTRUMENTS:
+    if msg.data['sensor'] not in PPS_SENSORS:
         LOG.info("Data from sensor " + str(msg.data['sensor']) +
                  " not needed by PPS " +
                  "Continue...")
@@ -318,23 +331,23 @@ def ready2run(msg, files4pps, job_register):
     if msg.data['platform_name'] in SUPPORTED_EOS_SATELLITES:
         if msg.data['sensor'] not in ['modis', ]:
             LOG.info(
-                'Instrument ' + str(msg.data['sensor']) +
+                'Sensor ' + str(msg.data['sensor']) +
                 ' not required for MODIS PPS processing...')
             return False
     elif msg.data['platform_name'] in SUPPORTED_JPSS_SATELLITES:
         if msg.data['sensor'] not in ['viirs', ]:
             LOG.info(
-                'Instrument ' + str(msg.data['sensor']) +
+                'Sensor ' + str(msg.data['sensor']) +
                 ' not required for S-NPP/VIIRS PPS processing...')
             return False
     else:
-        if msg.data['sensor'] not in ['avhrr', 'amsua', 'amsub', 'mhs']:
+        if msg.data['sensor'] not in ['avhrr/3', 'amsu-a', 'amsu-b', 'mhs']:
             LOG.info(
-                'Instrument ' + str(msg.data['sensor']) + ' not required...')
+                'Sensor ' + str(msg.data['sensor']) + ' not required...')
             return False
-        if (msg.data['sensor'] in ['amsua', 'amsub', 'mhs'] and
+        if (msg.data['sensor'] in ['amsu-a', 'amsu-b', 'mhs'] and
                 msg.data['data_processing_level'] != '1c'):
-            LOG.info('Level not the required type for PPS for this instrument: ' +
+            LOG.info('Level not the required type for PPS for this sensor: ' +
                      str(msg.data['sensor']) + ' ' +
                      str(msg.data['data_processing_level']))
             return False
@@ -345,7 +358,7 @@ def ready2run(msg, files4pps, job_register):
     level1_filename = urlobj.path
     dummy, fname = os.path.split(level1_filename)
 
-    #instrument = (msg.data['instrument'])
+    #sensor = (msg.data['sensor'])
     platform_name = msg.data['platform_name']
 
     try:
@@ -375,7 +388,7 @@ def ready2run(msg, files4pps, job_register):
             platform_name in SUPPORTED_NOAA_SATELLITES):
         if len(files4pps[keyname]) < 3:
             LOG.info(
-                "Not enough NOAA/Metop instrument data available yet...")
+                "Not enough NOAA/Metop sensor data available yet...")
             return False
     elif platform_name in SUPPORTED_EOS_SATELLITES:
         if len(files4pps[keyname]) < 2:
