@@ -303,9 +303,12 @@ class DataProcessor(object):
                     products.append(product)
 
             try:
+                LOGGER.debug("loading channels : %s",
+                             str(self.get_req_channels(products)))
                 self.global_data.load(self.get_req_channels(products),
                                       filename=filename,
                                       area_def_names=area_def_names)
+                LOGGER.debug("loaded data : %s", str(self.global_data))
             except IndexError:
                 LOGGER.error("Incomplete or corrupted input data.")
                 self._data_ok = False
