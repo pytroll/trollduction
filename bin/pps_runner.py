@@ -321,20 +321,20 @@ def ready2run(msg, files4pps, job_register):
                 ' not required for MODIS PPS processing...')
             return False
     elif msg.data['platform_name'] in SUPPORTED_JPSS_SATELLITES:
-        if msg.data['instrument'] not in ['viirs', ]:
+        if msg.data['sensor'] not in ['viirs', ]:
             LOG.info(
-                'Instrument ' + str(msg.data['instrument']) +
+                'Instrument ' + str(msg.data['sensor']) +
                 ' not required for S-NPP/VIIRS PPS processing...')
             return False
     else:
-        if msg.data['instrument'] not in ['avhrr', 'amsua', 'amsub', 'mhs']:
+        if msg.data['sensor'] not in ['avhrr', 'amsua', 'amsub', 'mhs']:
             LOG.info(
-                'Instrument ' + str(msg.data['instrument']) + ' not required...')
+                'Instrument ' + str(msg.data['sensor']) + ' not required...')
             return False
-        if (msg.data['instrument'] in ['amsua', 'amsub', 'mhs'] and
+        if (msg.data['sensor'] in ['amsua', 'amsub', 'mhs'] and
                 msg.data['data_processing_level'] != '1c'):
             LOG.info('Level not the required type for PPS for this instrument: ' +
-                     str(msg.data['instrument']) + ' ' +
+                     str(msg.data['sensor']) + ' ' +
                      str(msg.data['data_processing_level']))
             return False
 
