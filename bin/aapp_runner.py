@@ -329,8 +329,23 @@ class AappLvl1Processor(object):
                 return True
 
         keyname = (str(self.platform_name) + '_' +
-                   str(self.starttime) +
-                   '_' + str(self.endtime))
+                   self.starttime.strftime('%Y%m%d%H%M') +
+                   '_' + self.endtime.strftime('%Y%m%d%H%M'))
+
+        # Check for keys representing the same scene (slightly different
+        # start/end times):
+        for key in self.level0files:
+            pltrfn, startt, endt = key.split('_')
+            if not self.platform_name == pltrfn:
+                continue
+            t1_ = datetime.strptime(startt, '%Y%m%d%H%M')
+            t2_ = datetime.strptime(endt, '%Y%m%d%H%M')
+            if (abs(self.starttime - t1_).seconds < 60 and
+                    abs(self.endtime - t2_).seconds < 60):
+                # It is the same scene!
+                keyname = key
+                break
+
         if keyname in self.level0files:
             LOG.debug("Level-0files = " + str(self.level0files[keyname]))
         else:
