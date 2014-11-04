@@ -157,6 +157,11 @@ class DataProcessor(object):
         self.writer = DataWriter()
         self.writer.start()
 
+    def stop(self):
+        self.writer.stop()
+        del self.global_data
+        del self.local_data
+
     def create_scene_from_message(self, msg):
         """Parse the message *msg* and return a corresponding MPOP scene.
         """
@@ -795,7 +800,7 @@ class Trollduction(object):
 
         # more cleanup needed?
         self._loop = False
-        self.data_processor.writer.stop()
+        self.data_processor.stop()
         if self.config_watcher is not None:
             self.config_watcher.stop()
         if self.listener is not None:
@@ -814,18 +819,22 @@ class Trollduction(object):
     def run_single(self):
         """Run trollduction.
         """
-        while self._loop:
-            # wait for new messages
-            try:
-                msg = self.listener.queue.get(True, 5)
-            except KeyboardInterrupt:
-                self.stop()
-                raise
-            except Queue.Empty:
-                continue
+        try:
+            while self._loop:
+                # wait for new messages
+                try:
+                    msg = self.listener.queue.get(True, 5)
+                except KeyboardInterrupt:
+                    self.stop()
+                    raise
+                except Queue.Empty:
+                    continue
+                LOGGER.debug(str(msg))
+                if (msg.type in ["file", 'collection', 'dataset'] and
+                        msg.data["sensor"] in self.td_config['instruments'].split(',')):
+                    self.update_product_config(self.td_config['product_config_file'],
+                                               self.td_config['config_item'])
+                    self.data_processor.run(self.product_config, msg)
 
-            if (msg.type in ["file", 'collection', 'dataset'] and
-                    msg.data["sensor"] in self.td_config['instruments'].split(',')):
-                self.update_product_config(self.td_config['product_config_file'],
-                                           self.td_config['config_item'])
-                self.data_processor.run(self.product_config, msg)
+        finally:
+            self.shutdown()
