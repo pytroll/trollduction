@@ -328,8 +328,9 @@ class AappLvl1Processor(object):
                           " with overlapping time have been launched previously")
                 return True
 
-        keyname = str(self.satid) + '_' + str(self.starttime) + \
-            '_' + str(self.endtime)
+        keyname = (str(self.platform_name) + '_' +
+                   str(self.starttime) +
+                   '_' + str(self.endtime))
         if keyname in self.level0files:
             LOG.debug("Level-0files = " + str(self.level0files[keyname]))
         else:
