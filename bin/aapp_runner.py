@@ -115,17 +115,6 @@ from subprocess import Popen, PIPE, STDOUT
 from datetime import timedelta, datetime
 
 
-# def translate_satellite_id(satid, noaa=True):
-#     """Translate the satellite id from the pytroll message to what is needed by
-#     the aapp-statistics"""
-
-# "NOAA-19" => "noaa19"
-# "Metop-B" => "metop01"
-#     part1, part2 = satid.split('-')
-#     metopname = (part1 + part2).lower()
-#     return METOP_NAME_INV.get(metopname, metopname)
-
-
 def nonblock_read(output):
     """An attempt to catch any hangup in reading the output (stderr/stdout)
     from subprocess"""
@@ -188,9 +177,7 @@ class AappLvl1Processor(object):
         self.level0_filename = None
         self.starttime = None
         self.endtime = None
-        self.satid = "Unknown"
-        self.satellite = "Unknown"
-        self.platform = "Unknown"
+        self.platform_name = "Unknown"
         self.satnum = "0"
         self.orbit = "00000"
         self.result_files = None
@@ -206,9 +193,7 @@ class AappLvl1Processor(object):
         self.level0_filename = None
         self.starttime = None
         self.endtime = None
-        self.satid = "Unknown"
-        self.satellite = "Unknown"
-        self.platform = "Unknown"
+        self.platform_name = "Unknown"
         self.satnum = "0"
         self.orbit = "00000"
         self.result_files = []
@@ -294,7 +279,8 @@ class AappLvl1Processor(object):
             LOG.warning(str(err))
             return True
 
-        LOG.debug("Satellite = " + str(msg.data['platform_name']))
+        self.platform_name = msg.data['platform_name']
+        LOG.debug("Satellite = " + str(self.platform_name))
 
         LOG.debug("")
         LOG.debug("\tMessage:")
@@ -322,18 +308,14 @@ class AappLvl1Processor(object):
             LOG.warning("No orbit_number in message! Set to none...")
             self.orbit = None
 
-        self.satellite = msg.data['platform_name']
-        self.satid = SATELLITE_NAME.get(msg.data['platform_name'], 'unknown')
-        if msg.data['platform_name'] in SUPPORTED_METOP_SATELLITES:
-            self.platform = 'metop'
-            metop_id = self.satid.split('metop')[1]
+        if self.platform_name in SUPPORTED_METOP_SATELLITES:
+            metop_id = SATELLITE_NAME[self.platform_name].split('metop')[1]
             self.satnum = METOP_NUMBER.get(metop_id, metop_id)
         else:
-            self.platform = 'noaa'
-            self.satnum = self.satid.strip('noaa')
+            self.satnum = SATELLITE_NAME[self.platform_name].strip('noaa')
 
         year = self.starttime.year
-        keyname = str(self.satid)
+        keyname = str(self.platform_name)
         # Use sat id, start and end time as the unique identifier of the scene!
         if keyname in self.job_register and len(self.job_register[keyname]) > 0:
             # Go through list of start,end time tuples and see if the current
@@ -359,7 +341,7 @@ class AappLvl1Processor(object):
         if fname.find('.hmf') > 0:
             self.ishmf = True
 
-        if self.platform == 'metop':
+        if self.platform_name in SUPPORTED_METOP_SATELLITES:
             sensor = msg.data['sensor']
             if sensor not in SENSOR_NAMES:
                 LOG.debug(
@@ -399,17 +381,17 @@ class AappLvl1Processor(object):
         for envkey in my_env:
             LOG.debug("ENV: " + str(envkey) + " " + str(my_env[envkey]))
 
-        if (msg.data['platform_name'] not in SUPPORTED_NOAA_SATELLITES and
-                msg.data['platform_name'] not in SUPPORTED_METOP_SATELLITES):
-            LOG.warning("Satellite platform not noaa or metop!")
+        if (self.platform_name not in SUPPORTED_NOAA_SATELLITES and
+                self.platform_name not in SUPPORTED_METOP_SATELLITES):
+            LOG.warning("Satellite platform not NOAA or Metop!")
             return True
 
-        if msg.data['platform_name'] in SUPPORTED_NOAA_SATELLITES:
+        if self.platform_name in SUPPORTED_NOAA_SATELLITES:
             LOG.info("This is a NOAA scene. Start the NOAA processing!")
             LOG.info("Process the file %s" % self.level0_filename)
 
             # Add to job register to avoid this to be run again
-            keyname = str(self.satid)
+            keyname = str(self.platform_name)
             if keyname not in self.job_register.keys():
                 self.job_register[keyname] = []
 
@@ -424,10 +406,10 @@ class AappLvl1Processor(object):
                                   shell=True, env=my_env,
                                   stderr=PIPE, stdout=PIPE)
 
-        elif msg.data['platform_name'] in SUPPORTED_METOP_SATELLITES:
+        elif self.platform_name in SUPPORTED_METOP_SATELLITES:
             LOG.info("This is a Metop scene. Start the METOP processing!")
             LOG.info("Process the scene %s %s" %
-                     (self.satellite, str(self.orbit)))
+                     (self.platform_name, str(self.orbit)))
 
             sensor_filename = {}
             for (fname, instr) in self.level0files[keyname]:
@@ -439,7 +421,7 @@ class AappLvl1Processor(object):
                     return True
 
             # Add to job register to avoid this to be run again
-            keyname = str(self.satid)
+            keyname = str(self.platform_name)
             if keyname not in self.job_register.keys():
                 self.job_register[keyname] = []
 
@@ -499,7 +481,8 @@ class AappLvl1Processor(object):
 
         # Block any future run on this scene for x (e.g. 10) minutes from now
         t__ = threading.Timer(
-            10 * 60.0, reset_job_registry, args=(self.job_register, str(self.satid),
+            10 * 60.0, reset_job_registry, args=(self.job_register,
+                                                 str(self.platform_name),
                                                  (self.starttime, self.endtime)))
         t__.start()
 
@@ -509,7 +492,9 @@ class AappLvl1Processor(object):
         LOG.info("Output files: " + str(self.result_files))
 
         statresult = aapp_stat.do_noaa_and_metop(self.level0_filename,
-                                                 self.satid, self.starttime)
+                                                 SATELLITE_NAME.get(self.platform_name,
+                                                                    self.platform_name),
+                                                 self.starttime)
         if os.path.exists(_AAPP_STAT_FILE):
             fd = open(_AAPP_STAT_FILE, "r")
             lines = fd.readlines()
@@ -545,8 +530,8 @@ def aapp_rolling_runner():
                 tobj = aapp_proc.starttime
                 LOG.info("Time used in sub-dir name: " +
                          str(tobj.strftime("%Y-%m-%d %H:%M")))
-                if aapp_proc.satid.startswith('metop'):
-                    subd = create_subdirname(tobj, aapp_proc.satid,
+                if aapp_proc.platform_name.startswith('Metop'):
+                    subd = create_subdirname(tobj, aapp_proc.platform_name,
                                              aapp_proc.orbit)
                     LOG.info("Create sub-directory for level-1 files: %s" %
                              str(subd))
