@@ -79,9 +79,9 @@ LOG.setLevel(logging.DEBUG)
 LOG.addHandler(handler)
 
 
-packetfile_aqua_prfx = "P154095715409581540959"
-modisfile_aqua_prfx = "P1540064AAAAAAAAAAAAAA"
-modisfile_terra_prfx = "P0420064AAAAAAAAAAAAAA"
+PACKETFILE_AQUA_PRFX = "P154095715409581540959"
+MODISFILE_AQUA_PRFX = "P1540064AAAAAAAAAAAAAA"
+MODISFILE_TERRA_PRFX = "P0420064AAAAAAAAAAAAAA"
 
 
 from urlparse import urlparse
@@ -515,6 +515,8 @@ def send_message(this_publisher, msg):
 
 
 def create_message(mda, filename, level):
+    LOG.debug("mda: = " + str(mda))
+    LOG.debug("type(mda): " + str(type(mda)))
     to_send = mda.copy()
     if isinstance(filename, (list, tuple, set)):
         del to_send['uri']
@@ -530,6 +532,7 @@ def create_message(mda, filename, level):
     to_send['format'] = 'EOS'
     to_send['data_processing_level'] = level
     to_send['type'] = 'HDF4'
+    to_send['sensor'] = 'modis'
 
     message = Message('/'.join(('',
                                 str(to_send['format']),
@@ -542,7 +545,7 @@ def create_message(mda, filename, level):
     return message
 
 
-def start_modis_lvl1_processing(level1b_home, eos_files,
+def start_modis_lvl1_processing(eos_files,
                                 mypublisher, message):
     """From a posttroll message start the modis lvl1 processing"""
 
@@ -575,7 +578,7 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
         orbnum = message.data.get('orbit_number', None)
 
         path, fname = os.path.split(urlobj.path)
-        if fname.find(modisfile_terra_prfx) == 0 and fname.endswith('001.PDS'):
+        if fname.find(MODISFILE_TERRA_PRFX) == 0 and fname.endswith('001.PDS'):
             # Check if the file exists:
             if not os.path.exists(urlobj.path):
                 LOG.warning("File is reported to be dispatched " +
@@ -602,7 +605,6 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
                 LOG.info("Orb = %d" % orbnum)
             LOG.info("File = " + str(urlobj.path))
             result_files = run_terra_l0l1(urlobj.path)
-
             LOG.info("Result files: " + str(result_files))
 
             # Assume everything has gone well!
@@ -613,6 +615,9 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
                                                        'mod021km_file',
                                                        'mod02hkm_file',
                                                        'mod02qkm_file']]
+            LOG.debug("Message:")
+            LOG.debug(message)
+            LOG.debug("Message data: " + str(message.data))
             send_message(mypublisher, create_message(message.data,
                                                      l1b_files,
                                                      "1b"))
@@ -623,7 +628,7 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
                                                      l1a_file,
                                                      "1a"))
 
-    elif (message.data['platform_name'] == "AQUA" and
+    elif (message.data['platform_name'] == "EOS-Aqua" and
           (message.data['sensor'] == 'modis' or
            message.data['sensor'] == 'gbad')):
         orbnum = message.data.get('orbit_number')
@@ -635,8 +640,9 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             return eos_files
 
         path, fname = os.path.split(urlobj.path)
-        if ((fname.find(modisfile_aqua_prfx) == 0 or
-             fname.find(packetfile_aqua_prfx) == 0) and
+        LOG.debug("Path and filename: " + str(path) + ' ' + str(fname))
+        if ((fname.find(MODISFILE_AQUA_PRFX) == 0 or
+             fname.find(PACKETFILE_AQUA_PRFX) == 0) and
                 fname.endswith('001.PDS')):
             # Check if the file exists:
             if not os.path.exists(urlobj.path):
@@ -660,11 +666,15 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             aquanames = [os.path.basename(s) for s in eos_files[scene_id]]
             LOG.info('aquanames: ' + str(aquanames))
 
-            if (aquanames[0].find(modisfile_aqua_prfx) == 0 and
-                    aquanames[1].find(packetfile_aqua_prfx) == 0):
+            LOG.debug("Message:")
+            LOG.debug(message)
+            LOG.debug("Message data: " + str(message.data))
+
+            if (aquanames[0].find(MODISFILE_AQUA_PRFX) == 0 and
+                    aquanames[1].find(PACKETFILE_AQUA_PRFX) == 0):
                 modisfile = eos_files[scene_id][0]
-            elif (aquanames[1].find(modisfile_aqua_prfx) == 0 and
-                  aquanames[0].find(packetfile_aqua_prfx) == 0):
+            elif (aquanames[1].find(MODISFILE_AQUA_PRFX) == 0 and
+                  aquanames[0].find(PACKETFILE_AQUA_PRFX) == 0):
                 modisfile = eos_files[scene_id][1]
             else:
                 LOG.error("Either MODIS file or packet file not there!?")
@@ -694,19 +704,21 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
             LOG.info('Clean the internal aqua_files register')
             eos_files = {}
 
+            LOG.debug("Message:")
+            LOG.debug(message)
+            LOG.debug("Message data: " + str(message.data))
             # Now publish:
             l1b_files = [result_files[key] for key in ['geo_file',
                                                        'mod021km_file',
                                                        'mod02hkm_file',
                                                        'mod02qkm_file']]
-            send_message(mypublisher, create_message(l1b_files,
-                                                     message.data,
+            send_message(mypublisher, create_message(message.data,
+                                                     l1b_files,
                                                      "1b"))
 
             l1a_file = result_files['level1a_file']
-
-            send_message(mypublisher, create_message(l1a_file,
-                                                     message.data,
+            send_message(mypublisher, create_message(message.data,
+                                                     l1a_file,
                                                      "1a"))
 
     else:
@@ -714,13 +726,10 @@ def start_modis_lvl1_processing(level1b_home, eos_files,
 
     return eos_files
 
-# ---------------------------------------------------------------------------
 
-
-def modis_runner():
+def modis_live_runner():
     """Listens and triggers processing"""
 
-    lvl1b_home = OPTIONS['level1b_home']
     # Roll over log files at application start:
     try:
         LOG.handlers[0].doRollover()
@@ -731,14 +740,13 @@ def modis_runner():
         with Publish('modis_dr_runner', 0) as publisher:
             aquafiles = {}
             for msg in subscr.recv():
-                aquafiles = start_modis_lvl1_processing(lvl1b_home,
-                                                        aquafiles,
+                aquafiles = start_modis_lvl1_processing(aquafiles,
                                                         publisher, msg)
 
 
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    modis_runner()
+    modis_live_runner()
 
     #aqua_modis_file = '/san1/polar_in/direct_readout/modis/P1540064AAAAAAAAAAAAAA12298130323001.PDS'
 

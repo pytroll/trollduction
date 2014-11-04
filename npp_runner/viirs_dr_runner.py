@@ -31,9 +31,9 @@ import os
 from glob import glob
 from datetime import datetime, timedelta
 
-import sdr_runner
-import sdr_runner.orbitno
-_PACKAGEDIR = sdr_runner.__path__[0]
+import npp_runner
+import npp_runner.orbitno
+_PACKAGEDIR = npp_runner.__path__[0]
 _CONFIG_PATH = os.path.join(os.path.dirname(_PACKAGEDIR), 'etc')
 
 CSPP_SDR_HOME = os.environ.get("CSPP_SDR_HOME", '')
@@ -46,7 +46,7 @@ CONFIG_PATH = os.environ.get('NPP_SDRPROC_CONFIG_DIR', _CONFIG_PATH)
 print "CONFIG_PATH: ", CONFIG_PATH
 
 CONF = ConfigParser.ConfigParser()
-CONF.read(os.path.join(CONFIG_PATH, "npp_sdr_config.cfg"))
+CONF.read(os.path.join(CONFIG_PATH, "viirs_dr_config.cfg"))
 
 MODE = os.getenv("SMHI_MODE")
 if MODE is None:
@@ -68,17 +68,19 @@ ANC_UPDATE_STAMPFILE_RPEFIX = OPTIONS['anc_update_stampfile_prefix']
 URL_DOWNLOAD_TRIAL_FREQUENCY_HOURS = OPTIONS[
     'url_download_trial_frequency_hours']
 
+VIIRS_SATELLITES = ['Suomi-NPP', 'JPSS-1', 'JPSS-2']
+
 from urlparse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
 from posttroll.message import Message
 
-from sdr_runner import get_datetime_from_filename
-from sdr_runner.post_cspp import (get_sdr_files,
+from npp_runner import get_datetime_from_filename
+from npp_runner.post_cspp import (get_sdr_files,
                                   create_subdirname,
                                   pack_sdr_files, make_okay_files,
                                   cleanup_cspp_workdir)
-from sdr_runner.pre_cspp import fix_rdrfile
+from npp_runner.pre_cspp import fix_rdrfile
 
 #: Default time format
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -348,15 +350,16 @@ def publish_sdr(publisher, result_files, orbit):
         to_send = {}
         to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
         to_send['filename'] = filename
-        to_send['instrument'] = 'viirs'
+        to_send['sensor'] = 'viirs'
         to_send['orbit_number'] = orbit
-        to_send['satellite'] = 'NPP'
+        to_send['platform_name'] = 'Suomi-NPP'
         to_send['format'] = 'SDR'
         to_send['type'] = 'HDF5'
-        to_send['level'] = '1'
+        to_send['data_processing_level'] = '1'
         to_send['start_time'], to_send['end_time'] = get_sdr_times(filename)
 
-        msg = Message('/' + to_send['format'] + '/' + to_send['level'] +
+        msg = Message('/' + to_send['format'] + '/' +
+                      to_send['data_processing_level'] +
                       '/norrköping/' + environment + '/polar/direct_readout/',
                       "file", to_send).encode()
         # msg = Message('/oper/polar/direct_readout/norrkoping',
@@ -391,6 +394,7 @@ def spawn_cspp(current_granule, *glist):
                     for new_file in new_result_files
                     if start_str in new_file]
 
+    LOG.info("Number of results files = " + str(len(result_files)))
     return working_dir, result_files
 
 
@@ -406,7 +410,8 @@ class ViirsSdrProcessor(object):
         self.pool = ThreadPool(ncpus)
         self.ncpus = ncpus
 
-        self.orbit = 1  # Initialised orbit number
+        self.orbit_number = 1  # Initialised orbit number
+        self.platform_name = 'unknown'  # Ex.: Suomi-NPP
         self.fullswath = False
         self.cspp_results = []
         self.working_dirs = []
@@ -430,21 +435,25 @@ class ViirsSdrProcessor(object):
     def run(self, msg):
         """Start the VIIRS SDR processing using CSPP on one rdr granule"""
 
-        LOG.debug("Received message: " + str(msg))
+        if msg:
+            LOG.debug("Received message: " + str(msg))
+
         if self.glist and len(self.glist) > 0:
             LOG.debug("glist: " + str(self.glist))
 
         if msg is None and self.glist and len(self.glist) > 2:
             # The swath is assumed to be finished now
+            LOG.debug("The swath is assumed to be finished now")
             del self.glist[0]
             keeper = self.glist[1]
             LOG.info("Start CSPP: RDR files = " + str(self.glist))
             self.cspp_results.append(self.pool.apply_async(spawn_cspp,
                                                            [keeper] + self.glist))
+            LOG.debug("Inside run: Return with a False...")
             return False
-        elif msg and not (msg.data['satellite'] == "NPP" and
-                          msg.data['instrument'] == 'viirs'):
-            LOG.info("Not a Suomi NPP VIIRS scene. Continue...")
+        elif msg and not (msg.data['platform_name'] in VIIRS_SATELLITES and
+                          msg.data['sensor'] == 'viirs'):
+            LOG.info("Not a VIIRS scene. Continue...")
             return True
         elif msg is None:
             return True
@@ -459,8 +468,8 @@ class ViirsSdrProcessor(object):
                                                                SERVERNAME))
             return True
         LOG.info("Ok... " + str(urlobj.netloc))
-        LOG.info("Sat and Instrument: " + str(msg.data['satellite'])
-                 + " " + str(msg.data['instrument']))
+        LOG.info("Sat and Instrument: " + str(msg.data['platform_name'])
+                 + " " + str(msg.data['sensor']))
 
         start_time = msg.data['start_time']
         try:
@@ -504,7 +513,7 @@ class ViirsSdrProcessor(object):
                       str(urlobj.path))
             import traceback
             traceback.print_exc(file=sys.stderr)
-        except sdr_runner.orbitno.NoTleFile:
+        except npp_runner.orbitno.NoTleFile:
             LOG.error('Failed to fix orbit number in RDR file = ' +
                       str(urlobj.path))
             LOG.error('No TLE file...')
@@ -512,8 +521,8 @@ class ViirsSdrProcessor(object):
             traceback.print_exc(file=sys.stderr)
 
         if orbnum:
-            self.orbit = orbnum
-        LOG.info("Orbit number = " + str(self.orbit))
+            self.orbit_number = orbnum
+        LOG.info("Orbit number = " + str(self.orbit_number))
 
         self.glist.append(rdr_filename)
 
@@ -606,13 +615,13 @@ def npp_rolling_runner():
                 tobj = viirs_proc.pass_start_time
                 LOG.info("Time used in sub-dir name: " +
                          str(tobj.strftime("%Y-%m-%d %H:%M")))
-                subd = create_subdirname(tobj, orbit=viirs_proc.orbit)
+                subd = create_subdirname(tobj, orbit=viirs_proc.orbit_number)
                 LOG.info("Create sub-directory for sdr files: %s" % str(subd))
                 sdr_files = viirs_proc.pack_sdr_files(subd)
                 make_okay_files(viirs_proc.sdr_home, subd)
 
                 publish_sdr(publisher, sdr_files,
-                            viirs_proc.orbit)
+                            viirs_proc.orbit_number)
 
                 for working_dir in viirs_proc.working_dirs:
                     LOG.info("Cleaning up directory %s" % working_dir)
@@ -666,6 +675,6 @@ if __name__ == "__main__":
     logging.getLogger('').setLevel(logging.DEBUG)
     logging.getLogger('posttroll').setLevel(logging.INFO)
 
-    LOG = logging.getLogger('npp_sdr_runner')
+    LOG = logging.getLogger('viirs_dr_runner')
 
     npp_rolling_runner()
