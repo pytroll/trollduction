@@ -160,14 +160,14 @@ def terminate_process(popen_obj, scene):
 def pps_worker(publisher, scene, semaphore_obj, queue):
     """Spawn/Start a PPS run on a new thread if available
 
-        scene = {'satid': satid, 'orbit': orbit,
+        scene = {'satid': satid, 'orbit_number': orbit,
                  'satday': satday, 'sathour': sathour,
                  'starttime': starttime, 'endtime': endtime}
     """
 
     semaphore_obj.acquire()
     cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT, scene['satid'],
-                                 scene['orbit'], scene['satday'],
+                                 scene['orbit_number'], scene['satday'],
                                  scene['sathour'])
     LOG.info("Command " + cmdstr)
     my_env = os.environ.copy()
@@ -200,7 +200,7 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
 
     # Now check what netCDF out was produced and publish them:
     result_files = get_outputfiles(
-        PPS_OUTPUT_DIR, scene['satid'], scene['orbit'])
+        PPS_OUTPUT_DIR, scene['satid'], scene['orbit_number'])
     LOG.info("Output files: " + str(result_files))
     queue.put((publisher, scene, result_files))
     semaphore_obj.release()
@@ -231,7 +231,8 @@ class FilePublisher(threading.Thread):
                 LOG.info("Publish the files...")
                 publisher, scene, result_files = retv
 
-                keyname = str(scene['satid']) + '_' + str(scene['orbit'])
+                keyname = str(scene['satid']) + '_' + \
+                    str(scene['orbit_number'])
                 if keyname not in self.jobs:
                     LOG.warning("Scene-run seems unregistered! Forget it...")
                 else:
@@ -248,7 +249,7 @@ class FilePublisher(threading.Thread):
 
                 publish_level2(publisher, result_files,
                                scene['satid'],
-                               scene['orbit'],
+                               scene['orbit_number'],
                                # scene['instrument'],
                                None,
                                scene['starttime'],
