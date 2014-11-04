@@ -75,6 +75,9 @@ SATELLITE_NAME = {'NOAA-19': 'noaa19', 'NOAA-18': 'noaa18',
 #     SUPPORTED_METOP_SATELLITES.append(METOP_NAME.get(sat, sat))
 
 SENSOR_NAMES = ['amsu-a', 'amsu-b', 'mhs', 'avhrr/3']
+SENSOR_NAME_CONVERTER = {
+    'amsua': 'amsu-a', 'amsub': 'amsu-b', 'hirs': 'hirs/4'}
+
 METOP_NUMBER = {'b': '01', 'a': '02'}
 
 SERVERNAME = OPTIONS['servername']
@@ -257,7 +260,7 @@ class AappLvl1Processor(object):
                 instr = 'avhrr/3'
             else:
                 lvl = mstr[-2:]
-                instr = mstr[0:-3]
+                instr = SENSOR_NAME_CONVERTER.get(mstr[0:-3], 'unknown')
 
             retv[fname] = {'level': lvl, 'sensor': instr}
 
@@ -574,7 +577,7 @@ def publish_level1(publisher, result_files, satellite, orbit, start_t, end_t):
         filename = os.path.split(resultfile)[1]
         to_send = {}
         to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, resultfile))
-        to_send['filename'] = filename
+        to_send['uid'] = filename
         to_send['sensor'] = result_files[key]['sensor']
         to_send['platform_name'] = satellite
         to_send['orbit_number'] = orbit
@@ -656,7 +659,7 @@ def pack_aapplvl1_files(aappfiles, base_dir, subdir, satnum):
             instr = 'mhs'
             try:
                 if int(satnum) <= 17:
-                    instr = 'amsub'
+                    instr = 'amsu-b'
             except ValueError:
                 pass
             firstname = instr + ext
