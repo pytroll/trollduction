@@ -74,8 +74,7 @@ SATELLITE_NAME = {'NOAA-19': 'noaa19', 'NOAA-18': 'noaa18',
 # for sat in metop_sats:
 #     SUPPORTED_METOP_SATELLITES.append(METOP_NAME.get(sat, sat))
 
-METOP_SENSOR = {'amsu-a': 'amsua', 'avhrr/3': 'avhrr',
-                'amsu-b': 'amsub', 'hirs/4': 'hirs'}
+SENSOR_NAMES = ['amsu-a', 'amsu-b', 'mhs', 'avhrr/3']
 METOP_NUMBER = {'b': '01', 'a': '02'}
 
 SERVERNAME = OPTIONS['servername']
@@ -352,9 +351,8 @@ class AappLvl1Processor(object):
             self.ishmf = True
 
         if self.platform == 'metop':
-            sensor = METOP_SENSOR.get(
-                msg.data['sensor'], msg.data['sensor'])
-            if sensor not in ['avhrr', 'amsua', 'amsub', 'mhs', 'hirs']:
+            sensor = msg.data['sensor']
+            if sensor not in SENSOR_NAMES:
                 LOG.debug(
                     str(msg.data['sensor']) + '... Not a required sensor')
                 return True
@@ -427,7 +425,7 @@ class AappLvl1Processor(object):
                 sensor_filename[instr] = os.path.basename(fname)
 
             for instr in sensor_filename.keys():
-                if instr not in ['avhrr', 'amsua', 'hirs', 'mhs']:
+                if instr not in SENSOR_NAMES:
                     LOG.error("Sensor name mismatch! name = " + str(instr))
                     return True
 
@@ -441,13 +439,13 @@ class AappLvl1Processor(object):
             cmdstr = "%s -d %s -a %s -u %s -m %s -h %s -o %s" % (METOP_RUN_SCRIPT,
                                                                  METOP_IN_DIR,
                                                                  sensor_filename[
-                                                                     'avhrr'],
+                                                                     'avhrr/3'],
                                                                  sensor_filename[
-                                                                     'amsua'],
+                                                                     'amsu-a'],
                                                                  sensor_filename[
                                                                      'mhs'],
                                                                  sensor_filename[
-                                                                     'hirs'],
+                                                                     'hirs/4'],
                                                                  AAPP_OUT_DIR)
             LOG.info("Command sequence: " + str(cmdstr))
             # Run the command:
