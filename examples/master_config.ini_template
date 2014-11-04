@@ -5,7 +5,7 @@
 [noaa_hrpt]
 # posttroll message topc that provides information on new files
 # used in trollstalker and trollduction
-topic=/HRPT/L1b/dev/hki
+topics=/HRPT/L1b/dev/hki,/EPS/1b/dev/nkp
 # input directory that trollstalker watches
 directory=/home/lahtinep/data/satellite/new/
 # filepattern of the input files for trollstalker
@@ -26,7 +26,7 @@ posttroll_port=0
 timezone=UTC
 
 [msg_hrit]
-topic=/HRIT/L1.5/dev/hki
+topics=/HRIT/L1.5/dev/hki
 directory=/home/lahtinep/data/satellite/new/
 filepattern={path}H-000-{platform:3s}{satnumber:1d}__-{platform:3s}{satnumber:1d}________-_________-EPI______-{time:%Y%m%d%H%M}-__
 instrument=seviri

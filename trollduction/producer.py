@@ -160,10 +160,8 @@ class DataProcessor(object):
     def create_scene_from_message(self, msg):
         """Parse the message *msg* and return a corresponding MPOP scene.
         """
-        if msg.type == "file":
+        if msg.type in ["file", 'collection', 'dataset']:
             return self.create_scene_from_mda(msg.data)
-        if msg.type == "collection":
-            return self.create_scene_from_mda(msg.data[0])
 
     def create_scene_from_mda(self, mda):
         """Read the metadata *mda* and return a corresponding MPOP scene.
@@ -261,8 +259,12 @@ class DataProcessor(object):
 
         if msg.type == "file":
             uri = msg.data['uri']
+        elif msg.type == "dataset":
+            uri = [mda['uri'] for mda in msg.data['dataset']]
         else:
-            uri = [mda['uri'] for mda in msg.data]
+            LOGGER.warning("Can't run on %s messages", msg.type)
+            return
+        # TODO collections and collections of datasets
 
         LOGGER.info('New data available: %s', uri)
         t1a = time.time()
@@ -750,12 +752,12 @@ class Trollduction(object):
         # Initialize/restart listener
         if self.listener is None:
             self.listener = \
-                ListenerContainer(topic=self.td_config['topic'])
+                ListenerContainer(topics=self.td_config['topics'].split(','))
 #            self.listener = ListenerContainer()
             LOGGER.info("Listener started")
         else:
             #            self.listener.restart_listener('file')
-            self.listener.restart_listener(self.td_config['topic'])
+            self.listener.restart_listener(self.td_config['topics'].split(','))
             LOGGER.info("Listener restarted")
 
         try:
@@ -822,17 +824,8 @@ class Trollduction(object):
             except Queue.Empty:
                 continue
 
-            # For 'file' type messages, update product config and run
-            # production
-            if msg.type == "file" and msg.data["sensor"] == self.td_config['instrument']:
+            if (msg.type in ["file", 'collection', 'dataset'] and
+                    msg.data["sensor"] in self.td_config['instruments'].split(',')):
                 self.update_product_config(self.td_config['product_config_file'],
                                            self.td_config['config_item'])
                 self.data_processor.run(self.product_config, msg)
-
-            elif msg.type == "collection" and msg.data[0]["sensor"] == self.td_config['instrument']:
-                self.update_product_config(self.td_config['product_config_file'],
-                                           self.td_config['config_item'])
-                self.data_processor.run(self.product_config, msg)
-
-#            else:
-#                LOGGER.debug("Message type was %s" % msg.type)
