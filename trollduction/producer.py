@@ -750,12 +750,12 @@ class Trollduction(object):
         # Initialize/restart listener
         if self.listener is None:
             self.listener = \
-                ListenerContainer(topic=self.td_config['topic'])
+                ListenerContainer(topics=self.td_config['topics'].split(','))
 #            self.listener = ListenerContainer()
             LOGGER.info("Listener started")
         else:
             #            self.listener.restart_listener('file')
-            self.listener.restart_listener(self.td_config['topic'])
+            self.listener.restart_listener(self.td_config['topics'].split(','))
             LOGGER.info("Listener restarted")
 
         try:

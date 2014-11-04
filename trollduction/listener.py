@@ -37,33 +37,33 @@ class ListenerContainer(object):
     '''Container for listener instance
     '''
 
-    def __init__(self, topic=None):
+    def __init__(self, topics=None):
         self.listener = None
         self.queue = None
         self.thread = None
 
-        if topic is not None:
+        if topics is not None:
             # Create queue for the messages
             self.queue = Queue()  # Pipe()
 
             # Create a Listener instance
-            self.listener = Listener(topic=topic, queue=self.queue)
+            self.listener = Listener(topics=topics, queue=self.queue)
             # Start Listener instance into a new daemonized thread.
             self.thread = Thread(target=self.listener.run)
             self.thread.setDaemon(True)
             self.thread.start()
 
-    def restart_listener(self, topic):
+    def restart_listener(self, topics):
         '''Restart listener after configuration update.
         '''
         if self.listener is not None:
             if self.listener.running:
                 self.stop()
-        self.__init__(topic=topic)
+        self.__init__(topics=topics)
 
     def stop(self):
         '''Stop listener.'''
-        logger.debug("Stopping listener…")
+        logger.debug("Stopping listener.")
         self.listener.stop()
         self.thread.join()
         self.thread = None
@@ -75,10 +75,10 @@ class Listener(object):
     '''PyTroll listener class for reading messages for Trollduction
     '''
 
-    def __init__(self, topic=None, queue=None):
+    def __init__(self, topics=None, queue=None):
         '''Init Listener object
         '''
-        self.topic = topic
+        self.topics = topics
         self.queue = queue
         self.subscriber = None
         self.recv = None
@@ -90,8 +90,8 @@ class Listener(object):
         message types.
         '''
         if self.subscriber is None:
-            if self.topic:
-                self.subscriber = NSSubscriber("", self.topic,
+            if self.topics:
+                self.subscriber = NSSubscriber("", self.topics,
                                                addr_listener=True)
                 self.recv = self.subscriber.start().recv
 
