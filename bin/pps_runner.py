@@ -260,7 +260,7 @@ class FilePublisher(threading.Thread):
                 t__.start()
 
                 publish_level2(publisher, result_files,
-                               SATELLITE_NAME[scene['satid']],
+                               scene['satid'],
                                scene['orbit_number'],
                                scene['sensor'],
                                scene['starttime'],
