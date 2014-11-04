@@ -1,0 +1,54 @@
+[offline]
+pps_satpos_ephe_dir = /local_disk/tmp
+aapp_out_dir = /local_disk/data/pps/import/PPS_data/source
+tle_per_satellite = 'tle tle tle tle tle '
+satellites_to_schedule = ['noaa19', 'noaa18', 'noaa16', 'noaa15', 'metop02']
+supported_noaa_satellites = noaa19 noaa18 noaa16 noaa15
+
+# 20111128230412_NOAA_19.hmf
+# hrpt16_NOAA-18_29-NOV-2011_13:14:00.000_33626
+#filename = *_NOAA_%(number)s.hmf
+#filename = hrpt16_NOAA-%(number)s_*_%(orbit)s
+filename = hrpt16_NOAA-%(number)s_* 
+         *_NOAA_%(number)s.hmf 
+
+
+[prod]
+pps_satpos_ephe_dir = /san1/pps/import/ANC_data/source
+aapp_out_dir = /san1/pps/import/PPS_data/source
+tle_per_satellite = 'tle tle tle tle tle tle'
+satellites_to_schedule = ['noaa19', 'noaa18', 'noaa16', 'noaa15', 'metop02', 'metop01']
+supported_noaa_satellites = noaa19 noaa18 noaa16 noaa15
+filename = hrpt16_NOAA-%(number)s_* 
+         *_NOAA_%(number)s.hmf 
+aapp_log_file = /san1/AAPP_logs/aapp_with_ana.log
+aapp_stat_file = /san1/AappStatistics/aapp_statistics.log
+
+[test]
+pps_satpos_ephe_dir = /san1/pps/import/ANC_data/source
+aapp_out_dir = /san1/pps/import/PPS_data/source
+tle_per_satellite = 'tle tle tle tle tle tle'
+satellites_to_schedule = ['noaa19', 'noaa18', 'noaa16', 'noaa15', 'metop02', 'metop01']
+supported_noaa_satellites = noaa19 noaa18 noaa16 noaa15
+filename = hrpt16_NOAA-%(number)s_* 
+         *_NOAA_%(number)s.hmf 
+aapp_log_file = /san1/AAPP_logs/aapp_with_ana.log
+aapp_stat_file = /san1/AappStatistics/aapp_statistics.log
+
+[utv]
+pps_satpos_ephe_dir = /san1/pps/import/ANC_data/source
+aapp_out_dir = /san1/pps/import/PPS_data/source
+metop_lvl0_dir = /san1/polar_in/direct_readout/metop
+tle_per_satellite = 'tle tle tle tle tle tle'
+satellites_to_schedule = ['noaa19', 'noaa18', 'noaa16', 'noaa15', 'metop02', 'metop01']
+supported_noaa_satellites = noaa19 noaa18 noaa16 noaa15
+supported_metop_satellites = metop01 metop02
+filename = hrpt16_NOAA-%(number)s_* 
+         *_NOAA_%(number)s.hmf 
+aapp_log_file = /var/log/satellit/aapp_runner.log
+aapp_stat_file = /san1/AappStatistics/aapp_statistics.log
+
+servername = safe.smhi.se
+
+log_rotation_days = 1
+log_rotation_backup = 10
