@@ -74,6 +74,17 @@ SATELLITE_NAME = {'NOAA-19': 'noaa19', 'NOAA-18': 'noaa18',
                   'Metop-C': 'metop03',
                   'Suomi-NPP': 'npp',
                   'EOS-Aqua': 'eos2', 'EOS-Terra': 'eos1'}
+SENSOR_LIST = {}
+for sat in SATELLITE_NAME:
+    if sat in ['NOAA-15']:
+        SENSOR_LIST[sat] = ['avhrr/3', 'amsu-b', 'amsu-a']
+    elif sat in ['EOS-Aqua', 'EOS-Terra']:
+        SENSOR_LIST[sat] = 'modis'
+    elif sat in ['Suomi-NPP', 'JPSS-1', 'JPSS-2']:
+        SENSOR_LIST[sat] = 'viirs'
+    else:
+        SENSOR_LIST[sat] = ['avhrr/3', 'mhs', 'amsu-a']
+
 
 METOP_SENSOR = {'amsu-a': 'amsua', 'avhrr/3': 'avhrr',
                 'amsu-b': 'amsub', 'hirs/4': 'hirs'}
@@ -167,7 +178,7 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
     """
 
     semaphore_obj.acquire()
-    cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT, scene['satid'],
+    cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
                                  scene['orbit_number'], scene['satday'],
                                  scene['sathour'])
     LOG.info("Command " + cmdstr)
@@ -201,7 +212,7 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
 
     # Now check what netCDF out was produced and publish them:
     result_files = get_outputfiles(
-        PPS_OUTPUT_DIR, scene['satid'], scene['orbit_number'])
+        PPS_OUTPUT_DIR, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
     LOG.info("Output files: " + str(result_files))
     queue.put((publisher, scene, result_files))
     semaphore_obj.release()
@@ -249,10 +260,9 @@ class FilePublisher(threading.Thread):
                 t__.start()
 
                 publish_level2(publisher, result_files,
-                               scene['satid'],
+                               SATELLITE_NAME[scene['satid']],
                                scene['orbit_number'],
-                               # scene['sensor'],
-                               None,
+                               scene['sensor'],
                                scene['starttime'],
                                scene['endtime'])
 
@@ -268,8 +278,9 @@ def publish_level2(publisher, result_files, sat, orb, instr, start_t, end_t):
         filename = os.path.split(result_file)[1]
         to_send = {}
         to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
-        to_send['filename'] = filename
-        #to_send['sensor'] = instr
+        to_send['uid'] = filename
+        if instr:
+            to_send['sensor'] = instr
         to_send['platform_name'] = sat
         to_send['orbit_number'] = orb
         to_send['format'] = 'PPS'
@@ -316,7 +327,7 @@ def ready2run(msg, files4pps, job_register):
         server = urlobj.netloc
 
     LOG.debug("Server = " + str(server))
-    if server != SERVERNAME:
+    if len(server) > 0 and server != SERVERNAME:
         LOG.warning("Server %s not the current one: %s" % (str(server),
                                                            SERVERNAME))
         return False
@@ -361,13 +372,11 @@ def ready2run(msg, files4pps, job_register):
     #sensor = (msg.data['sensor'])
     platform_name = msg.data['platform_name']
 
-    try:
-        satid = SATELLITE_NAME[platform_name]
-    except KeyError:
-        LOG.info("Satellite not supported: " + str(platform_name))
+    if platform_name not in SATELLITE_NAME:
+        LOG.warning("Satellite not supported: " + str(platform_name))
         return False
 
-    keyname = str(satid) + '_' + str(orbit_number)
+    keyname = str(platform_name) + '_' + str(orbit_number)
     if keyname in job_register and job_register[keyname]:
         LOG.debug("Processing of scene " + str(keyname) +
                   " have already been launched...")
@@ -401,7 +410,7 @@ def ready2run(msg, files4pps, job_register):
         LOG.info(
             "This is a PPS supported scene. Start the PPS lvl2 processing!")
         LOG.info("Process the scene (sat, orbit) = " +
-                 str(satid) + ' ' + str(orbit_number))
+                 str(platform_name) + ' ' + str(orbit_number))
 
         job_register[keyname] = datetime.utcnow()
         return True
@@ -472,18 +481,17 @@ def pps_rolling_runner():
                         timedelta(seconds=60 * 14)
 
                 platform_name = message.data['platform_name']
-
-                try:
-                    satid = SATELLITE_NAME[platform_name]
-                except KeyError:
+                if platform_name not in SATELLITE_NAME:
                     raise IOError(
                         "Satellite not supported: " + str(platform_name))
 
+                sensors = SENSOR_LIST.get(platform_name, None)
                 satday = starttime.strftime('%Y%m%d')
                 sathour = starttime.strftime('%H%M')
-                scene = {'satid': satid, 'orbit_number': orbit_number,
+                scene = {'satid': platform_name, 'orbit_number': orbit_number,
                          'satday': satday, 'sathour': sathour,
-                         'starttime': starttime, 'endtime': endtime}
+                         'starttime': starttime, 'endtime': endtime,
+                         'sensor': sensors}
 
                 t__ = threading.Thread(target=pps_worker, args=(publisher, scene,
                                                                 sema, q__))
@@ -492,7 +500,7 @@ def pps_rolling_runner():
 
                 # Clean the files4pps dict:
                 LOG.debug("files4pps: " + str(files4pps))
-                keyname = str(satid) + '_' + str(orbit_number)
+                keyname = str(platform_name) + '_' + str(orbit_number)
                 try:
                     files4pps.pop(keyname)
                 except KeyError:
