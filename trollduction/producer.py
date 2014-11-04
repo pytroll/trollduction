@@ -310,7 +310,7 @@ class DataProcessor(object):
                                       area_def_names=area_def_names)
                 LOGGER.debug("loaded data : %s", str(self.global_data))
             except IndexError:
-                LOGGER.error("Incomplete or corrupted input data.")
+                LOGGER.exception("Incomplete or corrupted input data.")
                 self._data_ok = False
                 break
 
