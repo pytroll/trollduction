@@ -289,8 +289,8 @@ def ready2run(msg, files4pps, job_register):
     #"""Start the PPS processing on a NOAA/Metop/S-NPP/EOS scene"""
     # LOG.debug("Received message: " + str(msg))
     if msg:
-        if (msg.data['satellite'] not in SUPPORTED_PPS_SATELLITES):
-            LOG.info(str(msg.data['satellite']) + ": " +
+        if (msg.data['platform_name'] not in SUPPORTED_PPS_SATELLITES):
+            LOG.info(str(msg.data['platform_name']) + ": " +
                      "Not a NOAA/Metop/S-NPP/Terra/Aqua scene. Continue...")
             return False
 

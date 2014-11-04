@@ -17,11 +17,11 @@ case $SMHI_MODE in
 
 utv)
 
-APPL_HOME="/data/proj6/safutv/src/pps_runner"
+APPL_HOME="/usr/local/"
 ACPG_HOME="/local_disk/opt/ACPG/current"
 PPSRUNNER_LOG_FILE="/var/log/satellit/pps_runner.log"
-PPSRUNNER_CONFIG_DIR=${APPL_HOME}
-PPS_SCRIPT=${HOME}/src/pps_runner/pps_run.sh
+PPSRUNNER_CONFIG_DIR="/data/proj/safutv/etc"
+PPS_SCRIPT=/usr/local/bin/pps_run.sh
 DATA_ROOT="/san1"
 LVL0_DATA_HOME="${DATA_ROOT}/polar_in"
 
@@ -49,4 +49,5 @@ export PPSRUNNER_CONFIG_DIR
 PPS_LOG_FILE=/var/log/satellit/pps_runner.log
 export PPS_LOG_FILE
 
-/usr/bin/python ${APPL_HOME}/pps_runner.py
+/usr/bin/python ${APPL_HOME}/bin/pps_runner.py
+
