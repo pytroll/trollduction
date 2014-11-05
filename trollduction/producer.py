@@ -159,8 +159,6 @@ class DataProcessor(object):
 
     def stop(self):
         self.writer.stop()
-        del self.global_data
-        del self.local_data
 
     def create_scene_from_message(self, msg):
         """Parse the message *msg* and return a corresponding MPOP scene.
@@ -266,6 +264,13 @@ class DataProcessor(object):
             uri = msg.data['uri']
         elif msg.type == "dataset":
             uri = [mda['uri'] for mda in msg.data['dataset']]
+        elif msg.type == 'collection':
+            if 'dataset' in msg.data['collection'][0]:
+                uri = []
+                for dataset in msg.data['collection']:
+                    uri.extend([mda['uri'] for mda in dataset['dataset']])
+            else:
+                uri = [mda['uri'] for mda in msg.data['collection']]
         else:
             LOGGER.warning("Can't run on %s messages", msg.type)
             return
@@ -276,6 +281,7 @@ class DataProcessor(object):
 
         try:
             filename = self.check_uri(uri)
+            LOGGER.debug(str(filename))
         except IOError as err:
             LOGGER.info(str(err))
             LOGGER.info("Skipping...")
@@ -799,15 +805,15 @@ class Trollduction(object):
         '''Cleanup Trollduction before shutdown.
         '''
 
-        LOGGER.info('Shutting down Trollduction.')
-
         # more cleanup needed?
-        self._loop = False
-        self.data_processor.stop()
-        if self.config_watcher is not None:
-            self.config_watcher.stop()
-        if self.listener is not None:
-            self.listener.stop()
+        if self._loop:
+            LOGGER.info('Shutting down Trollduction.')
+            self._loop = False
+            self.data_processor.stop()
+            if self.config_watcher is not None:
+                self.config_watcher.stop()
+            if self.listener is not None:
+                self.listener.stop()
 
     def stop(self):
         """Stop running.
