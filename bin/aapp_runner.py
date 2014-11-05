@@ -74,7 +74,7 @@ SATELLITE_NAME = {'NOAA-19': 'noaa19', 'NOAA-18': 'noaa18',
 # for sat in metop_sats:
 #     SUPPORTED_METOP_SATELLITES.append(METOP_NAME.get(sat, sat))
 
-SENSOR_NAMES = ['amsu-a', 'amsu-b', 'mhs', 'avhrr/3']
+SENSOR_NAMES = ['amsu-a', 'amsu-b', 'mhs', 'avhrr/3', 'hirs/4']
 SENSOR_NAME_CONVERTER = {
     'amsua': 'amsu-a', 'amsub': 'amsu-b', 'hirs': 'hirs/4', 'mhs': 'mhs'}
 
@@ -561,7 +561,7 @@ def aapp_rolling_runner():
                         "Orbit AFTER call to move_lvl1dir: " + str(aapp_proc.orbit))
 
                 publish_level1(publisher, level1_files,
-                               aapp_proc.satellite,
+                               aapp_proc.platform_name,
                                aapp_proc.orbit,
                                aapp_proc.starttime,
                                aapp_proc.endtime)
