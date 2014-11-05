@@ -89,7 +89,6 @@ def terminator(metadata):
                         mda["format"],
                         mda["data_processing_level"],
                         ''))
-    # TODO: build a collection with some metadata, strip out the datasets.
 
     mda['end_time'] = sorted_mda[-1]['end_time']
 
