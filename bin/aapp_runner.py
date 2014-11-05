@@ -286,11 +286,13 @@ class AappLvl1Processor(object):
         LOG.debug("\tMessage:")
         LOG.debug(str(msg))
         urlobj = urlparse(msg.data['uri'])
-        LOG.debug("Server = " + str(urlobj.netloc))
-        if urlobj.netloc != SERVERNAME:
-            LOG.warning("Server %s not the current one: %s" % (str(urlobj.netloc),
+        server = urlobj.netloc
+        LOG.debug("Server = " + str(server))
+        if len(server) > 0 and server != SERVERNAME:
+            LOG.warning("Server %s not the current one: %s" % (str(server),
                                                                SERVERNAME))
             return True
+
         LOG.info("Ok... " + str(urlobj.netloc))
         LOG.info("Sat and Sensor: " + str(msg.data['platform_name'])
                  + " " + str(msg.data['sensor']))
