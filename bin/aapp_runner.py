@@ -76,7 +76,8 @@ SATELLITE_NAME = {'NOAA-19': 'noaa19', 'NOAA-18': 'noaa18',
 
 SENSOR_NAMES = ['amsu-a', 'amsu-b', 'mhs', 'avhrr/3', 'hirs/4']
 SENSOR_NAME_CONVERTER = {
-    'amsua': 'amsu-a', 'amsub': 'amsu-b', 'hirs': 'hirs/4', 'mhs': 'mhs'}
+    'amsua': 'amsu-a', 'amsub': 'amsu-b', 'hirs': 'hirs/4',
+    'mhs': 'mhs', 'avhrr': 'avhrt/3'}
 
 METOP_NUMBER = {'b': '01', 'a': '02'}
 
@@ -287,7 +288,7 @@ class AappLvl1Processor(object):
         LOG.debug(str(msg))
         urlobj = urlparse(msg.data['uri'])
         server = urlobj.netloc
-        LOG.debug("Server = " + str(server))
+        LOG.debug('Server = <' + str(server) + '>')
         if len(server) > 0 and server != SERVERNAME:
             LOG.warning("Server %s not the current one: %s" % (str(server),
                                                                SERVERNAME))
@@ -645,9 +646,9 @@ def pack_aapplvl1_files(aappfiles, base_dir, subdir, satnum):
     # Store the sensor name and the level corresponding to the file:
     sensor_and_level = {}
 
-    name_converter = {'avhr': 'avhrr/3',
-                      'aman': 'amsu-a',
-                      'hrsn': 'hirs/4',
+    name_converter = {'avhr': 'avhrr',
+                      'aman': 'amsua',
+                      'hrsn': 'hirs',
                       'msun': 'msu',
                       'hrpt': 'hrpt'
                       }
@@ -668,7 +669,7 @@ def pack_aapplvl1_files(aappfiles, base_dir, subdir, satnum):
             instr = 'mhs'
             try:
                 if int(satnum) <= 17:
-                    instr = 'amsu-b'
+                    instr = 'amsub'
             except ValueError:
                 pass
             firstname = instr + ext
@@ -676,6 +677,7 @@ def pack_aapplvl1_files(aappfiles, base_dir, subdir, satnum):
         elif in_name == 'hrpt':
             firstname = name_converter.get(in_name)
             instr = 'avhrr/3'
+            # Could also be 'avhrr'. Will anyhow be converted below...
             level = '1b'
         else:
             instr = name_converter.get(in_name, in_name)
@@ -689,7 +691,8 @@ def pack_aapplvl1_files(aappfiles, base_dir, subdir, satnum):
         shutil.copy(aapp_file, newfilename)
         # retvl.append(newfilename)
         sensor_and_level[newfilename] = {
-            'sensor': instr, 'level': level}
+            'sensor': SENSOR_NAME_CONVERTER.get(instr, instr),
+            'level': level}
 
     return sensor_and_level
     # return retvl
