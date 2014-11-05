@@ -67,6 +67,27 @@ import pyinotify
 # Generic event handler
 
 
+def check_uri(uri):
+    """Check that the provided *uri* is on the local host and return the
+    file path.
+    """
+    if isinstance(uri, (list, set, tuple)):
+        paths = [check_uri(ressource) for ressource in uri]
+        return paths
+    url = urlparse(uri)
+    try:
+        local_ip = socket.gethostbyname(socket.gethostname())
+        url_ip = socket.gethostbyname(url.netloc)
+
+        if url_ip != local_ip and url.netloc != '':
+            raise IOError("Data file %s unaccessible from this host" % uri)
+
+    except socket.gaierror:
+        LOGGER.warning("Couldn't check file location, running anyway")
+
+    return url.path
+
+
 class EventHandler(pyinotify.ProcessEvent):
 
     """Handle events with a generic *fun* function.
@@ -215,27 +236,6 @@ class DataProcessor(object):
 
         return global_data
 
-    @staticmethod
-    def check_uri(uri):
-        """Check that the provided *uri* is on the local host and return the
-        file path.
-        """
-        if isinstance(uri, (list, set, tuple)):
-            paths = [DataProcessor.check_uri(ressource) for ressource in uri]
-            return paths
-        url = urlparse(uri)
-        try:
-            local_ip = socket.gethostbyname(socket.gethostname())
-            url_ip = socket.gethostbyname(url.netloc)
-
-            if url_ip != local_ip and url.netloc != '':
-                raise IOError("Data file %s unaccessible from this host" % uri)
-
-        except socket.gaierror:
-            LOGGER.warning("Couldn't check file location, running anyway")
-
-        return url.path
-
     def save_to_netcdf(self, data, item, params):
         LOGGER.debug("Save full data to netcdf4")
         try:
@@ -280,7 +280,7 @@ class DataProcessor(object):
         t1a = time.time()
 
         try:
-            filename = self.check_uri(uri)
+            filename = check_uri(uri)
             LOGGER.debug(str(filename))
         except IOError as err:
             LOGGER.info(str(err))
