@@ -216,10 +216,6 @@ class DataProcessor(object):
         # TODO: this should be fixed in mpop.
         global_data.info.update(mda)
         global_data.info['time'] = time_slot
-        global_data.info['platform_name'] = platform
-        global_data.info['sensor'] = mda['sensor']
-        if mda['orbit_number'] is not None:
-            global_data.info['orbit_number'] = int(mda['orbit_number'])
 
         return global_data
 
@@ -427,6 +423,9 @@ class DataProcessor(object):
         for key, attrib in item.attrib.items():
             params["".join((item.tag, key))] = attrib
         params.update(item.attrib)
+
+        params['aliases'] = self.product_config.aliases.copy()
+
         return params
 
     def draw_images(self, area):
@@ -479,9 +478,9 @@ class DataProcessor(object):
                 LOGGER.debug("Generating %s", product.attrib['id'])
                 func = getattr(self.local_data.image, product.attrib['id'])
                 img = func()
+                img.info.update(self.global_data.info)
                 img.info["product_name"] = product.attrib.get("name",
                                                               product.attrib["id"])
-
             except AttributeError:
                 # Log incorrect product funcion name
                 LOGGER.error('Incorrect product id: %s for area %s',
@@ -671,25 +670,52 @@ class DataWriter(Thread):
                 except Queue.Empty:
                     pass
                 else:
-                    # TODO: copy file instead of saving it twice.
-                    # Check that the format and overlay are the same though...
+                    sorted_items = {}
                     for item in file_items:
-                        output_dir = item.attrib.get("output_dir",
-                                                     params["output_dir"])
-                        fname = os.path.join(output_dir,
-                                             compose(item.text, params))
-                        if item.attrib.get("overlay") == "true":
+                        attrib = item.attrib.copy()
+                        if "output_dir" in attrib:
+                            del attrib["output_dir"]
+                        if 'format' not in attrib:
+                            attrib.setdefault('format',
+                                              os.path.splitext(item.text)[1][1:])
+
+                        key = tuple(sorted(attrib.items()))
+                        sorted_items.setdefault(key, []).append(item)
+
+                    local_params = params.copy()
+                    local_aliases = local_params['aliases']
+                    for key, aliases in local_aliases.items():
+                        if key in local_params:
+                            local_params[key] = aliases.get(params[key],
+                                                            params[key])
+                    for item, copies in sorted_items.items():
+                        attrib = dict(item)
+                        if attrib.get("overlay") == "true":
                             obj.add_overlay()
-                        fformat = item.attrib.get("format")
-                        if fformat == "geotiff":
-                            fformat = "tif"
-                        obj.save(fname, fformat=fformat,
-                                 compression=item.attrib.get("compression", 6))
-                        LOGGER.info("Saved %s to %s", str(obj), fname)
-                        msg = _create_message(obj, os.path.basename(fname),
-                                              fname, params)
-                        pub.send(str(msg))
-                        LOGGER.debug("Sent message %s", str(msg))
+                        fformat = attrib.get("format")
+
+                        saved = False
+                        for copy in copies:
+                            output_dir = copy.attrib.get("output_dir",
+                                                         params["output_dir"])
+                            fname = compose(os.path.join(output_dir, copy.text),
+                                            local_params)
+                            if not saved:
+                                obj.save(fname,
+                                         fformat=fformat,
+                                         compression=copy.attrib.get("compression", 6))
+                                LOGGER.info("Saved %s to %s", str(obj), fname)
+                                saved = fname
+                            else:
+                                try:
+                                    os.link(saved, fname)
+                                except OSError:
+                                    shutil.copy(saved, fname)
+                                saved = fname
+                            msg = _create_message(obj, os.path.basename(fname),
+                                                  fname, params)
+                            pub.send(str(msg))
+                            LOGGER.debug("Sent message %s", str(msg))
                     self.prod_queue.task_done()
 
     def write(self, obj, item, params):

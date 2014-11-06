@@ -52,6 +52,7 @@ class ProductList(object):
         self.pl = None
         self.attrib = {}
         self.vars = {}
+        self.aliases = {}
         self.groups = []
         self.parse()
         self.check_groups()
@@ -110,6 +111,11 @@ class ProductList(object):
                 for var in item:
                     self.vars.setdefault(
                         var.tag, {})[var.attrib["id"]] = var.text
+            elif item.tag == "aliases":
+                for alias in item:
+                    self.aliases.setdefault(
+                        alias.tag,
+                        {})[alias.attrib["src"]] = alias.attrib['dst']
 
 
 def get_root(fname):
