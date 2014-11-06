@@ -670,6 +670,8 @@ class DataWriter(Thread):
                 except Queue.Empty:
                     pass
                 else:
+                    # Sort the file items in categories, to allow copying
+                    # similar ones.
                     sorted_items = {}
                     for item in file_items:
                         attrib = item.attrib.copy()
@@ -694,6 +696,7 @@ class DataWriter(Thread):
                             obj.add_overlay()
                         fformat = attrib.get("format")
 
+                        # Actually save the data to disk.
                         saved = False
                         for copy in copies:
                             output_dir = copy.attrib.get("output_dir",
