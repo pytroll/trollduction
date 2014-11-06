@@ -42,6 +42,9 @@ for option, value in CONF.items(MODE, raw=True):
 
 #PPS_OUTPUT_DIR = os.environ.get('SM_PRODUCT_DIR', OPTIONS['pps_outdir'])
 PPS_OUTPUT_DIR = OPTIONS['pps_outdir']
+LVL1_NPP_PATH = os.environ.get('LVL1_NPP_PATH', None)
+LVL1_EOS_PATH = os.environ.get('LVL1_EOS_PATH', None)
+
 
 LEVEL1_PUBLISH_PORT = 9031
 SERVERNAME = OPTIONS['servername']
@@ -181,6 +184,11 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
     cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
                                  scene['orbit_number'], scene['satday'],
                                  scene['sathour'])
+    if scene['satid'] in SUPPORTED_JPSS_SATELLITES and LVL1_NPP_PATH:
+        cmdstr = cmdstr + ' ' + str(LVL1_NPP_PATH)
+    elif scene['satid'] in SUPPORTED_EOS_SATELLITES and LVL1_EOS_PATH:
+        cmdstr = cmdstr + ' ' + str(LVL1_EOS_PATH)
+
     LOG.info("Command " + cmdstr)
     my_env = os.environ.copy()
     for envkey in my_env:
