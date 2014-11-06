@@ -301,6 +301,9 @@ def ready2run(msg, files4pps, job_register):
     """Check wether pps is ready to run or not"""
     #"""Start the PPS processing on a NOAA/Metop/S-NPP/EOS scene"""
     # LOG.debug("Received message: " + str(msg))
+
+    from trollduction.producer import check_uri
+
     if msg:
         if (msg.data['platform_name'] not in SUPPORTED_PPS_SATELLITES):
             LOG.info(str(msg.data['platform_name']) + ": " +
@@ -313,24 +316,33 @@ def ready2run(msg, files4pps, job_register):
     LOG.debug("Ready to run...")
     LOG.info("Got message: " + str(msg))
 
-    if 'dataset' in msg.data:
+    uris = []
+    if msg.type == 'dataset':
         LOG.info('Dataset: ' + str(msg.data['dataset']))
         LOG.info('\t...thus we can assume we have everything we need for PPS')
-        urls = []
-        filenames = []
         for obj in msg.data['dataset']:
-            urls.append(urlparse(obj['uri']))
-            filenames.append(obj['uid'])
-        server = urls[0].netloc  # Assume server is the same for all uri's!
+            uris.append(obj['uri'])
+    elif msg.type == 'collection':
+        if 'dataset' in msg.data['collection'][0]:
+            for dataset in msg.data['collection']:
+                uris.extend([mda['uri'] for mda in dataset['dataset']])
+    elif msg.type == 'file':
+        uris = [(msg.data['uri'])]
     else:
-        urlobj = urlparse(msg.data['uri'])
-        server = urlobj.netloc
-
-    LOG.debug("Server = " + str(server))
-    if len(server) > 0 and server != SERVERNAME:
-        LOG.warning("Server %s not the current one: %s" % (str(server),
-                                                           SERVERNAME))
+        LOG.debug(
+            "Ignoring this type of message data: tyep = " + str(msg.type))
         return False
+
+    # server = urlobj.netloc
+    # server = urlparse(obj['uri']).netloc  # Assume server is the same for
+    # all uri's!
+
+    try:
+        level1_files = check_uri(uris)
+    except IOError:
+        LOG.info('One or more files not present on this host!')
+        return False
+
     LOG.info("Sat and Sensor: " + str(msg.data['platform_name'])
              + " " + str(msg.data['sensor']))
     if msg.data['sensor'] not in PPS_SENSORS:
@@ -366,8 +378,6 @@ def ready2run(msg, files4pps, job_register):
     # The orbit number is mandatory!
     orbit_number = int(msg.data['orbit_number'])
     LOG.debug("Orbit number: " + str(orbit_number))
-    level1_filename = urlobj.path
-    dummy, fname = os.path.split(level1_filename)
 
     #sensor = (msg.data['sensor'])
     platform_name = msg.data['platform_name']
@@ -386,12 +396,15 @@ def ready2run(msg, files4pps, job_register):
         files4pps[keyname] = []
 
     if platform_name in SUPPORTED_EOS_SATELLITES:
-        fname = os.path.basename(level1_filename)
-        if (fname.startswith(GEOLOC_PREFIX[platform_name]) or
-                fname.startswith(DATA1KM_PREFIX[platform_name])):
-            files4pps[keyname].append(level1_filename)
+        for item in level1_files:
+            fname = os.path.basename(item)
+            if (fname.startswith(GEOLOC_PREFIX[platform_name]) or
+                    fname.startswith(DATA1KM_PREFIX[platform_name])):
+                files4pps[keyname].append(item)
     else:
-        files4pps[keyname].append(level1_filename)
+        for item in level1_files:
+            fname = os.path.basename(item)
+            files4pps[keyname].append(fname)
 
     if (platform_name in SUPPORTED_METOP_SATELLITES or
             platform_name in SUPPORTED_NOAA_SATELLITES):
@@ -404,7 +417,12 @@ def ready2run(msg, files4pps, job_register):
             LOG.info("Not enough MODIS level 1 files available yet...")
             return False
 
-    LOG.info("Level 1 files ready: " + str(files4pps[keyname]))
+    if len(files4pps[keyname]) > 10:
+        LOG.info(
+            "Number of level 1 files ready = " + str(len(files4pps[keyname])))
+        LOG.info("Scene = " + str(keyname))
+    else:
+        LOG.info("Level 1 files ready: " + str(files4pps[keyname]))
 
     if msg.data['platform_name'] in SUPPORTED_PPS_SATELLITES:
         LOG.info(
@@ -464,13 +482,9 @@ def pps_rolling_runner():
                     check_threads(threads)
 
                 LOG.info("Start spawning a PPS processor for the scene")
-
-                urlobj = urlparse(message.data['uri'])
                 orbit_number = int(message.data['orbit_number'])
-                LOG.debug("Orbit number: " + str(orbit_number))
-                level1_filename = urlobj.path
+                LOG.debug("Orbit number: = " + str(orbit_number))
 
-                LOG.info("Ok... " + str(urlobj.netloc))
                 starttime = message.data['start_time']
                 try:
                     endtime = message.data['end_time']
