@@ -190,15 +190,6 @@ class DataProcessor(object):
     def create_scene_from_mda(self, mda):
         """Read the metadata *mda* and return a corresponding MPOP scene.
         """
-
-        platforms = {"metop-a": ("metop", "a"),
-                     "metop-b": ("metop", "b"),
-                     "noaa-19": ("noaa", "19"),
-                     "noaa-18": ("noaa", "18"),
-                     "noaa-15": ("noaa", "15"),
-                     "eos-terra": ('terra', ''),
-                     "eos-aqua": ('aqua', '')}
-
         time_slot = (mda.get('start_time') or
                      mda.get('nominal_time') or
                      mda.get('end_time'))
@@ -208,19 +199,14 @@ class DataProcessor(object):
         if 'orbit_number' not in mda:
             mda['orbit_number'] = None
 
-        satellite = None
-        satnumber = None
-
         platform = mda["platform_name"]
-        satellite, satnumber = platforms.get(platform.lower(),
-                                             (platform, ''))
 
         LOGGER.info("platform %s time %s",
                     str(platform), str(time_slot))
 
         # Create satellite scene
-        global_data = GF.create_scene(satname=str(satellite),
-                                      satnumber=str(satnumber),
+        global_data = GF.create_scene(satname=str(platform),
+                                      satnumber='',
                                       instrument=str(mda['sensor']),
                                       time_slot=time_slot,
                                       orbit=str(mda['orbit_number']),
@@ -232,7 +218,8 @@ class DataProcessor(object):
         global_data.info['time'] = time_slot
         global_data.info['platform_name'] = platform
         global_data.info['sensor'] = mda['sensor']
-        global_data.info['orbit_number'] = int(mda['orbit_number'])
+        if mda['orbit_number'] is not None:
+            global_data.info['orbit_number'] = int(mda['orbit_number'])
 
         return global_data
 
