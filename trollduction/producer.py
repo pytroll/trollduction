@@ -320,7 +320,7 @@ class DataProcessor(object):
                         area_def)
                     if coverage <= min_coverage:
                         LOGGER.info("Coverage too small %.1f%% (out of %.1f%%) with %s",
-                                    coverage * 100, min_coverage,
+                                    coverage * 100, min_coverage * 100,
                                     area_item.attrib['name'])
                         continue
                     else:
@@ -673,7 +673,10 @@ def link_or_copy(src, dst):
     try:
         os.link(src, dst)
     except OSError:
-        shutil.copy(src, dst)
+        try:
+            shutil.copy(src, dst)
+        except Error:
+            LOGGER.exception("Something went wrong in copying a file")
 
 
 class DataWriter(Thread):
