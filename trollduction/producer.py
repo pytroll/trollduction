@@ -313,12 +313,15 @@ class DataProcessor(object):
             for area_item in group:
                 try:
                     area_def = get_area_def(area_item.attrib['id'])
-                    min_coverage = area_item.attrib.get('min_coverage', 0)
+                    min_coverage = float(
+                        area_item.attrib.get('min_coverage', 0))
+                    min_coverage /= 100.0
                     coverage = self.global_data.overpass.area_coverage(
                         area_def)
-                    if coverage <= float(min_coverage):
-                        LOGGER.info("Coverage too small %.1f%% with %s",
-                                    coverage * 100, area_item.attrib['name'])
+                    if coverage <= min_coverage:
+                        LOGGER.info("Coverage too small %.1f%% (out of %.1f%%) with %s",
+                                    coverage * 100, min_coverage,
+                                    area_item.attrib['name'])
                         continue
                     else:
                         LOGGER.info("Coverage %.1f%% with %s",
