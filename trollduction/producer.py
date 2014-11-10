@@ -57,6 +57,7 @@ from mpop.satout.cfscene import CFScene
 from posttroll.publisher import Publish
 from posttroll.message import Message
 from pyresample.utils import AreaNotFound
+from trollsched.satpass import Pass
 
 LOGGER = logging.getLogger(__name__)
 
@@ -212,6 +213,12 @@ class DataProcessor(object):
                                       orbit=str(mda['orbit_number']),
                                       variant=mda.get('variant', ''))
 
+        if mda['orbit_number'] is not None:
+            global_data.overpass = Pass(platform,
+                                        mda['start_time'],
+                                        mda['end_time'],
+                                        instrument=mda['sensor'])
+
         # Update missing information to global_data.info{}
         # TODO: this should be fixed in mpop.
         global_data.info.update(mda)
@@ -304,6 +311,22 @@ class DataProcessor(object):
                 break
 
             for area_item in group:
+                try:
+                    area_def = get_area_def(area_item.attrib['id'])
+                    min_coverage = area_item.attrib.get('min_coverage', 0)
+                    coverage = self.global_data.overpass.area_coverage(
+                        area_def)
+                    if coverage <= float(min_coverage):
+                        LOGGER.info("Coverage too small %.1f%% with %s",
+                                    coverage * 100, area_item.attrib['name'])
+                        continue
+                    else:
+                        LOGGER.info("Coverage %.1f%% with %s",
+                                    coverage * 100, area_item.attrib['name'])
+
+                except AttributeError:
+                    LOGGER.warning("Can't compute area coverage with %s!",
+                                   area_item.attrib['name'])
                 # reproject to local domain
                 LOGGER.debug(
                     "Projecting data to area " + area_item.attrib['name'])
