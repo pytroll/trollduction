@@ -641,6 +641,9 @@ def _create_message(obj, filename, uri, params):
 
 
 def link_or_copy(src, dst):
+    if src == dst:
+        LOGGER.warning("Trying to copy a file over itself: %s", src)
+        return
     try:
         os.link(src, dst)
     except OSError:
@@ -710,10 +713,7 @@ class DataWriter(Thread):
                                 LOGGER.info("Saved %s to %s", str(obj), fname)
                                 saved = fname
                             else:
-                                try:
-                                    os.link(saved, fname)
-                                except OSError:
-                                    shutil.copy(saved, fname)
+                                link_or_copy(saved, fname)
                                 saved = fname
                             msg = _create_message(obj, os.path.basename(fname),
                                                   fname, params)
