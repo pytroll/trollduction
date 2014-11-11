@@ -292,25 +292,32 @@ class DataProcessor(object):
                                     self.get_parameters(area_item))
 
         for group in self.product_config.groups:
-            area_def_names = self.get_area_def_names(group)
+            area_def_names = self.get_area_def_names(group.data)
             products = []
-            for area_item in group:
+            for area_item in group.data:
                 for product in area_item:
                     products.append(product)
 
+            if group.get("unload", "").lower() in ["yes", "true", "1"]:
+                self.global_data.unload(self.global_data.loaded_channels())
+                LOGGER.debug("unloading all channels before group %s",
+                             group.id)
             try:
                 LOGGER.debug("loading channels : %s",
                              str(self.get_req_channels(products)))
+                keywords = {"filename": filename,
+                            "area_def_names": area_def_names}
+                if "resolution" in group.info:
+                    keywords["resolution"] = int(group.resolution)
                 self.global_data.load(self.get_req_channels(products),
-                                      filename=filename,
-                                      area_def_names=area_def_names)
+                                      **keywords)
                 LOGGER.debug("loaded data : %s", str(self.global_data))
             except IndexError:
                 LOGGER.exception("Incomplete or corrupted input data.")
                 self._data_ok = False
                 break
 
-            for area_item in group:
+            for area_item in group.data:
                 try:
                     area_def = get_area_def(area_item.attrib['id'])
                     min_coverage = float(
@@ -352,6 +359,11 @@ class DataProcessor(object):
 
                 # Draw requested images for this area.
                 self.draw_images(area_item)
+
+            if group.get("unload", "").lower() in ["yes", "true", "1"]:
+                self.global_data.unload(self.global_data.loaded_channels())
+                LOGGER.debug("unloading all channels after group %s",
+                             group.id)
 
         # Wait for the writer to finish
         if self._data_ok:

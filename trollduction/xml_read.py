@@ -41,6 +41,29 @@ class InfoObject(object):
         except KeyError:
             raise AttributeError
 
+    def get(self, key, default=None):
+        return self.info.get(key, default)
+
+
+class Dataset(InfoObject):
+
+    def __init__(self, data, **attributes):
+        InfoObject.__init__(self, **attributes)
+        self.data = data
+
+    def __str__(self):
+        return str(self.data) + "\n" + str(self.info)
+
+    def __repr__(self):
+        return repr(self.data) + "\n" + repr(self.info)
+
+    def copy(self, copy_data=True):
+        if copy_data:
+            data = self.data.copy()
+        else:
+            data = self.data
+        return Dataset(data, **self.info)
+
 
 class ProductList(object):
 
@@ -55,7 +78,6 @@ class ProductList(object):
         self.aliases = {}
         self.groups = []
         self.parse()
-        self.check_groups()
 
         self.insert_vars()
 
@@ -72,23 +94,23 @@ class ProductList(object):
         for area in self.pl:
             assigned = False
             for group in self.groups:
-                if area.attrib["id"] in group:
+                if area.attrib["id"] in group.data:
                     assigned = True
                     break
             if not assigned:
                 last_group.append(area.attrib["id"])
         if last_group:
-            self.groups.append(last_group)
+            self.groups.append(Dataset(last_group, id="_rest"))
 
         # replace area ids with actual xml area items
         groups = []
         for group in self.groups:
-            new_group = []
-            for area_id in group:
+            new_group = Dataset([], **group.info)
+            for area_id in group.data:
                 assigned = False
                 for area in self.pl:
                     if area.attrib["id"] == area_id:
-                        new_group.append(area)
+                        new_group.data.append(area)
                         assigned = True
                         break
                 if not assigned:
@@ -106,7 +128,8 @@ class ProductList(object):
                     self.attrib[citem.tag] = citem.text
             elif item.tag == "groups":
                 for group in item:
-                    self.groups.append(group.text.split(","))
+                    self.groups.append(Dataset(group.text.split(","),
+                                               **group.attrib))
             elif item.tag == "variables":
                 for var in item:
                     self.vars.setdefault(
@@ -116,6 +139,7 @@ class ProductList(object):
                     self.aliases.setdefault(
                         alias.tag,
                         {})[alias.attrib["src"]] = alias.attrib['dst']
+        self.check_groups()
 
 
 def get_root(fname):
