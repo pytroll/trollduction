@@ -675,7 +675,7 @@ def link_or_copy(src, dst):
     except OSError:
         try:
             shutil.copy(src, dst)
-        except Error:
+        except shutil.Error:
             LOGGER.exception("Something went wrong in copying a file")
 
 
