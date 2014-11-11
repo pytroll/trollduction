@@ -299,7 +299,7 @@ class DataProcessor(object):
                     products.append(product)
 
             if group.get("unload", "").lower() in ["yes", "true", "1"]:
-                self.global_data.unload(self.global_data.loaded_channels())
+                self.global_data.unload(*self.global_data.loaded_channels())
                 LOGGER.debug("unloading all channels before group %s",
                              group.id)
             try:
@@ -361,7 +361,7 @@ class DataProcessor(object):
                 self.draw_images(area_item)
 
             if group.get("unload", "").lower() in ["yes", "true", "1"]:
-                self.global_data.unload(self.global_data.loaded_channels())
+                self.global_data.unload(*self.global_data.loaded_channels())
                 LOGGER.debug("unloading all channels after group %s",
                              group.id)
 
