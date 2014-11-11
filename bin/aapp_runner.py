@@ -368,11 +368,15 @@ class AappLvl1Processor(object):
                 return True
 
             if keyname not in self.level0files:
+                LOG.debug("Reset level0files: keyname = " + str(keyname))
                 self.level0files[keyname] = []
 
             item = (self.level0_filename, sensor)
             if item not in self.level0files[keyname]:
                 self.level0files[keyname].append(item)
+                LOG.debug("Appending item to list: " + str(item))
+            else:
+                LOG.debug("item already in list: " + str(item))
 
             if len(self.level0files[keyname]) < 4:
                 LOG.info("Not enough sensor data available yet. " +
