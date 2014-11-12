@@ -332,8 +332,9 @@ class AappLvl1Processor(object):
                 return True
 
         keyname = (str(self.platform_name) + '_' +
-                   self.starttime.strftime('%Y%m%d%H%M') +
-                   '_' + self.endtime.strftime('%Y%m%d%H%M'))
+                   self.starttime.strftime('%Y%m%d%H%M%S') +
+                   '_' + self.endtime.strftime('%Y%m%d%H%M%S'))
+        LOG.debug("keyname = " + str(keyname))
 
         # Check for keys representing the same scene (slightly different
         # start/end times):
@@ -341,14 +342,17 @@ class AappLvl1Processor(object):
             pltrfn, startt, endt = key.split('_')
             if not self.platform_name == pltrfn:
                 continue
-            t1_ = datetime.strptime(startt, '%Y%m%d%H%M')
-            t2_ = datetime.strptime(endt, '%Y%m%d%H%M')
+            t1_ = datetime.strptime(startt, '%Y%m%d%H%M%S')
+            t2_ = datetime.strptime(endt, '%Y%m%d%H%M%S')
             if (abs(self.starttime - t1_).seconds < 60 and
                     abs(self.endtime - t2_).seconds < 60):
                 # It is the same scene!
+                LOG.debug(
+                    "It is the same scene, though the file times differ a bit...")
                 keyname = key
                 break
 
+        LOG.debug("keyname = " + str(keyname))
         if keyname in self.level0files:
             LOG.debug("Level-0files = " + str(self.level0files[keyname]))
         else:
@@ -368,11 +372,15 @@ class AappLvl1Processor(object):
                 return True
 
             if keyname not in self.level0files:
+                LOG.debug("Reset level0files: keyname = " + str(keyname))
                 self.level0files[keyname] = []
 
             item = (self.level0_filename, sensor)
             if item not in self.level0files[keyname]:
                 self.level0files[keyname].append(item)
+                LOG.debug("Appending item to list: " + str(item))
+            else:
+                LOG.debug("item already in list: " + str(item))
 
             if len(self.level0files[keyname]) < 4:
                 LOG.info("Not enough sensor data available yet. " +
