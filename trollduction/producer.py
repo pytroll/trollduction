@@ -689,6 +689,8 @@ def link_or_copy(src, dst):
     try:
         os.link(src, dst)
     except OSError:
+        LOGGER.exception("Could not link, copy instead (%s -> %s)",
+                         src, dst)
         try:
             shutil.copy(src, dst)
         except shutil.Error:
