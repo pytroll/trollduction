@@ -58,6 +58,7 @@ from posttroll.publisher import Publish
 from posttroll.message import Message
 from pyresample.utils import AreaNotFound
 from trollsched.satpass import Pass
+import errno
 
 LOGGER = logging.getLogger(__name__)
 
@@ -706,9 +707,10 @@ def link_or_copy(src, dst):
         return
     try:
         os.link(src, dst)
-    except OSError:
-        LOGGER.exception("Could not link, copy instead (%s -> %s)",
-                         src, dst)
+    except OSError as err:
+        if err.errno not in [errno.EXDEV]:
+            LOGGER.exception("Could not link!")
+            return
         try:
             shutil.copy(src, dst)
         except shutil.Error:
@@ -920,8 +922,12 @@ class Trollduction(object):
                 except Queue.Empty:
                     continue
                 LOGGER.debug(str(msg))
+                if isinstance(msg.data['sensor'], (list, tuple, set)):
+                    sensors = set(msg.data['sensor'])
+                else:
+                    sensors = set((msg.data['sensor'], ))
                 if (msg.type in ["file", 'collection', 'dataset'] and
-                        msg.data["sensor"] in self.td_config['instruments'].split(',')):
+                        sensors.intersection(self.td_config['instruments'].split(','))):
                     self.update_product_config(self.td_config['product_config_file'],
                                                self.td_config['config_item'])
                     self.data_processor.run(self.product_config, msg)
