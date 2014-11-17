@@ -228,10 +228,15 @@ class DataProcessor(object):
         LOGGER.info("platform %s time %s",
                     str(platform), str(time_slot))
 
+        if isinstance(mda['sensor'], (list, tuple, set)):
+            sensor = mda['sensor'][0]
+        else:
+            sensor = mda['sensor']
+
         # Create satellite scene
         global_data = GF.create_scene(satname=str(platform),
                                       satnumber='',
-                                      instrument=str(mda['sensor']),
+                                      instrument=str(sensor),
                                       time_slot=time_slot,
                                       orbit=str(mda['orbit_number']),
                                       variant=mda.get('variant', ''))
@@ -240,7 +245,7 @@ class DataProcessor(object):
             global_data.overpass = Pass(platform,
                                         mda['start_time'],
                                         mda['end_time'],
-                                        instrument=mda['sensor'])
+                                        instrument=sensor)
 
         # Update missing information to global_data.info{}
         # TODO: this should be fixed in mpop.
