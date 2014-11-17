@@ -346,6 +346,11 @@ class DataProcessor(object):
                              str(self.get_req_channels(products)))
                 keywords = {"filename": filename,
                             "area_def_names": area_def_names}
+                try:
+                    keywords["time_interval"] = (msg.data["start_time"],
+                                                 msg.data["end_time"])
+                except KeyError:
+                    pass
                 if "resolution" in group.info:
                     keywords["resolution"] = int(group.resolution)
                 self.global_data.load(self.get_req_channels(products),
