@@ -58,6 +58,7 @@ from posttroll.publisher import Publish
 from posttroll.message import Message
 from pyresample.utils import AreaNotFound
 from trollsched.satpass import Pass
+import errno
 
 LOGGER = logging.getLogger(__name__)
 
@@ -166,6 +167,28 @@ class ConfigWatcher(object):
         self.notifier.stop()
 
 
+def covers(overpass, area_item):
+    try:
+        area_def = get_area_def(area_item.attrib['id'])
+        min_coverage = float(
+            area_item.attrib.get('min_coverage', 0))
+        min_coverage /= 100.0
+        coverage = overpass.area_coverage(area_def)
+        if coverage <= min_coverage:
+            LOGGER.info("Coverage too small %.1f%% (out of %.1f%%) with %s",
+                        coverage * 100, min_coverage * 100,
+                        area_item.attrib['name'])
+            return False
+        else:
+            LOGGER.info("Coverage %.1f%% with %s",
+                        coverage * 100, area_item.attrib['name'])
+
+    except AttributeError:
+        LOGGER.warning("Can't compute area coverage with %s!",
+                       area_item.attrib['name'])
+    return True
+
+
 class DataProcessor(object):
 
     """Process the data.
@@ -205,10 +228,15 @@ class DataProcessor(object):
         LOGGER.info("platform %s time %s",
                     str(platform), str(time_slot))
 
+        if isinstance(mda['sensor'], (list, tuple, set)):
+            sensor = mda['sensor'][0]
+        else:
+            sensor = mda['sensor']
+
         # Create satellite scene
         global_data = GF.create_scene(satname=str(platform),
                                       satnumber='',
-                                      instrument=str(mda['sensor']),
+                                      instrument=str(sensor),
                                       time_slot=time_slot,
                                       orbit=str(mda['orbit_number']),
                                       variant=mda.get('variant', ''))
@@ -217,7 +245,7 @@ class DataProcessor(object):
             global_data.overpass = Pass(platform,
                                         mda['start_time'],
                                         mda['end_time'],
-                                        instrument=mda['sensor'])
+                                        instrument=sensor)
 
         # Update missing information to global_data.info{}
         # TODO: this should be fixed in mpop.
@@ -294,9 +322,18 @@ class DataProcessor(object):
         for group in self.product_config.groups:
             area_def_names = self.get_area_def_names(group.data)
             products = []
+            skip = []
+
             for area_item in group.data:
+                if not covers(self.global_data.overpass, area_item):
+                    skip.append(area_item)
+                    continue
+                else:
+                    skip_group = False
                 for product in area_item:
                     products.append(product)
+            if not products:
+                continue
 
             if group.get("unload", "").lower() in ["yes", "true", "1"]:
                 loaded_channels = [chn.name for chn
@@ -309,6 +346,11 @@ class DataProcessor(object):
                              str(self.get_req_channels(products)))
                 keywords = {"filename": filename,
                             "area_def_names": area_def_names}
+                try:
+                    keywords["time_interval"] = (msg.data["start_time"],
+                                                 msg.data["end_time"])
+                except KeyError:
+                    pass
                 if "resolution" in group.info:
                     keywords["resolution"] = int(group.resolution)
                 self.global_data.load(self.get_req_channels(products),
@@ -320,25 +362,8 @@ class DataProcessor(object):
                 break
 
             for area_item in group.data:
-                try:
-                    area_def = get_area_def(area_item.attrib['id'])
-                    min_coverage = float(
-                        area_item.attrib.get('min_coverage', 0))
-                    min_coverage /= 100.0
-                    coverage = self.global_data.overpass.area_coverage(
-                        area_def)
-                    if coverage <= min_coverage:
-                        LOGGER.info("Coverage too small %.1f%% (out of %.1f%%) with %s",
-                                    coverage * 100, min_coverage * 100,
-                                    area_item.attrib['name'])
-                        continue
-                    else:
-                        LOGGER.info("Coverage %.1f%% with %s",
-                                    coverage * 100, area_item.attrib['name'])
-
-                except AttributeError:
-                    LOGGER.warning("Can't compute area coverage with %s!",
-                                   area_item.attrib['name'])
+                if area_item in skip:
+                    continue
                 # reproject to local domain
                 LOGGER.debug(
                     "Projecting data to area " + area_item.attrib['name'])
@@ -631,6 +656,10 @@ class DataProcessor(object):
 def _create_message(obj, filename, uri, params):
     to_send = obj.info.copy()
 
+    for key in ['collection', 'dataset']:
+        if key in to_send:
+            del to_send[key]
+
     to_send["nominal_time"] = getattr(obj, "time_slot",
                                       params.get("time_slot"))
     area = getattr(obj, "area", params.get("area"))
@@ -688,7 +717,10 @@ def link_or_copy(src, dst):
         return
     try:
         os.link(src, dst)
-    except OSError:
+    except OSError as err:
+        if err.errno not in [errno.EXDEV]:
+            LOGGER.exception("Could not link!")
+            return
         try:
             shutil.copy(src, dst)
         except shutil.Error:
@@ -900,8 +932,12 @@ class Trollduction(object):
                 except Queue.Empty:
                     continue
                 LOGGER.debug(str(msg))
+                if isinstance(msg.data['sensor'], (list, tuple, set)):
+                    sensors = set(msg.data['sensor'])
+                else:
+                    sensors = set((msg.data['sensor'], ))
                 if (msg.type in ["file", 'collection', 'dataset'] and
-                        msg.data["sensor"] in self.td_config['instruments'].split(',')):
+                        sensors.intersection(self.td_config['instruments'].split(','))):
                     self.update_product_config(self.td_config['product_config_file'],
                                                self.td_config['config_item'])
                     self.data_processor.run(self.product_config, msg)
