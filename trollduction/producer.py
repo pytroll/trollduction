@@ -806,7 +806,7 @@ class DataWriter(Thread):
                             if ("thumbnail_name" in copy.attrib and
                                     "thumbnail_size" in copy.attrib):
                                 thsize = [int(val) for val
-                                          in attrib["thumbnail_size"].split("x")]
+                                          in copy.attrib["thumbnail_size"].split("x")]
                                 copy.attrib["thumbnail_size"] = thsize
                                 thname = compose(os.path.join(output_dir,
                                                               copy.attrib["thumbnail_name"]),
