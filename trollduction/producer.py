@@ -734,6 +734,18 @@ def thumbnail(filename, thname, size, fformat):
     im.save(thname, fformat)
 
 
+def hash_color(colorstring):
+    """ convert #RRGGBB to an (R, G, B) tuple """
+    colorstring = colorstring.strip()
+    if colorstring[0] == '#':
+        colorstring = colorstring[1:]
+    if len(colorstring) != 6:
+        raise ValueError("input #%s is not in #RRGGBB format" % colorstring)
+    r, g, b = colorstring[:2], colorstring[2:4], colorstring[4:]
+    r, g, b = [int(n, 16) for n in (r, g, b)]
+    return (r, g, b)
+
+
 class DataWriter(Thread):
 
     """Writes data to disk.
@@ -782,8 +794,10 @@ class DataWriter(Thread):
                                                             params[key])
                     for item, copies in sorted_items.items():
                         attrib = dict(item)
-                        if attrib.get("overlay") == "true":
+                        if attrib.get("overlay", "").lower() == "true":
                             obj.add_overlay()
+                        elif attrib.get("overlay", "").startswith("#"):
+                            obj.add_overlay(hash_color(attrib.get("overlay")))
                         fformat = attrib.get("format")
 
                         # Actually save the data to disk.
