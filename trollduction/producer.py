@@ -727,6 +727,13 @@ def link_or_copy(src, dst):
             LOGGER.exception("Something went wrong in copying a file")
 
 
+def thumbnail(filename, thname, size, fformat):
+    from PIL import Image
+    im = Image.open(filename)
+    im.thumbnail(size, Image.ANTIALIAS)
+    im.save(thname, fformat)
+
+
 class DataWriter(Thread):
 
     """Writes data to disk.
@@ -755,8 +762,11 @@ class DataWriter(Thread):
                     sorted_items = {}
                     for item in file_items:
                         attrib = item.attrib.copy()
-                        if "output_dir" in attrib:
-                            del attrib["output_dir"]
+                        for key in ["output_dir",
+                                    "thumbnail_name",
+                                    "thumbnail_size"]:
+                            if key in attrib:
+                                del attrib[key]
                         if 'format' not in attrib:
                             attrib.setdefault('format',
                                               os.path.splitext(item.text)[1][1:])
@@ -792,6 +802,18 @@ class DataWriter(Thread):
                             else:
                                 link_or_copy(saved, fname)
                                 saved = fname
+
+                            if ("thumbnail_name" in copy.attrib and
+                                    "thumbnail_size" in copy.attrib):
+                                thsize = [int(val) for val
+                                          in attrib["thumbnail_size"].split("x")]
+                                copy.attrib["thumbnail_size"] = thsize
+                                thname = compose(os.path.join(output_dir,
+                                                              copy.attrib["thumbnail_name"]),
+                                                 local_params)
+                                copy.attrib["thumbnail_name"] = thname
+                                thumbnail(fname, thname, thsize, fformat)
+
                             msg = _create_message(obj, os.path.basename(fname),
                                                   fname, params)
                             pub.send(str(msg))
