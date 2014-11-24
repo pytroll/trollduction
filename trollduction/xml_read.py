@@ -132,9 +132,10 @@ class ProductList(object):
                                                **group.attrib))
             elif item.tag == "variables":
                 if item.attrib:
-                    for env, val in item.attrib.items():
-                        if os.environ[env] != val:
-                            continue
+                    res = [os.environ[env] != val
+                           for env, val in item.attrib.items()]
+                    if any(res):
+                        continue
                 for var in item:
                     self.vars.setdefault(
                         var.tag, {})[var.attrib["id"]] = var.text
