@@ -79,9 +79,9 @@ class ProductList(object):
         self.groups = []
         self.parse()
 
-        self.insert_vars()
-
     def insert_vars(self):
+        """Variable replacement
+        """
         for item in self.pl.getiterator():
             for key in self.vars:
                 if key in item.attrib and item.attrib[key] in self.vars[key]:
@@ -131,6 +131,10 @@ class ProductList(object):
                     self.groups.append(Dataset(group.text.split(","),
                                                **group.attrib))
             elif item.tag == "variables":
+                if item.attrib:
+                    for env, val in item.attrib.items():
+                        if os.environ[env] != val:
+                            continue
                 for var in item:
                     self.vars.setdefault(
                         var.tag, {})[var.attrib["id"]] = var.text
@@ -139,6 +143,7 @@ class ProductList(object):
                     self.aliases.setdefault(
                         alias.tag,
                         {})[alias.attrib["src"]] = alias.attrib['dst']
+        self.insert_vars()
         self.check_groups()
 
 
