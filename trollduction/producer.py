@@ -907,8 +907,8 @@ class Trollduction(object):
             self.update_product_config(self.td_config['product_config_file'],
                                        self.td_config['config_item'])
         except KeyError:
-            LOGGER.critical("Key 'product_config_file' or 'config_item' is "
-                            "missing from Trollduction config")
+            LOGGER.exception("Key 'product_config_file' or 'config_item' is "
+                             "missing from Trollduction config")
 
     def update_product_config(self, fname, config_item):
         '''Update area definitions, associated product names, output
