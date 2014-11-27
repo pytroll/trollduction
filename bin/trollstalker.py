@@ -37,15 +37,18 @@ from ConfigParser import ConfigParser
 import logging
 import logging.config
 
-LOGGER = logging.getLogger("trollstalker")
+LOGGER = logging.getLogger(__name__)
+
 
 class EventHandler(ProcessEvent):
+
     """
     Event handler class for inotify.
      *topic* - topic of the published messages
      *posttroll_port* - port number to publish the messages on
      *filepattern* - filepattern for finding information from the filename
     """
+
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
                  aliases=None):
         super(EventHandler, self).__init__()
@@ -112,12 +115,10 @@ class EventHandler(ProcessEvent):
                 self.pub.send(str(message))
             self.__clean__()
 
-
     def create_message(self):
         """Create broadcasted message
         """
         return Message(self.topic, 'file', self.info)
-
 
     def parse_file_info(self, event):
         '''Parse satellite and orbit information from the filename.
@@ -126,7 +127,8 @@ class EventHandler(ProcessEvent):
         try:
             self.info = self.file_parser.parse(event.pathname)
             self.info['uri'] = event.pathname
-            self.info['instrument'] = self.instrument
+            self.info['uid'] = os.path.basename(event.pathname)
+            self.info['sensor'] = self.instrument
 
             # replace values with corresponding aliases, if any are given
             if self.aliases:
@@ -137,9 +139,12 @@ class EventHandler(ProcessEvent):
             # Filename didn't match pattern, so empty the info dict
             self.info = {}
 
+
 class NewThreadedNotifier(ThreadedNotifier):
+
     '''Threaded notifier class
     '''
+
     def stop(self, *args, **kwargs):
         self._default_proc_fun.stop()
         ThreadedNotifier.stop(self, *args, **kwargs)
@@ -174,6 +179,7 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
 
     return notifier
 
+
 def parse_aliases(config):
     '''Parse aliases from the config.
 
@@ -203,6 +209,7 @@ def parse_aliases(config):
             aliases[new_key] = alias
     return aliases
 
+
 def main():
     '''Main(). Commandline parsing and stalker startup.'''
 
@@ -212,11 +219,11 @@ def main():
                         nargs='+',
                         type=str,
                         default=[],
-                        help="Names of the monitored directories "\
-                            "separated by space")
+                        help="Names of the monitored directories "
+                        "separated by space")
     parser.add_argument("-p", "--posttroll_port", dest="posttroll_port",
-                      default=0, type=int,
-                      help="Local port where messages are published")
+                        default=0, type=int,
+                        help="Local port where messages are published")
     parser.add_argument("-t", "--topic", dest="topic",
                         type=str,
                         default=None,
@@ -232,8 +239,8 @@ def main():
                         help="Name of the pyinotify events to monitor")
     parser.add_argument("-f", "--filepattern",
                         type=str,
-                        help="Filepattern used to parse " \
-                            "satellite/orbit/date/etc information")
+                        help="Filepattern used to parse "
+                        "satellite/orbit/date/etc information")
     parser.add_argument("-i", "--instrument",
                         type=str, default=None,
                         help="Instrument name in the satellite")
@@ -291,14 +298,13 @@ def main():
         except KeyError:
             pass
         try:
-            instrument = instrument or config['instrument']
+            instrument = instrument or config['instruments']
         except KeyError:
             pass
         aliases = parse_aliases(config)
         try:
             log_config = config["stalker_log_config"]
         except KeyError:
-            logging.basicConfig()
             try:
                 loglevel = getattr(logging, config["loglevel"])
                 if loglevel == "":
@@ -309,7 +315,7 @@ def main():
 
             strhndl = logging.StreamHandler()
             strhndl.setLevel(loglevel)
-            log_format = "[%(asctime)s %(levelname)-8s] %(name)s: %(message)s"
+            log_format = "[%(asctime)s %(levelname)-8s %(name)s] %(message)s"
             formatter = logging.Formatter(log_format)
 
             strhndl.setFormatter(formatter)
@@ -338,4 +344,5 @@ def main():
         notifier.stop()
 
 if __name__ == "__main__":
+    LOGGER = logging.getLogger("trollstalker")
     main()
