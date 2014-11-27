@@ -222,15 +222,7 @@ def run_terra_l0l1(pdsfile):
 
     from subprocess import Popen, PIPE, STDOUT
 
-    working_dir = OPTIONS['working_dir']
-    # Change working directory:
-    if not os.path.exists(working_dir):
-        try:
-            os.makedirs(working_dir)
-        except OSError:
-            LOG.error("Failed creating working directory %s" % working_dir)
-            working_dir = '/tmp'
-            LOG.info("Will use /tmp")
+    working_dir = get_working_dir()
 
     #fdwork = os.open(working_dir, os.O_RDONLY)
     # os.fchdir(fdwork)
@@ -337,6 +329,18 @@ def run_terra_l0l1(pdsfile):
 # ---------------------------------------------------------------------------
 
 
+def get_working_dir():
+    working_dir = OPTIONS['working_dir']
+    if not os.path.exists(working_dir):
+        try:
+            os.makedirs(working_dir)
+        except OSError:
+            LOG.error("Failed creating working directory %s" % working_dir)
+            working_dir = '/tmp'
+            LOG.info("Will use /tmp")
+    return working_dir
+
+
 def run_aqua_gbad(obs_time):
     """Run the gbad for aqua"""
 
@@ -362,7 +366,8 @@ def run_aqua_gbad(obs_time):
     # Run the command:
     # os.system(cmdstr)
     modislvl1b_proc = Popen(cmdstr, shell=True,
-                            stderr=PIPE, stdout=PIPE)
+                            stderr=PIPE, stdout=PIPE,
+                            cwd=working_dir)
 
     while True:
         line = modislvl1b_proc.stdout.readline()
@@ -388,14 +393,7 @@ def run_aqua_l0l1(pdsfile):
     import os
     from subprocess import Popen, PIPE, STDOUT
 
-    working_dir = OPTIONS['working_dir']
-    if not os.path.exists(working_dir):
-        try:
-            os.makedirs(working_dir)
-        except OSError:
-            LOG.error("Failed creating working directory %s" % working_dir)
-            working_dir = '/tmp'
-            LOG.info("Will use /tmp")
+    working_dir = get_working_dir()
 
     #ephemeris_home = OPTIONS['ephemeris_home']
     #attitude_home = OPTIONS['attitude_home']
