@@ -59,6 +59,7 @@ from posttroll.message import Message
 from pyresample.utils import AreaNotFound
 from trollsched.satpass import Pass
 import errno
+import netifaces
 
 LOGGER = logging.getLogger(__name__)
 
@@ -66,7 +67,16 @@ LOGGER = logging.getLogger(__name__)
 
 import pyinotify
 
-# Generic event handler
+
+def get_local_ips():
+    inet_addrs = [netifaces.ifaddresses(iface).get(netifaces.AF_INET)
+                  for iface in netifaces.interfaces()]
+    ips = []
+    for addr in inet_addrs:
+        if addr is not None:
+            for add in addr:
+                ips.append(add['addr'])
+    return ips
 
 
 def check_uri(uri):
@@ -78,16 +88,17 @@ def check_uri(uri):
         return paths
     url = urlparse(uri)
     try:
-        local_ip = socket.gethostbyname(socket.gethostname())
         url_ip = socket.gethostbyname(url.netloc)
 
-        if url_ip != local_ip and url.netloc != '':
+        if url_ip not in get_local_ips() and url.netloc != '':
             raise IOError("Data file %s unaccessible from this host" % uri)
 
     except socket.gaierror:
         LOGGER.warning("Couldn't check file location, running anyway")
 
     return url.path
+
+# Generic event handler
 
 
 class EventHandler(pyinotify.ProcessEvent):

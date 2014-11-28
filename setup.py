@@ -55,6 +55,6 @@ setup(name="trollduction",
       install_requires=['pyinotify', 'mpop', 'posttroll',
                         'pyresample', 'pykdtree',
                         'trollimage', 'pyorbital',
-                        'trollsift'],
+                        'trollsift', 'netifaces'],
       test_suite='trollduction.tests.suite',
       )
