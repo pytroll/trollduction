@@ -36,6 +36,7 @@ from trollsift import Parser
 from ConfigParser import ConfigParser
 import logging
 import logging.config
+import os.path
 
 LOGGER = logging.getLogger(__name__)
 
@@ -126,6 +127,10 @@ class EventHandler(ProcessEvent):
         '''
         try:
             self.info = self.file_parser.parse(event.pathname)
+        except ValueError:
+            # Filename didn't match pattern, so empty the info dict
+            self.info = {}
+        else:
             self.info['uri'] = event.pathname
             self.info['uid'] = os.path.basename(event.pathname)
             self.info['sensor'] = self.instrument
@@ -135,9 +140,6 @@ class EventHandler(ProcessEvent):
                 for key in self.info:
                     if key in self.aliases:
                         self.info[key] = self.aliases[key][str(self.info[key])]
-        except ValueError:
-            # Filename didn't match pattern, so empty the info dict
-            self.info = {}
 
 
 class NewThreadedNotifier(ThreadedNotifier):
