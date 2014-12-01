@@ -108,6 +108,7 @@ class EventHandler(ProcessEvent):
         '''Process the event'''
         # New file created and closed
         if not event.dir:
+            LOGGER.debug("processing %s", event.pathname)
             # parse information and create self.info dict{}
             self.parse_file_info(event)
             if len(self.info) > 0:
@@ -126,9 +127,14 @@ class EventHandler(ProcessEvent):
         Message is sent, if a matching filepattern is found.
         '''
         try:
-            self.info = self.file_parser.parse(event.pathname)
+            LOGGER.debug("filter: %s\t event: %s",
+                         self.file_parser.fmt, event.pathname)
+            self.info = self.file_parser.parse(
+                os.path.basename(event.pathname))
+            LOGGER.debug("Extracted: %s", str(self.info))
         except ValueError:
             # Filename didn't match pattern, so empty the info dict
+            LOGGER.info("Couldn't extract any usefull information")
             self.info = {}
         else:
             self.info['uri'] = event.pathname
