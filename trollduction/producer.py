@@ -251,7 +251,7 @@ class DataProcessor(object):
                                       time_slot=time_slot,
                                       orbit=str(mda['orbit_number']),
                                       variant=mda.get('variant', ''))
-
+        LOGGER.debug("Creating scene for satellite %s", str(platform))
         if mda['orbit_number'] is not None:
             global_data.overpass = Pass(platform,
                                         mda['start_time'],
@@ -336,11 +336,14 @@ class DataProcessor(object):
             skip = []
 
             for area_item in group.data:
-                if not covers(self.global_data.overpass, area_item):
-                    skip.append(area_item)
-                    continue
-                else:
-                    skip_group = False
+                try:
+                    if not covers(self.global_data.overpass, area_item):
+                        skip.append(area_item)
+                        continue
+                    else:
+                        skip_group = False
+                except AttributeError:
+                    LOGGER.debug("Couldn't compute coverage, running anyway")
                 for product in area_item:
                     products.append(product)
             if not products:
