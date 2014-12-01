@@ -44,7 +44,7 @@ Optional configuration keys:
 
 The field lengths of *filepattern* can, and should when possible, be given::
 
-{path}hrpt_{platform:4s}{satnumber:2d}_{time:%Y%m%d_%H%M}_{orbit:05d}.l1b
+ {path}hrpt_{platform:4s}{satnumber:2d}_{time:%Y%m%d_%H%M}_{orbit:05d}.l1b
 
 Here *path* holds everything that comes before "hrpt\_", *platform* is a character string of length 4, *satnumber* is a two-digit number, *time* has year, month and day followed by an underscore and hour and minutes, and *orbit* is a zero-padded number with five digits.
 
@@ -56,6 +56,82 @@ Product configuration file(s)
 -----------------------------
 .. _product:
 
+.. code-block:: xml
+
+ <?xml version='1.0' encoding='UTF-8'?>
+ <?xml-stylesheet type="text/xsl" href="prodlist2.xsl"?>
+ <product_config>
+
+   <common>
+     <output_dir>/tmp</output_dir>
+     <unload>False</unload>
+   </common>
+
+   <aliases>
+     <platform_name src="Metop-A" dst="metop02" />
+     <platform_name src="Metop-B" dst="metop01" />
+     <platform_name src="NOAA-15" dst="noaa15" />
+     <platform_name src="NOAA-18" dst="noaa18" />
+     <platform_name src="NOAA-19" dst="noaa19" />
+     <platform_name src="EOS-Terra" dst="terra" />
+     <platform_name src="EOS-Aqua" dst="aqua" />
+     <platform_name src="Suomi-NPP" dst="npp" />
+   </aliases>
+
+   <variables>
+     <output_dir id="path0">/local_disk/data/out/sir</output_dir>
+     <output_dir id="path1">/local_disk/data/out/sir</output_dir>
+     <output_dir id="path2">/local_disk/data/out/rgb</output_dir>
+     <overlay id="black">#000000</overlay>
+     <overlay id="white">#ffffff</overlay>
+   </variables>
+
+
+   <groups>
+     <group id="africa">afhorn,mali</group>
+     <group id="asia">afghanistan</group>
+     <group id="eport">eport</group>
+     <group id="highres" unload="True" resolution="250">baws250</group>
+   </groups>
+
+   <product_list>
+     <area id="afghanistan" name="afghanistan" min_coverage="25">
+       <product id="cloudtop" name="cloudtop">
+         <file output_dir="path0">pps_cltpafghan__{nominal_time:%y%m%d%H%M}.png</file>
+         <file output_dir="path1" format="png">pps_cltpafghan__{nominal_time:%y%m%d%H%M}.png_original</file>
+         <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_rgb_{productname}.png</file>
+       </product>
+       <product id="green_snow" name="green_snow">
+         <file output_dir="path0">pps_snopafghan__{nominal_time:%y%m%d%H%M}.png</file>
+         <file output_dir="path1" format="png">pps_snopafghan__{nominal_time:%y%m%d%H%M}.png_original</file>
+         <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_rgb_greensnow.png</file>
+       </product>
+       <product id="ir108" name="ir108">
+         <file output_dir="path0">pps_ir4pafghan__{nominal_time:%y%m%d%H%M}.png</file>
+         <file output_dir="path1" format="png">pps_ir4pafghan__{nominal_time:%y%m%d%H%M}.png_original</file>
+         <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_bw_ir4.png</file>
+       </product>
+       <product id="overview" name="overview">
+         <file output_dir="path0">pps_ovwpafghan__{nominal_time:%y%m%d%H%M}.png</file>
+         <file output_dir="path1" format="png">pps_ovwpafghan__{nominal_time:%y%m%d%H%M}.png_original</file>
+         <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_rgb_{productname}.png</file>
+       </product>
+     </area>
+     <area id="afhorn" name="afhorn" min_coverage="25">
+       <product id="ir108" name="ir108">
+         <file output_dir="path0">pps_ir4p{areaname:_&lt;8}{nominal_time:%y%m%d%H%M}.png</file>
+         <file output_dir="path1" format="png">pps_ir4p{areaname:_&lt;8}{nominal_time:%y%m%d%H%M}.png_original</file>
+         <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_{areaname}_bw_ir4.png</file>
+       </product>
+       <product id="overview" name="overview">
+         <file output_dir="path0">pps_ovwp{areaname:_&lt;8}{nominal_time:%y%m%d%H%M}.png</file>
+         <file output_dir="path1" format="png">pps_ovwp{areaname:_&lt;8}{nominal_time:%y%m%d%H%M}.png_original</file>
+         <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_{areaname}_rgb_{productname}.png</file>
+       </product>
+     </area>
+   </product_list>
+ </product_config>
+
 Two examples for product configuration are supplied in *trollduction/examples/* directory:
 
 * *product_config_hrpt.xml_template* for NOAA/AVHRR
@@ -63,27 +139,43 @@ Two examples for product configuration are supplied in *trollduction/examples/* 
 
 These files describe, in XML format, which image composites are made. Use these as a starting point for your own configuration, and save the file to the place set in your *master_config.ini* (without the *_template* ending!). The different parts and tags of the product configuration file are explained below. Notice that also *all* the corresponding closing tag is required (eg. *</common>*), and the file needs to be valid XML.
 
-The first part, *<common>*, can be used to give default values that are used, if not overridden, by all the *<product>* definitions. Also, by defining *<netcdf_file>* in this section, the data in original satellite projection will be saved in netCDF4 format to the given filename.
+The first part, *<common>*, can be used to give default values that are used, if not overridden, by all the *<product>* definitions.
 
-The next layer of the product configuration is the *<area>*, which holds the following items:
+The second part is *<aliases>* and contains the substitutions to perform in the file patterns (from *src* to *dst*)
 
-* *<name>* --- replaces the *{areaname}* tag in the file name template
-* *<definition>* --- the name of the area/projection definition given in mpop areas.def file
-* *<product>* --- holds the details of each product to be generated for this area
+The third part is *<variables>* which holds the substitutions for the tag attributes.
 
+The fourth part is the *<groups>* defining the area to group for processing. This means for example that the data will be loaded for the whole group (cutting at the area definition boundaries if supported). Setting th *unload* attribute to "true" provokes the unloading of the data before and after processing the group.
+
+The next part is the *<product_list>* which contains the list of products and areas to work on.
+
+The next layer of the product configuration is the *<area>*, which holds the following attributes:
+
+* *name* --- replaces the *{areaname}* tag in the file name template
+* *id* --- the name of the area/projection definition given in mpop areas.def file
+
+The following layer is the *<product>* details to be produced in the area.
 The *<product>* section is given for each product. These values override the defaults given (if any) in the *<common>* section.
 
-Required definitions within *<product>*:
+Required attributes within *<product>*:
 
-* *<composite>* --- name of the function (from *mpop.image*) that produces the product
-* *<name>* --- user-defined name for the composite, this will replace the *{composite}* tag in the file name pattern
-* *<filename>* --- file name pattern to be used for saving the image. See example filename pattern at the end of the Master config section above. Optional, if the filename pattern is given in *<common>* section
+* *id* --- name of the function (from *mpop.image*) that produces the product
+* *name* --- user-defined name for the composite, this will replace the *{productname}* tag in the file name pattern
 
-Optional definitions:
 
-* *<netcdf_file>* --- save the resampled data to the given filename (pattern)
-* *<sunzen_day_maximum>* --- Sun zenith angle, can be used to limit the product to be generated only during sufficient lighting
-* *<sunzen_night_minimum>* --- Sun zenith angle, can be used to limit the product to be generated only during sufficient darkness
-* *<sunzen_lonlat>* --- comma-ceperated longitude and latitude values that can be used to define the location where Sun zenith angle values are checked. Only effective if either *<sunzen_day_maximum>* or *<sunzen_night_minimum>* is given.
-* *<sunzen_xy_loc>* --- comma-ceperated x- and y-pixel coordinates that can be used to define the location where Sun zenith angle values are checked. Only effective if either *<sunzen_day_maximum>* or *<sunzen_night_minimum>* is given. Faster option for *<sunzen_lonlat>*, but needs to be determined separately for each area.
+The final layer is the *<file>* tag which holds information of the file to be saved. It can have the following attributes:
+
+* *output_dir* --- the destination directory
+* *format* --- the file format to use. This is optional, but if the file format cannot be easily guessed from the file extension, it's good to write it here.
+* *overlay* --- the color of the overlay to put on the image
+* *thumbnail_size* and *thumbnail_name* --- the size and filename of the thumbnail to produce. The thumbnail will be written in the same directory as the image
+* The text of this *<file>* item is the filename pattern to use.
+* *sunzen_day_maximum* --- Sun zenith angle, can be used to limit the product to be generated only during sufficient lighting
+* *sunzen_night_minimum* --- Sun zenith angle, can be used to limit the product to be generated only during sufficient darkness
+* *sunzen_lonlat* --- comma-ceperated longitude and latitude values that can be used to define the location where Sun zenith angle values are checked. Only effective if either *sunzen_day_maximum* or *sunzen_night_minimum* is given.
+* *sunzen_xy_loc* --- comma-ceperated x- and y-pixel coordinates that can be used to define the location where Sun zenith angle values are checked. Only effective if either *sunzen_day_maximum* or *sunzen_night_minimum* is given. Faster option for *sunzen_lonlat*, but needs to be determined separately for each area.
+
+Data dumps
+~~~~~~~~~~
+An alternative to the *<product>* tag is the *<dump>* tag that saves the resampled data to the given filename (pattern). It can also be inserted at the previous layer to do a data dump of the unprojected data.
 
