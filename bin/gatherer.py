@@ -45,13 +45,17 @@ def get_metadata(fname):
     for section in config.sections():
         if section == "default":
             continue
-        parser = Parser(config.get(section, "pattern"))
+        try:
+            parser = Parser(config.get(section, "pattern"))
+        except NoOptionError:
+            continue
         if not parser.validate(fname):
             continue
         res = parser.parse(fname)
         res.update(dict(config.items(section)))
-        del res["pattern"]
-        del res["timeliness"]
+
+        for key in ["watcher", "pattern", "timeliness"]:
+            res.pop(key, None)
 
         if "duration" in res and "end_time" not in res:
             res["end_time"] = (res["start_time"] +
@@ -171,11 +175,20 @@ if __name__ == '__main__':
 
         try:
             pattern = config.get(section, "pattern")
+            try:
+                observer_class = config.get(section, "watcher")
+            except NoOptionError:
+                observer_class = None
+            logger.debug("Using watchdog for %s", section)
             parser = Parser(pattern)
 
             granule_trigger = trigger.WatchDogTrigger(collectors, terminator,
-                                                      decoder, [parser.globify()])
+                                                      decoder,
+                                                      [parser.globify()],
+                                                      observer_class)
+
         except NoOptionError:
+            logger.debug("Using posttroll for %s", section)
             granule_trigger = trigger.PostTrollTrigger(
                 collectors, terminator,
                 config.get(section, 'service').split(','),
