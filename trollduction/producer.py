@@ -58,9 +58,11 @@ from posttroll.publisher import Publish
 from posttroll.message import Message
 from pyresample.utils import AreaNotFound
 from trollsched.satpass import Pass
+from trollsched.boundary import Boundary, AreaDefBoundary
 import errno
 import netifaces
 
+from xml.etree.ElementTree import tostring
 LOGGER = logging.getLogger(__name__)
 
 # Config watcher stuff
@@ -200,6 +202,135 @@ def covers(overpass, area_item):
     return True
 
 
+def get_polygons_positions(datas, frequency=1):
+
+    mask = None
+    for data in datas:
+        if mask is None:
+            mask = data.mask
+        else:
+            mask = np.logical_or(mask, data.mask)
+
+    polygons = []
+    polygon_left = []
+    polygon_right = []
+    count = 0
+    last_valid_line = None
+    for line in range(mask.shape[0]):
+        if np.any(1 - mask[line, :]):
+            indices = np.nonzero(1 - mask[line, :])[0]
+
+            if last_valid_line is not None and last_valid_line != line - 1:
+                # close the polygon and start a new one.
+                last_indices = np.nonzero(1 - mask[last_valid_line, :])[0]
+                if count % frequency != 0:
+                    polygon_right.append((last_valid_line, last_indices[-1]))
+                    polygon_left.append((last_valid_line, last_indices[0]))
+                for indice in last_indices[1:-1:frequency]:
+                    polygon_left.append((last_valid_line, indice))
+                polygon_left.reverse()
+                polygons.append(polygon_left + polygon_right)
+                polygon_left = []
+                polygon_right = []
+                count = 0
+
+                for indice in indices[1::frequency]:
+                    polygon_right.append((line, indice))
+                polygon_left.append((line, indices[0]))
+
+            elif count % frequency == 0:
+                polygon_left.append((line, indices[0]))
+                polygon_right.append((line, indices[-1]))
+            count += 1
+            last_valid_line = line
+
+    if (count - 1) % frequency != 0 and last_valid_line is not None:
+        polygon_left.append((last_valid_line, indices[0]))
+        polygon_right.append((last_valid_line, indices[-1]))
+
+    polygon_left.reverse()
+    result = polygon_left + polygon_right
+    if result:
+        polygons.append(result)
+
+    return polygons
+
+
+def get_polygons(datas, area, frequency=1):
+    polygons = get_polygons_positions(datas, frequency)
+
+    llpolygons = []
+    for poly in polygons:
+        lons = []
+        lats = []
+        for line, col in poly:
+            lon, lat = area.get_lonlat(line, col)
+            lons.append(lon)
+            lats.append(lat)
+        lons = np.array(lons)
+        lats = np.array(lats)
+        llpolygons.append(Boundary(lons, lats))
+
+    return llpolygons
+
+
+def coverage(scene, area):
+
+    shapes = set()
+    for channel in scene.channels:
+        if channel.is_loaded():
+            shapes.add(channel.shape)
+
+    coverages = []
+
+    from trollsched.satpass import Mapper
+
+    for shape in shapes:
+
+        datas = []
+        areas = []
+        for channel in scene.channels:
+            if channel.is_loaded() and channel.shape == shape:
+                datas.append(channel.data)
+                areas.append(channel.area)
+
+        disk_polys = [poly.contour_poly
+                      for poly
+                      in get_polygons(datas, areas[0], frequency=100)]
+
+        area_poly = AreaDefBoundary(area, frequency=100).contour_poly
+
+        inter_area = 0
+
+        for poly in disk_polys:
+            inter = poly.intersection(area_poly)
+            if inter is not None:
+                inter_area += inter.area()
+
+        coverages.append(inter_area / area_poly.area())
+    try:
+        return min(*coverages)
+    except TypeError:
+        return coverages[0]
+
+
+def generic_covers(scene, area_item):
+    area_def = get_area_def(area_item.attrib['id'])
+    min_coverage = float(
+        area_item.attrib.get('min_coverage', 0))
+    min_coverage /= 100.0
+    cov = coverage(scene, area_def)
+    if cov <= min_coverage:
+        LOGGER.info("Coverage too small %.1f%% (out of %.1f%%) with %s",
+                    cov * 100, min_coverage * 100,
+                    area_item.attrib['name'])
+        return False
+    else:
+        LOGGER.info("Coverage %.1f%% with %s",
+                    cov * 100, area_item.attrib['name'])
+        return True
+
+
 class DataProcessor(object):
 
     """Process the data.
@@ -249,10 +380,10 @@ class DataProcessor(object):
                                       satnumber='',
                                       instrument=str(sensor),
                                       time_slot=time_slot,
-                                      orbit=str(mda['orbit_number']),
+                                      orbit=mda['orbit_number'],
                                       variant=mda.get('variant', ''))
         LOGGER.debug("Creating scene for satellite %s", str(platform))
-        if mda['orbit_number'] is not None:
+        if mda['orbit_number'] is not None or mda.get('orbit_type') == "polar":
             global_data.overpass = Pass(platform,
                                         mda['start_time'],
                                         mda['end_time'],
@@ -331,9 +462,12 @@ class DataProcessor(object):
                                     self.get_parameters(area_item))
 
         for group in self.product_config.groups:
+            LOGGER.debug("processing %s", str(group))
             area_def_names = self.get_area_def_names(group.data)
             products = []
             skip = []
+            skip_group = True
+            do_generic_coverage = False
 
             for area_item in group.data:
                 try:
@@ -343,10 +477,13 @@ class DataProcessor(object):
                     else:
                         skip_group = False
                 except AttributeError:
-                    LOGGER.debug("Couldn't compute coverage, running anyway")
+                    LOGGER.exception(
+                        "Can't compute coverage from unloaded data, continuing")
+                    do_generic_coverage = True
+                    skip_group = False
                 for product in area_item:
                     products.append(product)
-            if not products:
+            if not products or skip_group:
                 continue
 
             if group.get("unload", "").lower() in ["yes", "true", "1"]:
@@ -378,6 +515,10 @@ class DataProcessor(object):
             for area_item in group.data:
                 if area_item in skip:
                     continue
+                elif (do_generic_coverage and
+                      not generic_covers(self.global_data, area_item)):
+                    continue
+
                 # reproject to local domain
                 LOGGER.debug(
                     "Projecting data to area " + area_item.attrib['name'])
@@ -515,7 +656,6 @@ class DataProcessor(object):
         '''
 
         params = self.get_parameters(area)
-
         # Create images for each color composite
         for product in area:
             params.update(self.get_parameters(product))
@@ -781,8 +921,8 @@ class DataWriter(Thread):
                 try:
                     obj, file_items, params = self.prod_queue.get(True, 1)
                 except Queue.Empty:
-                    pass
-                else:
+                    continue
+                try:
                     # Sort the file items in categories, to allow copying
                     # similar ones.
                     sorted_items = {}
@@ -846,6 +986,12 @@ class DataWriter(Thread):
                                                   fname, params)
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
+                except:
+                    LOGGER.exception("Something wrong happened saving %s to %s",
+                                     str(obj),
+                                     str([tostring(item)
+                                          for item in file_items]))
+                finally:
                     self.prod_queue.task_done()
 
     def write(self, obj, item, params):
@@ -938,7 +1084,7 @@ class Trollduction(object):
 
         # add checks, or do we just assume the config to be valid at
         # this point?
-        #self.product_config = product_config
+        # self.product_config = product_config
         if self.td_config['product_config_file'] != fname:
             self.td_config['product_config_file'] = fname
 

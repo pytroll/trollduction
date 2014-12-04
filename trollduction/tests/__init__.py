@@ -26,7 +26,7 @@
 #from trollduction.tests import test_listener
 import unittest
 import doctest
-from trollduction.tests import test_trollduction, test_xml_read, test_scisys, test_trigger
+from trollduction.tests import test_trollduction, test_xml_read, test_scisys, test_trigger, test_producer
 
 
 def suite():
@@ -40,5 +40,6 @@ def suite():
     mysuite.addTests(test_xml_read.suite())
     mysuite.addTests(test_scisys.suite())
     mysuite.addTests(test_trigger.suite())
+    mysuite.addTests(test_producer.suite())
 
     return mysuite
