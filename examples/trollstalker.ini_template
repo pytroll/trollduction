@@ -1,0 +1,37 @@
+
+# This config is used in Trollduction.  Both trollstalker.py and
+# l2processor.py will read their configurations from here.
+
+[noaa_hrpt]
+# posttroll message topc that provides information on new files
+# used in trollstalker and trollduction
+topics=/HRPT/L1b/dev/hki,/EPS/1b/dev/nkp
+# input directory that trollstalker watches
+directory=/home/lahtinep/data/satellite/new/
+# filepattern of the input files for trollstalker
+filepattern={path}hrpt_{platform:4s}{satnumber:2d}_{time:%Y%m%d_%H%M}_{orbit_number:05d}.l1b
+# instrument name for mpop
+instrument=avhrr
+# products that will be made
+product_config_file=/home/lahtinep/Software/pytroll/mpop_etc/product_config_hrpt.xml
+# logging config for trollstalker
+stalker_log_config=/home/lahtinep/Software/pytroll/mpop_etc/stalker_logging.ini
+# logging config for trollduction
+td_log_config=/home/lahtinep/Software/pytroll/mpop_etc/td_logging.ini
+# inotify events that trigger trollstalker to send messages
+event_names=IN_CLOSE_WRITE,IN_MOVED_TO
+# port to send the posttroll messages to, optional so use "0"
+posttroll_port=0
+# Timezone to use for logging. If not given, defaults to UTC
+timezone=UTC
+
+[msg_hrit]
+topic=/HRIT/L1.5/dev/hki
+directory=/home/lahtinep/data/satellite/new/
+filepattern={path}H-000-{platform_name:4s}__-{platform_name:4s}________-_________-EPI______-{nominal_time:%Y%m%d%H%M}-__
+instruments=seviri
+stalker_log_config=/home/lahtinep/Software/pytroll/mpop_etc/stalker_logging.ini
+alias_platform_name=MSG1:Meteosat-8|MSG2:Meteosat-9|MSG3:Meteosat-10|MSG4:Meteosat-11
+event_names=IN_CLOSE_WRITE,IN_MOVED_TO
+posttroll_port=0
+timezone=UTC

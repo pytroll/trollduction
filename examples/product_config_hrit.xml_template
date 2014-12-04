@@ -1,42 +1,48 @@
-<?xml version="1.0" encoding='utf-8'?>
-
-<!-- This config is used by Trollduction.-->
-
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="prodlist2.xsl"?>
 <product_config>
-    <common>
-        <!-- calibrated, satellite projection -->
-        <!--netcdf_file>%Y%m%d_%H%M_%(satellite)_full_disc.nc</netcdf_file-->
-        <output_dir>/tmp</output_dir>
-    </common>
 
-     <area>
-        <!-- Area name to filename -->
-        <name>Europe_large</name>
-        <!-- pytroll area definition name -->
-        <definition>eurol</definition>
-        <!-- First product definition -->
-        <product>
-            <composite>overview</composite>
-	        <name>overview</name>
-	        <output_dir>/tmp</output_dir>
-            <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
-            <!-- Generate this product only if the Sun is above the
-                 horizon at the defined longitude/latitude-->
-            <sunzen_night_minimum></sunzen_night_minimum>
-            <sunzen_day_maximum>90</sunzen_day_maximum>
-	        <sunzen_xy_loc></sunzen_xy_loc>
-	        <sunzen_lonlat>25,60</sunzen_lonlat>
-        </product>
+  <common>
+    <output_dir>/tmp</output_dir>
+    <unload>False</unload>
+  </common>
 
-        <product>
-            <composite>airmass</composite>
-	        <name>airmass</name>
-	        <output_dir>/tmp</output_dir>
-            <filename>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</filename>
-            <sunzen_night_minimum></sunzen_night_minimum>
-            <sunzen_day_maximum></sunzen_day_maximum>
-	        <sunzen_xy_loc></sunzen_xy_loc>
-	        <sunzen_lonlat></sunzen_lonlat>
-        </product>
-     </area>
+  <variables>
+    <overlay id="black">#000000</overlay>
+    <overlay id="white">#ffffff</overlay>
+  </variables>
+
+
+  <groups>
+    <group id="africa">afhorn,mali</group>
+    <group id="asia">afghanistan</group>
+    <group id="eport">eport</group>
+    <group id="highres" unload="True" resolution="250">baws250</group>
+  </groups>
+
+  <product_list>
+    <area id="eurol" name="eurol" min_coverage="25">
+      <product id="cloudtop" name="cloudtop">
+        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_rgb_{productname}.png</file>
+      </product>
+      <product id="green_snow" name="green_snow">
+        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_rgb_greensnow.png</file>
+      </product>
+      <product id="ir108" name="ir108">
+        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_bw_ir4.png</file>
+      </product>
+      <product id="overview" name="overview">
+        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_rgb_{productname}.png</file>
+      </product>
+    </area>
+    <area id="euro4" name="euro4" min_coverage="25">
+      <product id="ir108" name="ir108">
+        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_{areaname}_bw_ir4.png</file>
+      </product>
+      <product id="overview" name="overview">
+        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_{areaname}_rgb_{productname}.png</file>
+      </product>
+    </area>
+  </product_list>
 </product_config>
+
