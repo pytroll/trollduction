@@ -948,10 +948,11 @@ class DataWriter(Thread):
                                                             params[key])
                     for item, copies in sorted_items.items():
                         attrib = dict(item)
-                        if attrib.get("overlay", "").lower() == "true":
-                            obj.add_overlay()
-                        elif attrib.get("overlay", "").startswith("#"):
+                        if attrib.get("overlay", "").startswith("#"):
                             obj.add_overlay(hash_color(attrib.get("overlay")))
+                        elif len(attrib.get("overlay", "")) > 0:
+                            LOGGER.debug("Adding overlay from config file")
+                            obj.add_overlay_config(attrib["overlay"])
                         fformat = attrib.get("format")
 
                         # Actually save the data to disk.
