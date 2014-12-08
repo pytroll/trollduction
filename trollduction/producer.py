@@ -873,7 +873,7 @@ def link_or_copy(src, dst):
         os.link(src, dst)
     except OSError as err:
         if err.errno not in [errno.EXDEV]:
-            LOGGER.exception("Could not link!")
+            LOGGER.exception("Could not link: %s -> %s", src, dst)
             return
         try:
             shutil.copy(src, dst)
