@@ -19,32 +19,34 @@ Setting things up cheat sheet
 1. Install other required packages
     * mpop_ - select *pre-master* branch
     * pyresample_
-    * posttroll_ - select *feature_service* branch
+    * posttroll_ - select *develop* branch
     * pyorbital_
     * trollsift_
     * python-pyinotify
-    * trollduction_ - select *develop* branch
+    * trollduction_ - select *feature-aapp-and-npp* branch
+    * pytroll-schedule_ - select *develop* branch
 #. Configure mpop
     * modify *mpop.cfg* to suit your needs
     * add configurations for satellites you are going to use
-#. Create Trollduction configuration file
-    * use *examples/master_config.ini_template* as a template
+#. Create Trollduction configuration files
+    * use *examples/trollstalker_config.ini_template* as a template
+    * use *examples/l2processor_config.ini_template* as a template
     * save config file to your chosen place without the *_template* ending
 #. Create Trollduction product configuration file
     * use *trollduction/examples/product_config_hrpt.xml_template* or *trollduction/examples/product_config_hrpt.xml_template* as a template
-    * save the file to the path defined in your *master_config.ini* without the *_template* ending
+    * save the file to the path defined in your *l2processor_config.ini* without the *_template* ending
 #. Create logging configurations for *trollduction* and *trollstalker*
     * use *trollduction/examples/td_logging.ini_template* and *trollduction/examples/stalker_logging.ini_tempalate* as templates
     * check the log filename (by default logs go to */tmp/* directory)
-    * save these configs to the path defined in you *master_config.ini* without the *_template* ending
+    * save these configs to the path defined in you *l2processor_config.ini* and *trollstalker_config.ini* without the *_template* ending
 #. Start *posttroll/bin/nameserver*
-    * this will relay the messages sent in the network
+    * this will register the different components on the network
     * *./nameserver*
 #. Start *trollduction/bin/trollstalker.py*
     * file watcher that sends messages of new files available for processing
-    * for example: *./trollstalker.py -c /path/to/master_config.ini -C noaa_hrpt*
+    * for example: *./trollstalker.py -c /path/to/trollstalker_config.ini -C noaa_hrpt*
 #. Start Trollduction *trollduction/bin/l2processor.py*
-    * *./l2processor.py -c /path/to/master_config.ini -C noaa_hrpt*
+    * *./l2processor.py -c /path/to/l2processor_config.ini -C noaa_hrpt*
     * this should print your configuration and stop to wait for new
       messages
 #. Copy a suitable file to your data input directory
@@ -54,6 +56,7 @@ Setting things up cheat sheet
 .. _pyresample: https://code.google.com/p/pyresample/
 .. _posttroll: https://github.com/mraspaud/posttroll
 .. _pyorbital: https://github.com/mraspaud/pyorbital
+.. _pytroll-schedule: https://github.com/mraspaud/pytroll-schedule
 .. _trollsift: https://github.com/pnuu/trollsift
 .. _trollduction: https://github.com/mraspaud/trollduction
 

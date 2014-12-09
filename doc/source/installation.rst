@@ -13,7 +13,7 @@ You need to have the following packages, and their requirements, installed befor
 
 * mpop_ - select *pre-master* branch
 * pyresample_
-* posttroll_ - select *feature_service* branch
+* posttroll_
 * pyorbital_
 * trollsift_
 * python-pyinotify
