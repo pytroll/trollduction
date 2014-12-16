@@ -141,7 +141,7 @@ def get_outputfiles(path, satid, orb):
     from glob import glob
     matchstr = (os.path.join(path, 'S_NWC') + '*' +
                 str(METOP_NAME_LETTER.get(satid, satid)) +
-                '_' + str(orb) + '*.nc')
+                '_' + str(orb) + '*.h5')
     LOG.debug(
         "Match string to do a file globbing on output files: " + str(matchstr))
     return glob(matchstr)
