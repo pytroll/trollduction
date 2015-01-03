@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2014
+# Copyright (c) 2014, 2015
 #
 # Author(s):
 #
@@ -696,8 +696,8 @@ class DataProcessor(object):
 
             try:
                 # Check if this combination is defined
-                LOGGER.debug("Generating %s", product.attrib['id'])
                 func = getattr(self.local_data.image, product.attrib['id'])
+                LOGGER.debug("Generating %s", product.attrib['id'])
                 img = func()
                 img.info.update(self.global_data.info)
                 img.info["product_name"] = product.attrib.get("name",
@@ -988,6 +988,9 @@ class DataWriter(Thread):
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
                 except:
+                    if "thumbnail_size" in item.attrib:
+                        item.attrib["thumbnail_size"] = str(
+                            item.attrib["thumbnail_size"])
                     LOGGER.exception("Something wrong happened saving %s to %s",
                                      str(obj),
                                      str([tostring(item)
