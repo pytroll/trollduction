@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -545,7 +545,7 @@ def aapp_rolling_runner():
 
     aapp_proc = AappLvl1Processor()
 
-    with posttroll.subscriber.Subscribe('receiver', ['HRPT/0', 'EPS/0'], True) as subscr:
+    with posttroll.subscriber.Subscribe('', ['HRPT/0', 'EPS/0'], True) as subscr:
         with Publish('aapp_runner', 0) as publisher:
             while True:
                 aapp_proc.initialise()
