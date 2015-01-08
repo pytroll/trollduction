@@ -136,8 +136,8 @@ def overlapping_timeinterval(start_end_times, timelist):
 
     starttime, endtime = start_end_times
     for tstart, tend in timelist:
-        if ((starttime > tstart and starttime < tend) or
-                (endtime > tstart and endtime < tend)):
+        if ((starttime >= tstart and starttime < tend) or
+                (endtime > tstart and endtime <= tend)):
             return tstart, tend
 
     return False
@@ -330,10 +330,14 @@ class AappLvl1Processor(object):
             status = overlapping_timeinterval((self.starttime, self.endtime),
                                               self.job_register[keyname])
             if status:
-                LOG.debug("Processing of scene " + keyname +
-                          " " + str(status[0]) + " " + str(status[1]) +
-                          " with overlapping time have been launched previously")
+                LOG.warning("Processing of scene " + keyname +
+                            " " + str(status[0]) + " " + str(status[1]) +
+                            " with overlapping time have been launched previously")
+                LOG.info("Skip it...")
                 return True
+            else:
+                LOG.debug(
+                    "No overlap with any recently processed scenes...")
 
         scene_id = (str(self.platform_name) + '_' +
                     self.starttime.strftime('%Y%m%d%H%M%S') +
