@@ -320,6 +320,9 @@ class AappLvl1Processor(object):
 
         year = self.starttime.year
         keyname = str(self.platform_name)
+        LOG.debug("Keyname = " + str(keyname))
+        LOG.debug("Start: job register = " + str(self.job_register))
+
         # Use sat id, start and end time as the unique identifier of the scene!
         if keyname in self.job_register and len(self.job_register[keyname]) > 0:
             # Go through list of start,end time tuples and see if the current
@@ -339,6 +342,7 @@ class AappLvl1Processor(object):
 
         # Check for keys representing the same scene (slightly different
         # start/end times):
+        LOG.debug("Level-0files = " + str(self.level0files))
         for key in self.level0files:
             pltrfn, startt, endt = key.split('_')
             if not self.platform_name == pltrfn:
@@ -368,10 +372,15 @@ class AappLvl1Processor(object):
             LOG.info("File is not a hmf file, " +
                      "probably a Metop file or a NOAA from DMI: " + str(fname))
 
+        LOG.debug("Sensor = " + str(msg.data['sensor']))
+        LOG.debug("type:" + type(msg.data['sensor']))
         if type(msg.data['sensor']) is str:
             sensors = [msg.data['sensor']]
         elif type(msg.data['sensor']) is list:
             sensors = msg.data['sensor']
+        else:
+            sensors = []
+            LOG.warning('Failed interpreting sensor(s)!')
 
         LOG.info("Sensor(s): " + str(sensors))
         sensor_ok = False
@@ -505,6 +514,7 @@ class AappLvl1Processor(object):
             self.job_register[keyname] = []
 
         self.job_register[keyname].append((self.starttime, self.endtime))
+        LOG.debug("End: job register = " + str(self.job_register))
 
         # Block any future run on this scene for x (e.g. 10) minutes from now
         t__ = threading.Timer(
@@ -512,6 +522,8 @@ class AappLvl1Processor(object):
                                                  str(self.platform_name),
                                                  (self.starttime, self.endtime)))
         t__.start()
+
+        LOG.debug("After timer call: job register = " + str(self.job_register))
 
         self.result_files = get_aapp_lvl1_files(
             self.working_dir, msg.data['platform_name'])
