@@ -363,18 +363,30 @@ class AappLvl1Processor(object):
 
         if fname.find('.hmf') > 0:
             self.ishmf = True
+        else:
+            LOG.info("File is not a hmf file, " +
+                     "probably a Metop file or a NOAA from DMI: " + str(fname))
 
-        if self.platform_name in SUPPORTED_METOP_SATELLITES:
-            sensor = msg.data['sensor']
-            if sensor not in SENSOR_NAMES:
-                LOG.debug(
-                    str(msg.data['sensor']) + '... Not a required sensor')
-                return True
+        if type(msg.data['sensor']) is str:
+            sensors = [msg.data['sensor']]
+        elif type(msg.data['sensor']) is list:
+            sensors = msg.data['sensor']
 
-            if keyname not in self.level0files:
-                LOG.debug("Reset level0files: keyname = " + str(keyname))
-                self.level0files[keyname] = []
+        LOG.info("Sensor(s): " + str(sensors))
+        sensor_ok = False
+        for sensor in sensors:
+            if sensor in SENSOR_NAMES:
+                sensor_ok = True
+                break
+        if not sensor_ok:
+            LOG.info("No required sensors....")
+            return True
 
+        if keyname not in self.level0files:
+            LOG.debug("Reset level0files: keyname = " + str(keyname))
+            self.level0files[keyname] = []
+
+        for sensor in sensors:
             item = (self.level0_filename, sensor)
             if item not in self.level0files[keyname]:
                 self.level0files[keyname].append(item)
@@ -382,14 +394,14 @@ class AappLvl1Processor(object):
             else:
                 LOG.debug("item already in list: " + str(item))
 
-            if len(self.level0files[keyname]) < 4:
-                LOG.info("Not enough sensor data available yet. " +
-                         "Level-0files = " +
-                         str(self.level0files[keyname]))
-                return True
-            else:
-                LOG.info(
-                    "Level 0 files ready: " + str(self.level0files[keyname]))
+        if len(self.level0files[keyname]) < 4:
+            LOG.info("Not enough sensor data available yet. " +
+                     "Level-0files = " +
+                     str(self.level0files[keyname]))
+            return True
+        else:
+            LOG.info(
+                "Level 0 files ready: " + str(self.level0files[keyname]))
 
         if not self.working_dir:
             try:
@@ -408,21 +420,9 @@ class AappLvl1Processor(object):
         for envkey in my_env:
             LOG.debug("ENV: " + str(envkey) + " " + str(my_env[envkey]))
 
-        if (self.platform_name not in SUPPORTED_NOAA_SATELLITES and
-                self.platform_name not in SUPPORTED_METOP_SATELLITES):
-            LOG.warning("Satellite platform not NOAA or Metop!")
-            return True
-
         if self.platform_name in SUPPORTED_NOAA_SATELLITES:
             LOG.info("This is a NOAA scene. Start the NOAA processing!")
             LOG.info("Process the file %s" % self.level0_filename)
-
-            # Add to job register to avoid this to be run again
-            keyname = str(self.platform_name)
-            if keyname not in self.job_register.keys():
-                self.job_register[keyname] = []
-
-            self.job_register[keyname].append((self.starttime, self.endtime))
 
             cmdseq = (NOAA_RUN_SCRIPT + ' -Y ' + str(year) + ' ' +
                       self.level0_filename)
@@ -446,13 +446,6 @@ class AappLvl1Processor(object):
                 if instr not in SENSOR_NAMES:
                     LOG.error("Sensor name mismatch! name = " + str(instr))
                     return True
-
-            # Add to job register to avoid this to be run again
-            keyname = str(self.platform_name)
-            if keyname not in self.job_register.keys():
-                self.job_register[keyname] = []
-
-            self.job_register[keyname].append((self.starttime, self.endtime))
 
             cmdstr = "%s -d %s -a %s -u %s -m %s -h %s -o %s" % (METOP_RUN_SCRIPT,
                                                                  METOP_IN_DIR,
@@ -505,6 +498,13 @@ class AappLvl1Processor(object):
             "Ready with AAPP level-1 processing on NOAA scene: " + str(fname))
         LOG.info(
             "working dir: self.working_dir = " + str(self.working_dir))
+
+        # Add to job register to avoid this to be run again
+        keyname = str(self.platform_name)
+        if keyname not in self.job_register.keys():
+            self.job_register[keyname] = []
+
+        self.job_register[keyname].append((self.starttime, self.endtime))
 
         # Block any future run on this scene for x (e.g. 10) minutes from now
         t__ = threading.Timer(

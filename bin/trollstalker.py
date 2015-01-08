@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014
+# Copyright (c) 2013, 2014, 2015
 
 # Author(s):
 
@@ -77,7 +77,7 @@ class EventHandler(ProcessEvent):
     def process_IN_CLOSE_WRITE(self, event):
         """When a file is closed, process the associated event.
         """
-        LOGGER.debug("trigger: IN_MOVED_TO")
+        LOGGER.debug("trigger: IN_CLOSE_WRITE")
         self.process(event)
 
     def process_IN_CLOSE_NOWRITE(self, event):
@@ -101,7 +101,7 @@ class EventHandler(ProcessEvent):
     def process_IN_CLOSE_MODIFY(self, event):
         """When a file is modified and closed, process the associated event.
         """
-        LOGGER.debug("trigger: IN_CREATE")
+        LOGGER.debug("trigger: IN_MODIFY")
         self.process(event)
 
     def process(self, event):
