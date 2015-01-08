@@ -374,7 +374,7 @@ class AappLvl1Processor(object):
 
         LOG.debug("Sensor = " + str(msg.data['sensor']))
         LOG.debug("type: " + str(type(msg.data['sensor'])))
-        if type(msg.data['sensor']) is str:
+        if type(msg.data['sensor']) in [str, unicode]:
             sensors = [msg.data['sensor']]
         elif type(msg.data['sensor']) is list:
             sensors = msg.data['sensor']
