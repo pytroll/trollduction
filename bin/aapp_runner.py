@@ -373,7 +373,7 @@ class AappLvl1Processor(object):
                      "probably a Metop file or a NOAA from DMI: " + str(fname))
 
         LOG.debug("Sensor = " + str(msg.data['sensor']))
-        LOG.debug("type:" + type(msg.data['sensor']))
+        LOG.debug("type: " + str(type(msg.data['sensor'])))
         if type(msg.data['sensor']) is str:
             sensors = [msg.data['sensor']]
         elif type(msg.data['sensor']) is list:
