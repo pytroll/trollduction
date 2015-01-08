@@ -500,7 +500,6 @@ class AappLvl1Processor(object):
             "working dir: self.working_dir = " + str(self.working_dir))
 
         # Add to job register to avoid this to be run again
-        keyname = str(self.platform_name)
         if keyname not in self.job_register.keys():
             self.job_register[keyname] = []
 
