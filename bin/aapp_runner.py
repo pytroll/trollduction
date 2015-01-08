@@ -208,6 +208,7 @@ class AappLvl1Processor(object):
         filelist = glob('%s/*' % self.working_dir)
         LOG.info("Number of items left after cleaning working dir = " +
                  str(len(filelist)))
+        LOG.debug("Files: " + str(filelist))
         shutil.rmtree(self.working_dir)
         return
 
@@ -331,10 +332,10 @@ class AappLvl1Processor(object):
                           " with overlapping time have been launched previously")
                 return True
 
-        keyname = (str(self.platform_name) + '_' +
-                   self.starttime.strftime('%Y%m%d%H%M%S') +
-                   '_' + self.endtime.strftime('%Y%m%d%H%M%S'))
-        LOG.debug("keyname = " + str(keyname))
+        scene_id = (str(self.platform_name) + '_' +
+                    self.starttime.strftime('%Y%m%d%H%M%S') +
+                    '_' + self.endtime.strftime('%Y%m%d%H%M%S'))
+        LOG.debug("scene_id = " + str(scene_id))
 
         # Check for keys representing the same scene (slightly different
         # start/end times):
@@ -349,12 +350,12 @@ class AappLvl1Processor(object):
                 # It is the same scene!
                 LOG.debug(
                     "It is the same scene, though the file times differ a bit...")
-                keyname = key
+                scene_id = key
                 break
 
-        LOG.debug("keyname = " + str(keyname))
-        if keyname in self.level0files:
-            LOG.debug("Level-0files = " + str(self.level0files[keyname]))
+        LOG.debug("scene_id = " + str(scene_id))
+        if scene_id in self.level0files:
+            LOG.debug("Level-0files = " + str(self.level0files[scene_id]))
         else:
             LOG.debug("No level-0files yet...")
 
@@ -382,26 +383,26 @@ class AappLvl1Processor(object):
             LOG.info("No required sensors....")
             return True
 
-        if keyname not in self.level0files:
-            LOG.debug("Reset level0files: keyname = " + str(keyname))
-            self.level0files[keyname] = []
+        if scene_id not in self.level0files:
+            LOG.debug("Reset level0files: scene_id = " + str(scene_id))
+            self.level0files[scene_id] = []
 
         for sensor in sensors:
             item = (self.level0_filename, sensor)
-            if item not in self.level0files[keyname]:
-                self.level0files[keyname].append(item)
+            if item not in self.level0files[scene_id]:
+                self.level0files[scene_id].append(item)
                 LOG.debug("Appending item to list: " + str(item))
             else:
                 LOG.debug("item already in list: " + str(item))
 
-        if len(self.level0files[keyname]) < 4:
+        if len(self.level0files[scene_id]) < 4:
             LOG.info("Not enough sensor data available yet. " +
                      "Level-0files = " +
-                     str(self.level0files[keyname]))
+                     str(self.level0files[scene_id]))
             return True
         else:
             LOG.info(
-                "Level 0 files ready: " + str(self.level0files[keyname]))
+                "Level 0 files ready: " + str(self.level0files[scene_id]))
 
         if not self.working_dir:
             try:
@@ -439,7 +440,7 @@ class AappLvl1Processor(object):
                      (self.platform_name, str(self.orbit)))
 
             sensor_filename = {}
-            for (fname, instr) in self.level0files[keyname]:
+            for (fname, instr) in self.level0files[scene_id]:
                 sensor_filename[instr] = os.path.basename(fname)
 
             for instr in sensor_filename.keys():
