@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014
+# Copyright (c) 2013, 2014, 2015
 
 # Author(s):
 
@@ -51,7 +51,7 @@ class EventHandler(ProcessEvent):
     """
 
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
-                 aliases=None):
+                 aliases=None, tbus_orbit=False):
         super(EventHandler, self).__init__()
 
         self._pub = NoisyPublisher("trollstalker", posttroll_port, topic)
@@ -63,6 +63,7 @@ class EventHandler(ProcessEvent):
         self.file_parser = Parser(filepattern)
         self.instrument = instrument
         self.aliases = aliases
+        self.tbus_orbit = tbus_orbit
 
     def stop(self):
         '''Stop publisher.
@@ -140,7 +141,8 @@ class EventHandler(ProcessEvent):
             self.info['uri'] = event.pathname
             self.info['uid'] = os.path.basename(event.pathname)
             self.info['sensor'] = self.instrument
-
+            if self.tbus_orbit and "orbit_number" in self.info:
+                self.info["orbit_number"] -= 1
             # replace values with corresponding aliases, if any are given
             if self.aliases:
                 for key in self.info:
@@ -159,7 +161,8 @@ class NewThreadedNotifier(ThreadedNotifier):
 
 
 def create_notifier(topic, instrument, posttroll_port, filepattern,
-                    event_names, monitored_dirs, aliases=None):
+                    event_names, monitored_dirs, aliases=None,
+                    tbus_orbit=False):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
@@ -178,7 +181,8 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
     event_handler = EventHandler(topic, instrument,
                                  posttroll_port=posttroll_port,
                                  filepattern=filepattern,
-                                 aliases=aliases)
+                                 aliases=aliases,
+                                 tbus_orbit=tbus_orbit)
     notifier = NewThreadedNotifier(manager, event_handler)
 
     # Add directories and event masks to watch manager
@@ -310,6 +314,7 @@ def main():
         except KeyError:
             pass
         aliases = parse_aliases(config)
+        tbus_orbit = bool(config.get("tbus_orbit", False))
         try:
             log_config = config["stalker_log_config"]
         except KeyError:
@@ -340,7 +345,8 @@ def main():
 
     # Start watching for new files
     notifier = create_notifier(topic, instrument, posttroll_port, filepattern,
-                               event_names, monitored_dirs, aliases=aliases)
+                               event_names, monitored_dirs, aliases=aliases,
+                               tbus_orbit=tbus_orbit)
     notifier.start()
 
     try:
