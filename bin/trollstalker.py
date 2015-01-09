@@ -139,7 +139,7 @@ class EventHandler(ProcessEvent):
         else:
             self.info['uri'] = event.pathname
             self.info['uid'] = os.path.basename(event.pathname)
-            self.info['sensor'] = self.instrument
+            self.info['sensor'] = self.instrument.split(',')
 
             # replace values with corresponding aliases, if any are given
             if self.aliases:
