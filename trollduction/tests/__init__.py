@@ -26,7 +26,8 @@
 #from trollduction.tests import test_listener
 import unittest
 import doctest
-from trollduction.tests import (test_trollduction,
+from trollduction.tests import (test_helper_functions,
+                                test_trollduction,
                                 test_xml_read,
                                 test_scisys,
                                 test_trigger,
@@ -40,6 +41,7 @@ def suite():
     # Test the documentation strings
     # mysuite.addTests(doctest.DocTestSuite(image))
     # Use the unittests also
+    mysuite.addTests(test_helper_functions.suite())
     mysuite.addTests(test_trollduction.suite())
     mysuite.addTests(test_xml_read.suite())
     mysuite.addTests(test_scisys.suite())

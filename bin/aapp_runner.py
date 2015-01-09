@@ -110,6 +110,7 @@ from urlparse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
 from posttroll.message import Message
+from trollduction.helper_functions import overlapping_timeinterval
 
 import tempfile
 from glob import glob
@@ -133,19 +134,6 @@ def nonblock_read(output):
         return output.readline()
     except:
         return ''
-
-
-def overlapping_timeinterval(start_end_times, timelist):
-    """From a list of start and end times check if the current time interval
-    overlaps with one or more"""
-
-    starttime, endtime = start_end_times
-    for tstart, tend in timelist:
-        if ((starttime >= tstart and starttime < tend) or
-                (endtime > tstart and endtime <= tend)):
-            return tstart, tend
-
-    return False
 
 
 def reset_job_registry(objdict, key, start_end_times):
@@ -317,10 +305,12 @@ class AappLvl1Processor(object):
             sat = orb.Orbital(
                 TLE_SATNAME.get(self.platform_name, self.platform_name))
             start_orbnum = sat.get_orbit_number(self.starttime)
-        except:
+        except ImportError:
             LOG.warning("Failed calculating orbit number using pyorbital")
             start_orbnum = None
 
+        LOG.info(
+            "Orbit number determined from pyorbital = " + str(start_orbnum))
         try:
             self.orbit = int(msg.data['orbit_number'])
         except KeyError:
@@ -331,6 +321,9 @@ class AappLvl1Processor(object):
             LOG.warning("Correcting orbit number: Orbit now = " +
                         str(start_orbnum) + " Before = " + str(self.orbit))
             self.orbit = start_orbnum
+        else:
+            LOG.debug(
+                'Orbit number in message determined to be okay and not changed...')
 
         if self.platform_name in SUPPORTED_METOP_SATELLITES:
             metop_id = SATELLITE_NAME[self.platform_name].split('metop')[1]
