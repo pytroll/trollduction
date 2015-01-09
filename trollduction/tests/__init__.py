@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Martin Raspaud
+# Copyright (c) 2014, 2015 Martin Raspaud
 
 # Author(s):
 
@@ -26,7 +26,11 @@
 #from trollduction.tests import test_listener
 import unittest
 import doctest
-from trollduction.tests import test_trollduction, test_xml_read, test_scisys, test_trigger, test_producer
+from trollduction.tests import (test_trollduction,
+                                test_xml_read,
+                                test_scisys,
+                                test_trigger,
+                                test_producer)
 
 
 def suite():

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Adam.Dybbroe
+# Copyright (c) 2014, 2015 Adam.Dybbroe
 
 # Author(s):
 
@@ -181,9 +181,14 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
     """
 
     semaphore_obj.acquire()
-    cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
-                                 scene['orbit_number'], scene['satday'],
-                                 scene['sathour'])
+    if scene['satid'] in SUPPORTED_EOS_SATELLITES:
+        cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
+                                     scene['orbit_number'], scene['satday'],
+                                     scene['sathour'])
+    else:
+        cmdstr = "%s %s %s 0 0" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
+                                   scene['orbit_number'])
+
     if scene['satid'] in SUPPORTED_JPSS_SATELLITES and LVL1_NPP_PATH:
         cmdstr = cmdstr + ' ' + str(LVL1_NPP_PATH)
     elif scene['satid'] in SUPPORTED_EOS_SATELLITES and LVL1_EOS_PATH:

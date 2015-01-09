@@ -78,7 +78,7 @@ class EventHandler(ProcessEvent):
     def process_IN_CLOSE_WRITE(self, event):
         """When a file is closed, process the associated event.
         """
-        LOGGER.debug("trigger: IN_MOVED_TO")
+        LOGGER.debug("trigger: IN_CLOSE_WRITE")
         self.process(event)
 
     def process_IN_CLOSE_NOWRITE(self, event):
@@ -102,7 +102,7 @@ class EventHandler(ProcessEvent):
     def process_IN_CLOSE_MODIFY(self, event):
         """When a file is modified and closed, process the associated event.
         """
-        LOGGER.debug("trigger: IN_CREATE")
+        LOGGER.debug("trigger: IN_MODIFY")
         self.process(event)
 
     def process(self, event):
@@ -140,7 +140,7 @@ class EventHandler(ProcessEvent):
         else:
             self.info['uri'] = event.pathname
             self.info['uid'] = os.path.basename(event.pathname)
-            self.info['sensor'] = self.instrument
+            self.info['sensor'] = self.instrument.split(',')
             if self.tbus_orbit and "orbit_number" in self.info:
                 self.info["orbit_number"] -= 1
             # replace values with corresponding aliases, if any are given
