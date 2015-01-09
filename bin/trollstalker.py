@@ -144,6 +144,7 @@ class EventHandler(ProcessEvent):
             LOGGER.debug("self.info['sensor']: " + str(self.info['sensor']))
 
             if self.tbus_orbit and "orbit_number" in self.info:
+                LOGGER.info("Changing orbit number by -1!")
                 self.info["orbit_number"] -= 1
 
             # replace values with corresponding aliases, if any are given
