@@ -140,6 +140,7 @@ class EventHandler(ProcessEvent):
             self.info['uri'] = event.pathname
             self.info['uid'] = os.path.basename(event.pathname)
             self.info['sensor'] = self.instrument.split(',')
+            LOGGER.debug("self.info['sensor']: " + str(self.info['sensor']))
 
             # replace values with corresponding aliases, if any are given
             if self.aliases:

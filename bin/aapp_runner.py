@@ -62,6 +62,11 @@ for option, value in CONF.items(MODE, raw=True):
 SUPPORTED_NOAA_SATELLITES = ['NOAA-19', 'NOAA-18', 'NOAA-16', 'NOAA-15']
 SUPPORTED_METOP_SATELLITES = ['Metop-B', 'Metop-A', 'Metop-C']
 
+TLE_SATNAME = {'NOAA-19': 'NOAA 19', 'NOAA-18': 'NOAA 18',
+               'NOAA-15': 'NOAA 15',
+               'Metop-A': 'Metop A', 'Metop-B': 'Metop B',
+               'Metop-C': 'Metop C'}
+
 METOP_NAME = {'metop01': 'Metop-B', 'metop02': 'Metop-A'}
 METOP_NAME_INV = {'metopb': 'metop01', 'metopa': 'metop02'}
 SATELLITE_NAME = {'NOAA-19': 'noaa19', 'NOAA-18': 'noaa18',
@@ -306,11 +311,26 @@ class AappLvl1Processor(object):
             LOG.warning(
                 "No end_time in message! Guessing start_time + 14 minutes...")
             self.endtime = msg.data['start_time'] + timedelta(seconds=60 * 14)
+
+        try:
+            import pyorbital.orbital as orb
+            sat = orb.Orbital(
+                TLE_SATNAME.get(self.platform_name, self.platform_name))
+            start_orbnum = sat.get_orbit_number(self.starttime)
+        except:
+            LOG.warning("Failed calculating orbit number using pyorbital")
+            start_orbnum = None
+
         try:
             self.orbit = int(msg.data['orbit_number'])
         except KeyError:
             LOG.warning("No orbit_number in message! Set to none...")
             self.orbit = None
+
+        if start_orbnum and self.orbit != start_orbnum:
+            LOG.warning("Correcting orbit number: Orbit now = " +
+                        str(start_orbnum) + " Before = " + str(self.orbit))
+            self.orbit = start_orbnum
 
         if self.platform_name in SUPPORTED_METOP_SATELLITES:
             metop_id = SATELLITE_NAME[self.platform_name].split('metop')[1]
