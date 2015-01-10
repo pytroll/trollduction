@@ -308,6 +308,11 @@ class AappLvl1Processor(object):
         except ImportError:
             LOG.warning("Failed calculating orbit number using pyorbital")
             start_orbnum = None
+        except AttributeError:
+            LOG.warning("Failed calculating orbit number using pyorbital")
+            LOG.warning("platform name = " +
+                        str(TLE_SATNAME.get(self.platform_name, self.platform_name)) + " " +
+                        str(self.platform_name))
 
         LOG.info(
             "Orbit number determined from pyorbital = " + str(start_orbnum))
