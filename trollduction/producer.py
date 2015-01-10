@@ -382,7 +382,8 @@ class DataProcessor(object):
                                       time_slot=time_slot,
                                       orbit=mda['orbit_number'],
                                       variant=mda.get('variant', ''))
-        LOGGER.debug("Creating scene for satellite %s", str(platform))
+        LOGGER.debug("Creating scene for satellite %s and time %s",
+                     str(platform), str(time_slot))
         if mda['orbit_number'] is not None or mda.get('orbit_type') == "polar":
             global_data.overpass = Pass(platform,
                                         mda['start_time'],
