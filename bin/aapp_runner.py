@@ -64,8 +64,8 @@ SUPPORTED_METOP_SATELLITES = ['Metop-B', 'Metop-A', 'Metop-C']
 
 TLE_SATNAME = {'NOAA-19': 'NOAA 19', 'NOAA-18': 'NOAA 18',
                'NOAA-15': 'NOAA 15',
-               'Metop-A': 'Metop A', 'Metop-B': 'Metop B',
-               'Metop-C': 'Metop C'}
+               'Metop-A': 'METOP-A', 'Metop-B': 'METOP-B',
+               'Metop-C': 'METOP-C'}
 
 METOP_NAME = {'metop01': 'Metop-B', 'metop02': 'Metop-A'}
 METOP_NAME_INV = {'metopb': 'metop01', 'metopa': 'metop02'}
@@ -300,14 +300,15 @@ class AappLvl1Processor(object):
                 "No end_time in message! Guessing start_time + 14 minutes...")
             self.endtime = msg.data['start_time'] + timedelta(seconds=60 * 14)
 
+        start_orbnum = None
         try:
             import pyorbital.orbital as orb
             sat = orb.Orbital(
                 TLE_SATNAME.get(self.platform_name, self.platform_name))
             start_orbnum = sat.get_orbit_number(self.starttime)
         except ImportError:
-            LOG.warning("Failed calculating orbit number using pyorbital")
-            start_orbnum = None
+            LOG.warning("Failed importing pyorbital, " +
+                        "cannot calculate orbit number")
         except AttributeError:
             LOG.warning("Failed calculating orbit number using pyorbital")
             LOG.warning("platform name = " +
