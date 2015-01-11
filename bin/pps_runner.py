@@ -310,7 +310,7 @@ def publish_level2(publisher, result_files, sat, orb, instr, start_t, end_t):
         publisher.send(msg)
 
 
-def ready2run(msg, files4pps, job_register):
+def ready2run(msg, files4pps, job_register, sceneid):
     """Check wether pps is ready to run or not"""
     #"""Start the PPS processing on a NOAA/Metop/S-NPP/EOS scene"""
     # LOG.debug("Received message: " + str(msg))
@@ -399,23 +399,20 @@ def ready2run(msg, files4pps, job_register):
         LOG.warning("Satellite not supported: " + str(platform_name))
         return False
 
-    starttime = None
     if 'start_time' in msg.data:
         starttime = msg.data['start_time']
-        keyname = (str(platform_name) + '_' + str(orbit_number) +
-                   '_' + str(starttime.strftime('%Y%m%d%H%M')))
     else:
-        keyname = str(platform_name) + '_' + str(orbit_number)
+        starttime = None
 
-    LOG.debug("Scene identifier = " + str(keyname))
+    LOG.debug("Scene identifier = " + str(sceneid))
     LOG.debug("Job register = " + str(job_register))
-    if keyname in job_register and job_register[keyname]:
-        LOG.debug("Processing of scene " + str(keyname) +
+    if sceneid in job_register and job_register[sceneid]:
+        LOG.debug("Processing of scene " + str(sceneid) +
                   " have already been launched...")
         return False
 
     tdelta_thr = timedelta(seconds=180)  # 3 minutes
-    key_entries = keyname.split('_')
+    key_entries = sceneid.split('_')
     if len(key_entries) == 3:
         for key in job_register.keys():
             firstpart = key.split('_')[0] + '_' + key.split('_')[1]
@@ -431,37 +428,37 @@ def ready2run(msg, files4pps, job_register):
                                 "processed scene! Don't do anything with it then...")
                     return False
 
-    if keyname not in files4pps:
-        files4pps[keyname] = []
+    if sceneid not in files4pps:
+        files4pps[sceneid] = []
 
     if platform_name in SUPPORTED_EOS_SATELLITES:
         for item in level1_files:
             fname = os.path.basename(item)
             if (fname.startswith(GEOLOC_PREFIX[platform_name]) or
                     fname.startswith(DATA1KM_PREFIX[platform_name])):
-                files4pps[keyname].append(item)
+                files4pps[sceneid].append(item)
     else:
         for item in level1_files:
             fname = os.path.basename(item)
-            files4pps[keyname].append(fname)
+            files4pps[sceneid].append(fname)
 
     if (platform_name in SUPPORTED_METOP_SATELLITES or
             platform_name in SUPPORTED_NOAA_SATELLITES):
-        if len(files4pps[keyname]) < 3:
+        if len(files4pps[sceneid]) < 3:
             LOG.info(
                 "Not enough NOAA/Metop sensor data available yet...")
             return False
     elif platform_name in SUPPORTED_EOS_SATELLITES:
-        if len(files4pps[keyname]) < 2:
+        if len(files4pps[sceneid]) < 2:
             LOG.info("Not enough MODIS level 1 files available yet...")
             return False
 
-    if len(files4pps[keyname]) > 10:
+    if len(files4pps[sceneid]) > 10:
         LOG.info(
-            "Number of level 1 files ready = " + str(len(files4pps[keyname])))
-        LOG.info("Scene = " + str(keyname))
+            "Number of level 1 files ready = " + str(len(files4pps[sceneid])))
+        LOG.info("Scene = " + str(sceneid))
     else:
-        LOG.info("Level 1 files ready: " + str(files4pps[keyname]))
+        LOG.info("Level 1 files ready: " + str(files4pps[sceneid]))
 
     if msg.data['platform_name'] in SUPPORTED_PPS_SATELLITES:
         LOG.info(
@@ -469,7 +466,7 @@ def ready2run(msg, files4pps, job_register):
         LOG.info("Process the scene (sat, orbit) = " +
                  str(platform_name) + ' ' + str(orbit_number))
 
-        job_register[keyname] = datetime.utcnow()
+        job_register[sceneid] = datetime.utcnow()
         return True
 
 
@@ -511,7 +508,24 @@ def pps_rolling_runner():
                 status = False
                 check_threads(threads)
                 for msg in subscr.recv(timeout=90):
-                    status = ready2run(msg, files4pps, pub_thread.jobs)
+                    keyname = None
+                    if (msg and
+                            'platform_name' in msg.data and
+                            'orbit_number' in msg.data):
+                        orbit_number = int(msg.data['orbit_number'])
+                        platform_name = msg.data['platform_name']
+                        starttime = None
+                        if 'start_time' in msg.data:
+                            starttime = msg.data['start_time']
+                            keyname = (str(platform_name) + '_' +
+                                       str(orbit_number) + '_' +
+                                       str(starttime.strftime('%Y%m%d%H%M')))
+                        else:
+                            keyname = (str(platform_name) + '_' +
+                                       str(orbit_number))
+
+                    status = ready2run(msg, files4pps,
+                                       pub_thread.jobs, keyname)
                     if status:
                         # end the loop and spawn a pps process on the scene
                         message = msg
@@ -552,7 +566,6 @@ def pps_rolling_runner():
 
                 # Clean the files4pps dict:
                 LOG.debug("files4pps: " + str(files4pps))
-                keyname = str(platform_name) + '_' + str(orbit_number)
                 try:
                     files4pps.pop(keyname)
                 except KeyError:
