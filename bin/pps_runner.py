@@ -399,11 +399,37 @@ def ready2run(msg, files4pps, job_register):
         LOG.warning("Satellite not supported: " + str(platform_name))
         return False
 
-    keyname = str(platform_name) + '_' + str(orbit_number)
+    starttime = None
+    if 'start_time' in msg.data:
+        starttime = msg.data['start_time']
+        keyname = (str(platform_name) + '_' + str(orbit_number) +
+                   '_' + str(starttime.strftime('%Y%m%d%H%M')))
+    else:
+        keyname = str(platform_name) + '_' + str(orbit_number)
+
+    LOG.debug("Scene identifier = " + str(keyname))
+    LOG.debug("Job register = " + str(job_register))
     if keyname in job_register and job_register[keyname]:
         LOG.debug("Processing of scene " + str(keyname) +
                   " have already been launched...")
         return False
+
+    tdelta_thr = timedelta(seconds=180)  # 3 minutes
+    key_entries = keyname.split('_')
+    if len(key_entries) == 3:
+        for key in job_register.keys():
+            firstpart = key.split('_')[0] + '_' + key.split('_')[1]
+            this_firstpart = key_entries[0] + '_' + key_entries[1]
+            LOG.debug('datetimes of entries: ' +
+                      str(firstpart) + ' ' +
+                      str(this_firstpart))
+            if firstpart == this_firstpart:
+                # Check if the times are approximately the same:
+                tobj = datetime.strptime(key.split('_')[-1], '%Y%m%d%H%M')
+                if starttime and abs(tobj - starttime) < tdelta_thr:
+                    LOG.warning("This secene is very close to a previously " +
+                                "processed scene! Don't do anything with it then...")
+                    return False
 
     if keyname not in files4pps:
         files4pps[keyname] = []
