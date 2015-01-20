@@ -880,6 +880,9 @@ def link_or_copy(src, dst):
             shutil.copy(src, dst)
         except shutil.Error:
             LOGGER.exception("Something went wrong in copying a file")
+        except IOError as err:
+            LOGGER.info(str(err))
+            LOGGER.exception("Could not copy: %s -> %s", src, dst)
 
 
 def thumbnail(filename, thname, size, fformat):
