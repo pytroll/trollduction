@@ -56,6 +56,7 @@ setup(name="trollduction",
                         'pyresample', 'pykdtree',
                         'trollimage', 'pyorbital',
                         'trollsift', 'netifaces',
-                        'pytroll-schedule'],
+                        'pytroll-schedule', 'netcdf4'],
+      test_requires=['mock'],
       test_suite='trollduction.tests.suite',
       )
