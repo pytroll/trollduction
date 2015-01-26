@@ -2,6 +2,8 @@ language: python
 python:
 - '2.6'
 - '2.7'
+before_install:
+ - sudo apt-get install libhdf5-serial-dev netcdf-bin libnetcdf-dev
 install:
 - pip install .
 - pip install coveralls
