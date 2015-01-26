@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014 Martin Raspaud
+# Copyright (c) 2013, 2014, 2015 Martin Raspaud
 
 # Author(s):
 
@@ -55,6 +55,7 @@ setup(name="trollduction",
       install_requires=['pyinotify', 'mpop', 'posttroll',
                         'pyresample', 'pykdtree',
                         'trollimage', 'pyorbital',
-                        'trollsift', 'netifaces'],
+                        'trollsift', 'netifaces',
+                        'pytroll-schedule'],
       test_suite='trollduction.tests.suite',
       )
