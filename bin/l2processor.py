@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Martin Raspaud
+# Copyright (c) 2014, 2015 Martin Raspaud
 
 # Author(s):
 
@@ -97,6 +97,7 @@ if __name__ == '__main__':
     trd = Trollduction(cfg)
 
     def shutdown(*args):
+        logger.info("l2processor shutting down")
         del args
         trd.shutdown()
         logging.shutdown()
@@ -108,6 +109,8 @@ if __name__ == '__main__':
         trd.run_single()
     except KeyboardInterrupt:
         logging.shutdown()
+    except:
+        logger.exception("Trollduction died!")
 
     print "Thank you for using pytroll/l2processor!" \
         "See you soon on pytroll.org."
