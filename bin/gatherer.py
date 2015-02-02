@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Martin Raspaud
+# Copyright (c) 2014, 2015 Martin Raspaud
 
 # Author(s):
 
@@ -155,7 +155,7 @@ if __name__ == '__main__':
 
     granule_triggers = []
 
-    pub = publisher.NoisyPublisher("eumetcast_poller")
+    pub = publisher.NoisyPublisher("gatherer")
 
     # TODO: get this from the product config files
     regions = [get_area_def(region)
