@@ -6,6 +6,7 @@ before_install:
  - sudo apt-get install libhdf5-serial-dev netcdf-bin libnetcdf-dev
 install:
 - pip install .
+- pip install mock
 - pip install coveralls
 script: coverage run --source=trollduction setup.py test
 after_success: coveralls
