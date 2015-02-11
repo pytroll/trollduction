@@ -164,6 +164,10 @@ def terminate_process(popen_obj, scene):
     """Terminate a Popen process"""
     if popen_obj.returncode == None:
         popen_obj.terminate()
+        import time
+        time.sleep(2)
+        if popen_obj.poll() == None:
+            popen_obj.kill()
         LOG.info(
             "Process timed out and pre-maturely terminated. Scene: " + str(scene))
     else:
@@ -256,8 +260,9 @@ class FilePublisher(threading.Thread):
                 LOG.info("Publish the files...")
                 publisher, scene, result_files = retv
 
-                keyname = str(scene['satid']) + '_' + \
-                    str(scene['orbit_number'])
+                keyname = (str(scene['satid']) + '_' +
+                           str(scene['orbit_number']) + '_' +
+                           str(scene['starttime'].strftime('%Y%m%d%H%M')))
                 if keyname not in self.jobs:
                     LOG.warning("Scene-run seems unregistered! Forget it...")
                 else:
@@ -265,6 +270,10 @@ class FilePublisher(threading.Thread):
                         dt_ = datetime.utcnow() - self.jobs[keyname]
                         LOG.info("PPS on scene " + str(keyname) +
                                  " finished. It took: " + str(dt_))
+                    else:
+                        LOG.warning(
+                            "Not a datetime instance: jobs[%s]" % str(keyname) +
+                            str(self.jobs[keyname]))
 
                     self.jobs[keyname] = False
                 # Block any future run on this scene for x minutes from now
@@ -424,7 +433,7 @@ def ready2run(msg, files4pps, job_register, sceneid):
                 # Check if the times are approximately the same:
                 tobj = datetime.strptime(key.split('_')[-1], '%Y%m%d%H%M')
                 if starttime and abs(tobj - starttime) < tdelta_thr:
-                    LOG.warning("This secene is very close to a previously " +
+                    LOG.warning("This scene is very close to a previously " +
                                 "processed scene! Don't do anything with it then...")
                     return False
 
