@@ -163,11 +163,7 @@ def reset_job_registry(objdict, key):
 def terminate_process(popen_obj, scene):
     """Terminate a Popen process"""
     if popen_obj.returncode == None:
-        popen_obj.terminate()
-        import time
-        time.sleep(2)
-        if popen_obj.poll() == None:
-            popen_obj.kill()
+        popen_obj.kill()
         LOG.info(
             "Process timed out and pre-maturely terminated. Scene: " + str(scene))
     else:
