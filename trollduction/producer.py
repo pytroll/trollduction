@@ -992,14 +992,14 @@ class DataWriter(Thread):
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
                 except:
-                    LOGGER.exception("Something wrong happened saving %s to %s",
-                                     str(obj),
-                                     str([tostring(item)
-                                          for item in file_items]))
                     for item in file_items:
                         if "thumbnail_size" in item.attrib:
                             item.attrib["thumbnail_size"] = str(
                                 item.attrib["thumbnail_size"])
+                    LOGGER.exception("Something wrong happened saving %s to %s",
+                                     str(obj),
+                                     str([tostring(item)
+                                          for item in file_items]))
                 finally:
                     self.prod_queue.task_done()
 
