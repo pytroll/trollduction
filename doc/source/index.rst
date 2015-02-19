@@ -93,6 +93,7 @@ Detailed instructions
 
    installation.rst
    configuration.rst
+   gatherer.rst
 
 Indices and tables
 ==================
