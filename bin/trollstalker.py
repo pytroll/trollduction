@@ -22,7 +22,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""./trollstalker.py -c /path/to/master_config.ini -C noaa_hrpt
+"""./trollstalker.py -c /path/to/trollstalker_config.ini -C noaa_hrpt
 """
 
 import argparse

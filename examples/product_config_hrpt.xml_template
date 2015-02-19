@@ -4,58 +4,96 @@
 <!-- This config is used by Trollduction.-->
 
 <product_config>
-  <metadata>
-    <platform>noaa</platform>
-    <number>15</number>
-  </metadata>
-
+  <!-- common default values -->
   <common>
     <output_dir>/tmp</output_dir>
+    <unload>False</unload>
   </common>
+  
 
+  <!-- aliases: substitutions to make in the filenames. E.g. replace in "platform_name" items. -->
+  <aliases>
+    <platform_name src="Metop-A" dst="metop02" />
+    <platform_name src="Metop-B" dst="metop01" />
+    <platform_name src="NOAA-15" dst="noaa15" />
+    <platform_name src="NOAA-18" dst="noaa18" />
+    <platform_name src="NOAA-19" dst="noaa19" />
+    <platform_name src="EOS-Terra" dst="terra" />
+    <platform_name src="EOS-Aqua" dst="aqua" />
+    <platform_name src="Suomi-NPP" dst="npp" />
+  </aliases>
+
+  <!-- variables: substitution to make in the xlm attributes. E.g. replate "output_dir" items matching with real path -->
   <variables>
-    <path id="local_sir">/local_disk/data/sir</path>
-    <path id="sir">/local_disk/data/out/sir</path>
-    <path id="rgb">/local_disk/data/out/rgb</path>
-    <path id="tmp">/tmp</path>
+    <output_dir id="path0">/san1/sir</output_dir>
+    <output_dir id="path3">/san1/pps/www/latest</output_dir>
+    <output_dir id="path4">/san1/pps/www/ash</output_dir>
+    <overlay id="black">#000000</overlay>
+    <overlay id="white">#ffffff</overlay>
   </variables>
 
+  <!-- variables section with attribute. E.g. if the "MODE" environment variable is defined to "offline", the items should take these values instead. This takes of course precedence over the standart "variables" section. -->
+  <variables MODE="offline">
+    <output_dir id="path0">/local_disk/data/out/sir</output_dir>
+    <output_dir id="path1">/local_disk/data/out/sir</output_dir>
+    <output_dir id="path2">/local_disk/data/out/rgb</output_dir>
+    <output_dir id="path3">/local_disk/data/out/rgb</output_dir>
+    <output_dir id="path4">/local_disk/data/out/rgb</output_dir>
+  </variables>
+
+  <!-- areas to group together for processing -->
+  <groups>
+    <group id="africa">afhorn,mali</group>
+    <group id="asia">afghanistan</group>
+    <group id="eport">eport</group>
+    <group id="highres" unload="True" resolution="250">baws250</group>
+  </groups>
+
+  
   <product_list>
     <!-- dump to netcdf -->
     <!-- calibrated, satellite projection -->
     <dump>
       <file format="netcdf4">{time:%Y%m%d_%H%M}_{platform}{satnumber}.nc</file>
     </dump>
+
     <area id="eurol" name="Europe_large">
       <!-- Generate the product only if sun is above the horizon at the
            defined longitude/latitude -->
-      <product id="overview" name="overview" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
-        <file output_dir="tmp">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
-      </product>
-
-      <product id="natural" name="dnc" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
-        <file>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
-      </product>
-
-      <product id="green_snow" name="green_snow" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
-        <file>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
-      </product>
-
-      <product id="red_snow" name="red_snow" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
-        <file format="png">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
-      </product>
-
-      <product id="cloudtop" name="cloudtop">
-        <file format="png">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+      <product id="overview" name="overview" output_dir="path0" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
+        <file output_dir="tmp">{time:%Y%m%d_%H%M}_{platform_name}_{areaname}_{productname}.png</file>
       </product>
 
       <!-- Generate only if the Sun is below the horizon -->
       <product id="night_overview" name="night_overview" sunzen_night_minimum="90" sunzen_lonlat="25, 60">
-        <file format="png">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+        <file format="png">{time:%Y%m%d_%H%M}_{platform_name}_{areaname}_{productname}.png</file>
+      </product>
+
+      <!-- Generate also thumbnails -->
+      <product id="natural" name="dnc" output_dir="path1" thumbnail_size="640x640" thumbnail_name="{platform_name}_{start_time:%Y%m%d_%H%M}_{orbit_number:05d}_{areaname}_dnc_thumbnail.png" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
+        <file>{time:%Y%m%d_%H%M}_{platform_name}_{areaname}_{productname}.png</file>
+      </product>
+
+      <!-- add overlay using pycoast configuration "black.cfg"-->
+      <product id="green_snow" name="green_snow" output_dir="path3" overlay="/usr/local/etc/pytroll/black_overlay.cfg" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
+        <file>{time:%Y%m%d_%H%M}_{platform_name}_{areaname}_{productname}.png</file>
+      </product>
+
+
+    </area>
+
+    <!-- another area -->
+    <area id="euron1" name="North europe, 1km/pixel">
+      <product id="red_snow" name="red_snow" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
+        <file format="png">{time:%Y%m%d_%H%M}_{platform_name}_{areaname}_{productname}.png</file>
+      </product>
+
+      <product id="cloudtop" name="cloudtop">
+        <file format="png">{time:%Y%m%d_%H%M}_{platform_name}_{areaname}_{productname}.png</file>
       </product>
 
       <product id="night_fog" name="night_fog" sunzen_night_minimum="90" sunzen_lonlat="25, 60">
-        <file>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+        <file>{time:%Y%m%d_%H%M}_{platform_name}_{areaname}_{productname}.png</file>
       </product>
 
     </area>

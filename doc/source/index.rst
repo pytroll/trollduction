@@ -13,6 +13,31 @@ This documentation is a work in progress, but the most important bits should be 
 .. contents::
    :depth: 3
 
+How does Trollduction work?
+===========================
+
+Trollduction builds on the principle that satellite image batch production is
+event based, and that different processing steps are chained together to produce
+the final products. This is why trollduction is a collection of independent
+elements of this chain, which are then communicating together through
+lightweight network messages.
+
+The different elements provided are:
+ - trollstalker: triggers an event message each time a file is put in given
+   directory
+ - l2processor: generates rgb images when an appropriate event message is
+   received
+ - gatherer: gathers polar satellite granules together given an area of
+   interest, and send an event messages when a matching group of granules has
+   been gathered
+ - aapp_runner: runs the NWP-AAPP software on raw hrpt files, when such an event
+   message is received, to generate level 1 data
+ - viirs_dr_runner: runs the CSPP software on Suomi-NPP RDR files to generate
+   level 1 data
+ - modis_dr_runner: runs the SPA software on EOS-Terra/Aqua PDS files to
+   generate level 1 data
+
+
 Setting things up cheat sheet
 =============================
 
@@ -33,7 +58,7 @@ Setting things up cheat sheet
     * use *examples/l2processor_config.ini_template* as a template
     * save config file to your chosen place without the *_template* ending
 #. Create Trollduction product configuration file
-    * use *trollduction/examples/product_config_hrpt.xml_template* or *trollduction/examples/product_config_hrpt.xml_template* as a template
+    * use *trollduction/examples/product_config_hrpt.xml_template* as a template
     * save the file to the path defined in your *l2processor_config.ini* without the *_template* ending
 #. Create logging configurations for *trollduction* and *trollstalker*
     * use *trollduction/examples/td_logging.ini_template* and *trollduction/examples/stalker_logging.ini_tempalate* as templates
@@ -68,7 +93,6 @@ Detailed instructions
 
    installation.rst
    configuration.rst
-   usage.rst
 
 Indices and tables
 ==================
@@ -88,20 +112,6 @@ Listener
 -------------
 
 .. automodule:: trollduction.listener
-   :members:
-   :undoc-members:
-
-Duke
-----
-
-.. automodule:: trollduction.duke
-   :members:
-   :undoc-members:
-
-Minion
-------
-
-.. automodule:: trollduction.minion
    :members:
    :undoc-members:
 
