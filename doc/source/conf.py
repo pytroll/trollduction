@@ -16,6 +16,8 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 # sys.path.insert(0, os.path.abspath('.'))
 
+import sys, os
+
 class Mock(object):
     def __init__(self, *args, **kwargs):
         pass
@@ -36,7 +38,7 @@ class Mock(object):
         else:
             return Mock()
 
-MOCK_MODULES = ['mpop',]
+MOCK_MODULES = ['mpop', 'h5py', 'netCDF4']
 
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
