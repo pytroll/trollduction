@@ -37,6 +37,7 @@ from ConfigParser import ConfigParser
 import logging
 import logging.config
 import os.path
+import datetime as dt
 
 LOGGER = logging.getLogger(__name__)
 
@@ -153,6 +154,19 @@ class EventHandler(ProcessEvent):
                     if key in self.aliases:
                         self.info[key] = self.aliases[key][str(self.info[key])]
 
+            # add start_time and end_time if not present
+            try:
+                base_time = self.info["time"]
+            except KeyError:
+                try:
+                    base_time = self.info["nominal_time"]
+                except KeyError:
+                    base_time = self.info["start_time"]
+            if "start_time" not in self.info:
+                self.info["start_time"] = base_time
+            if "end_time" not in self.info:
+                self.info["end_time"] = base_time + dt.timedelta(minutes=15)
+
 
 class NewThreadedNotifier(ThreadedNotifier):
 
@@ -187,6 +201,7 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
                                  filepattern=filepattern,
                                  aliases=aliases,
                                  tbus_orbit=tbus_orbit)
+
     notifier = NewThreadedNotifier(manager, event_handler)
 
     # Add directories and event masks to watch manager
@@ -319,6 +334,7 @@ def main():
             pass
         aliases = parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
+
         try:
             log_config = config["stalker_log_config"]
         except KeyError:
