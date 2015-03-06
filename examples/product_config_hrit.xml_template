@@ -5,6 +5,9 @@
   <common>
     <output_dir>/tmp</output_dir>
     <unload>False</unload>
+    <!-- To remove all area coverage checks, eg. for running without
+         TLE data, uncomment the following row. -->
+    <!-- <check_coverage>False</check_coverage> -->
   </common>
 
   <variables>
