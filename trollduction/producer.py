@@ -369,8 +369,6 @@ class DataProcessor(object):
 
         platform = mda["platform_name"]
 
-        satnumber = str(mda.get("satnumber", ""))
-
         LOGGER.info("platform %s time %s",
                     str(platform), str(time_slot))
 
@@ -381,7 +379,7 @@ class DataProcessor(object):
 
         # Create satellite scene
         global_data = GF.create_scene(satname=str(platform),
-                                      satnumber=satnumber,
+                                      satnumber='',
                                       instrument=str(sensor),
                                       time_slot=time_slot,
                                       orbit=mda['orbit_number'],
