@@ -460,6 +460,14 @@ class DataProcessor(object):
 
         self.product_config = product_config
 
+        # Replace incoming information with aliases, if such exist
+        for key in product_config.aliases:
+            if key in msg.data:
+                LOGGER.debug("Replacing %s with alias: %s -> %s",
+                             key, msg.data[key],
+                             product_config.aliases[key][msg.data[key]])
+                msg.data[key] = product_config.aliases[key][msg.data[key]]
+
         self.global_data = self.create_scene_from_message(msg)
         self._data_ok = True
 
