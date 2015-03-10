@@ -301,8 +301,12 @@ def publish_level2(publisher, result_files, sat, orb, instr, start_t, end_t):
             to_send['sensor'] = instr
         to_send['platform_name'] = sat
         to_send['orbit_number'] = orb
-        to_send['format'] = 'PPS'
-        to_send['type'] = 'netCDF4'
+        if result_file.endswith("nc"):
+            to_send['format'] = 'CF'
+            to_send['type'] = 'netCDF4'
+        if result_file.endswith("h5"):
+            to_send['format'] = 'PPS'
+            to_send['type'] = 'HDF5'
         to_send['data_processing_level'] = '2'
         to_send['start_time'], to_send['end_time'] = start_t, end_t
 

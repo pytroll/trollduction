@@ -839,7 +839,7 @@ def _create_message(obj, filename, uri, params):
     # we should have more info on format...
     fformat = os.path.splitext(filename)[1][1:]
     if fformat.startswith("tif"):
-        fformat = "GeoTIFF"
+        fformat = "TIFF"
     elif fformat.startswith("png"):
         fformat = "PNG"
     elif fformat.startswith("jp"):
@@ -847,13 +847,21 @@ def _create_message(obj, filename, uri, params):
     elif fformat.startswith("nc"):
         fformat = "NetCDF"
     to_send["type"] = fformat
-    if fformat != "NetCDF":
+    if fformat not in ["NetCDF", "HDF5", "GeoTIFF"]:
         to_send["format"] = "raster"
         to_send["data_processing_level"] = "2"
         to_send["product_name"] = obj.info["product_name"]
-    else:
+    elif fformat == "TIFF":
+        to_send["format"] = "GeoTIFF"
+        to_send["data_processing_level"] = "2"
+        to_send["product_name"] = obj.info["product_name"]
+    elif fformat == "NetCDF":
         to_send["format"] = "CF"
         to_send["data_processing_level"] = "1b"
+        to_send["product_name"] = "dump"
+    elif fformat == "HDF5":
+        to_send["format"] = "PPS"
+        to_send["data_processing_level"] = "2"
         to_send["product_name"] = "dump"
 
     subject = "/".join(("",
