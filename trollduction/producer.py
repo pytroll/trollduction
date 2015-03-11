@@ -863,8 +863,8 @@ def _create_message(obj, filename, uri, params):
         to_send["product_name"] = "dump"
     elif fformat == "HDF5":
         to_send["format"] = "PPS"
-        to_send["data_processing_level"] = "2"
-        to_send["product_name"] = "dump"
+        to_send["data_processing_level"] = "3"
+        to_send["product_name"] = "cloudproduct"
 
     subject = "/".join(("",
                         to_send["format"],
