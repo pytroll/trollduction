@@ -303,7 +303,7 @@ def publish_level2(publisher, result_files, sat, orb, instr, start_t, end_t):
         to_send['orbit_number'] = orb
         if result_file.endswith("nc"):
             to_send['format'] = 'CF'
-            to_send['type'] = 'netCDF4'
+            to_send['type'] = 'NetCDF4'
         if result_file.endswith("h5"):
             to_send['format'] = 'PPS'
             to_send['type'] = 'HDF5'

@@ -845,9 +845,11 @@ def _create_message(obj, filename, uri, params):
     elif fformat.startswith("jp"):
         fformat = "JPEG"
     elif fformat.startswith("nc"):
-        fformat = "NetCDF"
+        fformat = "NetCDF4"
+    elif fformat in ["hdf", "h5"]:
+        fformat = "HDF5"
     to_send["type"] = fformat
-    if fformat not in ["NetCDF", "HDF5", "GeoTIFF"]:
+    if fformat not in ["NetCDF4", "HDF5", "TIFF"]:
         to_send["format"] = "raster"
         to_send["data_processing_level"] = "2"
         to_send["product_name"] = obj.info["product_name"]
@@ -855,7 +857,7 @@ def _create_message(obj, filename, uri, params):
         to_send["format"] = "GeoTIFF"
         to_send["data_processing_level"] = "2"
         to_send["product_name"] = obj.info["product_name"]
-    elif fformat == "NetCDF":
+    elif fformat == "NetCDF4":
         to_send["format"] = "CF"
         to_send["data_processing_level"] = "1b"
         to_send["product_name"] = "dump"

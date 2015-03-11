@@ -635,7 +635,7 @@ def publish_level1(publisher, result_files, satellite, orbit, start_t, end_t):
         to_send['platform_name'] = satellite
         to_send['orbit_number'] = int(orbit)
         to_send['format'] = 'AAPP-HRPT'
-        to_send['type'] = 'Binary'
+        to_send['type'] = 'binary'
         to_send['data_processing_level'] = result_files[key]['level']
         LOG.debug('level in message: ' + str(to_send['data_processing_level']))
         environment = MODE
