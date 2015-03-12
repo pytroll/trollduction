@@ -808,7 +808,7 @@ class DataProcessor(object):
         return True
 
 
-def _create_message(obj, filename, uri, params):
+def _create_message(obj, filename, uri, params, uid=None):
     to_send = obj.info.copy()
 
     for key in ['collection', 'dataset']:
@@ -835,7 +835,7 @@ def _create_message(obj, filename, uri, params):
 
     # FIXME: fishy: what if the uri already has a scheme ?
     to_send["uri"] = urlunsplit(("file", "", uri, "", ""))
-    to_send["uid"] = os.path.basename(filename)
+    to_send["uid"] = uid or os.path.basename(filename)
     # we should have more info on format...
     fformat = os.path.splitext(filename)[1][1:]
     if fformat.startswith("tif"):
@@ -982,6 +982,7 @@ class DataWriter(Thread):
                                          compression=copy.attrib.get("compression", 6))
                                 LOGGER.info("Saved %s to %s", str(obj), fname)
                                 saved = fname
+                                uid = os.path.basename(fname)
                             else:
                                 link_or_copy(saved, fname)
                                 saved = fname
@@ -998,7 +999,7 @@ class DataWriter(Thread):
                                 thumbnail(fname, thname, thsize, fformat)
 
                             msg = _create_message(obj, os.path.basename(fname),
-                                                  fname, params)
+                                                  fname, params, uid=uid)
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
                 except:
