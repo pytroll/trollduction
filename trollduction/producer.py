@@ -183,8 +183,9 @@ class ConfigWatcher(object):
 def covers(overpass, area_item):
     try:
         area_def = get_area_def(area_item.attrib['id'])
-        min_coverage = float(
-            area_item.attrib.get('min_coverage', 0))
+        min_coverage = float(area_item.attrib.get('min_coverage', 0))
+        if min_coverage == 0 or overpass is None:
+            return True
         min_coverage /= 100.0
         coverage = overpass.area_coverage(area_def)
         if coverage <= min_coverage:
@@ -316,8 +317,9 @@ def coverage(scene, area):
 
 def generic_covers(scene, area_item):
     area_def = get_area_def(area_item.attrib['id'])
-    min_coverage = float(
-        area_item.attrib.get('min_coverage', 0))
+    min_coverage = float(area_item.attrib.get('min_coverage', 0))
+    if min_coverage == 0:
+        return True
     min_coverage /= 100.0
     cov = coverage(scene, area_def)
     if cov <= min_coverage:
@@ -384,11 +386,19 @@ class DataProcessor(object):
                                       variant=mda.get('variant', ''))
         LOGGER.debug("Creating scene for satellite %s and time %s",
                      str(platform), str(time_slot))
-        if mda['orbit_number'] is not None or mda.get('orbit_type') == "polar":
+
+        check_coverage = \
+            self.product_config.attrib.get("check_coverage",
+                                           "true") in ("true", "yes", "1")
+
+        if check_coverage and (mda['orbit_number'] is not None or
+                        mda.get('orbit_type') == "polar"):
             global_data.overpass = Pass(platform,
                                         mda['start_time'],
                                         mda['end_time'],
                                         instrument=sensor)
+        else:
+            global_data.overpass = None
 
         # Update missing information to global_data.info{}
         # TODO: this should be fixed in mpop.
@@ -448,12 +458,30 @@ class DataProcessor(object):
             LOGGER.info("Skipping...")
             return
 
-        self.global_data = self.create_scene_from_message(msg)
-
-        self._data_ok = True
         self.product_config = product_config
 
+        # Replace incoming information with aliases, if such exist
+        for key in product_config.aliases:
+            if key in msg.data:
+                LOGGER.debug("Replacing %s with alias: %s -> %s",
+                             key, msg.data[key],
+                             product_config.aliases[key][msg.data[key]])
+                msg.data[key] = product_config.aliases[key][msg.data[key]]
+
+        self.global_data = self.create_scene_from_message(msg)
+        self._data_ok = True
+
         area_def_names = self.get_area_def_names()
+
+        nprocs = int(self.product_config.attrib.get("nprocs", 1))
+        proj_method = self.product_config.attrib.get("proj_method", "nearest")
+        LOGGER.info("Using %d CPUs for reprojecting with method %s.",
+                    nprocs, proj_method)
+        precompute = \
+            self.product_config.attrib.get("precompute", "").lower() in \
+            ["true", "yes", "1"]
+        if precompute:
+            LOGGER.debug("Saving projection mapping for re-use")
 
         for area_item in self.product_config.pl:
             if area_item.tag == "dump":
@@ -463,7 +491,7 @@ class DataProcessor(object):
                                     self.get_parameters(area_item))
 
         for group in self.product_config.groups:
-            LOGGER.debug("processing %s", str(group))
+            LOGGER.debug("processing %s", group.info['id'])
             area_def_names = self.get_area_def_names(group.data)
             products = []
             skip = []
@@ -494,8 +522,8 @@ class DataProcessor(object):
                 LOGGER.debug("unloading all channels before group %s",
                              group.id)
             try:
-                LOGGER.debug("loading channels : %s",
-                             str(self.get_req_channels(products)))
+                req_channels = self.get_req_channels(products)
+                LOGGER.debug("loading channels: %s", str(req_channels))
                 keywords = {"filename": filename,
                             "area_def_names": area_def_names}
                 try:
@@ -505,9 +533,9 @@ class DataProcessor(object):
                     pass
                 if "resolution" in group.info:
                     keywords["resolution"] = int(group.resolution)
-                self.global_data.load(self.get_req_channels(products),
-                                      **keywords)
-                LOGGER.debug("loaded data : %s", str(self.global_data))
+
+                self.global_data.load(req_channels, **keywords)
+                LOGGER.debug("loaded data: %s", str(self.global_data))
             except IndexError:
                 LOGGER.exception("Incomplete or corrupted input data.")
                 self._data_ok = False
@@ -528,7 +556,8 @@ class DataProcessor(object):
                         self.global_data.project(
                             area_item.attrib["id"],
                             channels=self.get_req_channels(area_item),
-                            mode='nearest')
+                            mode=proj_method, nprocs=nprocs,
+                            precompute=precompute)
                 except ValueError:
                     LOGGER.warning("No data in this area")
                     continue
@@ -690,7 +719,9 @@ class DataProcessor(object):
                                   product.attrib['sunzen_lonlat'].split(',')]
                     else:
                         lonlat = None
-                if not self.check_sunzen(product.attrib, area_def=get_area_def(area.attrib['id']),
+                if not self.check_sunzen(product.attrib,
+                                         area_def=\
+                                         get_area_def(area.attrib['id']),
                                          xy_loc=xy_loc, lonlat=lonlat):
                     # If the return value is False, skip this product
                     continue
@@ -698,11 +729,12 @@ class DataProcessor(object):
             try:
                 # Check if this combination is defined
                 func = getattr(self.local_data.image, product.attrib['id'])
-                LOGGER.debug("Generating %s", product.attrib['id'])
+                LOGGER.debug("Generating composite \"%s\"",
+                             product.attrib['id'])
                 img = func()
                 img.info.update(self.global_data.info)
-                img.info["product_name"] = product.attrib.get("name",
-                                                              product.attrib["id"])
+                img.info["product_name"] = \
+                    product.attrib.get("name", product.attrib["id"])
             except AttributeError:
                 # Log incorrect product funcion name
                 LOGGER.error('Incorrect product id: %s for area %s',
@@ -710,7 +742,8 @@ class DataProcessor(object):
             except KeyError as err:
                 # log missing channel
                 LOGGER.warning('Missing channel on product %s for area %s: %s',
-                               product.attrib['name'], area.attrib['name'], str(err))
+                               product.attrib['name'], area.attrib['name'],
+                               str(err))
             except Exception:
                 # log other errors
                 LOGGER.exception('Error on product %s for area %s',
@@ -1152,6 +1185,7 @@ class Trollduction(object):
                     sensors = set(msg.data['sensor'])
                 else:
                     sensors = set((msg.data['sensor'], ))
+
                 if (msg.type in ["file", 'collection', 'dataset'] and
                         sensors.intersection(self.td_config['instruments'].split(','))):
                     self.update_product_config(self.td_config['product_config_file'],
