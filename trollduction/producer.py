@@ -473,6 +473,16 @@ class DataProcessor(object):
 
         area_def_names = self.get_area_def_names()
 
+        nprocs = int(self.product_config.attrib.get("nprocs", 1))
+        proj_method = self.product_config.attrib.get("proj_method", "nearest")
+        LOGGER.info("Using %d CPUs for reprojecting with method %s.",
+                    nprocs, proj_method)
+        precompute = \
+            self.product_config.attrib.get("precompute", "").lower() in \
+            ["true", "yes", "1"]
+        if precompute:
+            LOGGER.debug("Saving projection mapping for re-use")
+
         for area_item in self.product_config.pl:
             if area_item.tag == "dump":
                 self.global_data.load(filename=filename)
@@ -546,7 +556,8 @@ class DataProcessor(object):
                         self.global_data.project(
                             area_item.attrib["id"],
                             channels=self.get_req_channels(area_item),
-                            mode='nearest')
+                            mode=proj_method, nprocs=nprocs,
+                            precompute=precompute)
                 except ValueError:
                     LOGGER.warning("No data in this area")
                     continue
@@ -1163,6 +1174,7 @@ class Trollduction(object):
                     sensors = set(msg.data['sensor'])
                 else:
                     sensors = set((msg.data['sensor'], ))
+
                 if (msg.type in ["file", 'collection', 'dataset'] and
                         sensors.intersection(self.td_config['instruments'].split(','))):
                     self.update_product_config(self.td_config['product_config_file'],
