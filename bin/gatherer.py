@@ -171,7 +171,7 @@ def setup(regions, decoder):
                                                       [glob],
                                                       observer_class)
 
-        else observer_class is "posttroll":
+        else:
             LOGGER.debug("Using posttroll for %s", section)
             granule_trigger = trigger.PostTrollTrigger(
                 collectors, terminator,
