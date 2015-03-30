@@ -8,6 +8,15 @@
     <!-- To remove all area coverage checks, eg. for running without
          TLE data, uncomment the following row. -->
     <!-- <check_coverage>False</check_coverage> -->
+    <!-- Number of processors to use in resampling. If not specified,
+         use one CPU. -->
+    <!-- nprocs>4</nprocs -->
+    <!-- Projection method. If not specified, use 'nearest' -->
+    <!-- proj_method>nearest</proj_method -->
+    <!-- Save reprojection information for re-use. Speeds up
+         resampling, but may in some cases cause erroneus
+         results. Default False. -->
+    <!--precompute>True</precompute-->
   </common>
 
   <variables>
