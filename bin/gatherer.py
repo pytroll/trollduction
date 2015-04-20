@@ -40,6 +40,7 @@ LOGGER = logging.getLogger(__name__)
 CONFIG = RawConfigParser()
 PUB = None
 
+
 def get_metadata(fname):
     '''Parse metadata from the file.
     '''
@@ -120,6 +121,7 @@ def terminator(metadata):
     LOGGER.info("sending %s", str(msg))
     PUB.send(str(msg))
 
+
 def arg_parse():
     '''Handle input arguments.
     '''
@@ -154,14 +156,13 @@ def setup(regions, decoder):
         collectors = [region_collector.RegionCollector(
             region, timeliness, duration) for region in regions]
 
-        pattern = CONFIG.get(section, "pattern")
         try:
             observer_class = CONFIG.get(section, "watcher")
+            pattern = CONFIG.get(section, "pattern")
+            parser = Parser(pattern)
+            glob = parser.globify()
         except NoOptionError:
             observer_class = None
-
-        parser = Parser(pattern)
-        glob = parser.globify()
 
         if observer_class in ["PollingObserver", "Observer"]:
             LOGGER.debug("Using %s for %s", observer_class, section)
