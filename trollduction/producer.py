@@ -392,7 +392,7 @@ class DataProcessor(object):
                                            "true") in ("true", "yes", "1")
 
         if check_coverage and (mda['orbit_number'] is not None or
-                        mda.get('orbit_type') == "polar"):
+                               mda.get('orbit_type') == "polar"):
             global_data.overpass = Pass(platform,
                                         mda['start_time'],
                                         mda['end_time'],
@@ -459,14 +459,6 @@ class DataProcessor(object):
             return
 
         self.product_config = product_config
-
-        # Replace incoming information with aliases, if such exist
-        for key in product_config.aliases:
-            if key in msg.data:
-                LOGGER.debug("Replacing %s with alias: %s -> %s",
-                             key, msg.data[key],
-                             product_config.aliases[key][msg.data[key]])
-                msg.data[key] = product_config.aliases[key][msg.data[key]]
 
         self.global_data = self.create_scene_from_message(msg)
         self._data_ok = True
@@ -720,8 +712,8 @@ class DataProcessor(object):
                     else:
                         lonlat = None
                 if not self.check_sunzen(product.attrib,
-                                         area_def=\
-                                         get_area_def(area.attrib['id']),
+                                         area_def=get_area_def(
+                                             area.attrib['id']),
                                          xy_loc=xy_loc, lonlat=lonlat):
                     # If the return value is False, skip this product
                     continue
