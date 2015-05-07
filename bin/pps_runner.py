@@ -45,7 +45,12 @@ PPS_OUTPUT_DIR = OPTIONS['pps_outdir']
 LVL1_NPP_PATH = os.environ.get('LVL1_NPP_PATH', None)
 LVL1_EOS_PATH = os.environ.get('LVL1_EOS_PATH', None)
 
-SERVERNAME = OPTIONS['servername']
+
+servername = None
+import socket
+servername = socket.gethostname()
+SERVERNAME = OPTIONS.get('servername', servername)
+
 
 SUPPORTED_NOAA_SATELLITES = ['NOAA-15', 'NOAA-18', 'NOAA-19']
 SUPPORTED_METOP_SATELLITES = ['Metop-B', 'Metop-A']
