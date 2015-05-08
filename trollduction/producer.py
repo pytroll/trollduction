@@ -485,6 +485,7 @@ class DataProcessor(object):
         for group in self.product_config.groups:
             LOGGER.debug("processing %s", group.info['id'])
             area_def_names = self.get_area_def_names(group.data)
+            LOGGER.debug("areas: %s", str(area_def_names))
             products = []
             skip = []
             skip_group = True
@@ -615,7 +616,7 @@ class DataProcessor(object):
         pl = group or self.product_config.pl
 
         def_names = [item.attrib["id"]
-                     for item in self.product_config.pl
+                     for item in pl
                      if item.tag == "area"]
 
         return def_names
