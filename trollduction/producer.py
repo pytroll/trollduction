@@ -599,8 +599,8 @@ class DataProcessor(object):
             if product.tag == "dump":
                 return None
             try:
-                composite = getattr(
-                    self.global_data.image, product.attrib['id'])
+                composite = getattr(self.global_data.image,
+                                    product.attrib['id'])
                 reqs |= composite.prerequisites
             except AttributeError:
                 LOGGER.info("Composite %s not available",

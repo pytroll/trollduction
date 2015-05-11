@@ -25,7 +25,7 @@
 """
 
 from ConfigParser import RawConfigParser, NoOptionError
-from trollsift import Parser
+from trollsift import Parser, compose
 from datetime import timedelta, datetime
 from trollduction.collectors import trigger
 from trollduction.collectors import region_collector
@@ -87,17 +87,20 @@ def get_metadata(fname):
     return res
 
 
-def terminator(metadata):
+def terminator(metadata, publish_topic=None):
     """Dummy terminator function.
     """
     sorted_mda = sorted(metadata, key=lambda x: x["start_time"])
 
     mda = metadata[0].copy()
 
-    subject = "/".join(("",
-                        mda["format"],
-                        mda["data_processing_level"],
-                        ''))
+    if publish_topic is not None:
+        LOGGER.info("Composing topic.")
+        subject = compose(publish_topic, mda)
+    else:
+        LOGGER.warning("Using default topic.")
+        subject = "/".join(("", mda["format"], mda["data_processing_level"],
+                            ''))
 
     mda['end_time'] = sorted_mda[-1]['end_time']
 
@@ -164,20 +167,28 @@ def setup(regions, decoder):
         except NoOptionError:
             observer_class = None
 
+        try:
+            publish_topic = CONFIG.get(section, "publish_topic")
+        except NoOptionError:
+            publish_topic = None
+
         if observer_class in ["PollingObserver", "Observer"]:
             LOGGER.debug("Using %s for %s", observer_class, section)
-            granule_trigger = trigger.WatchDogTrigger(collectors,
-                                                      terminator,
-                                                      decoder,
-                                                      [glob],
-                                                      observer_class)
+            granule_trigger = \
+                trigger.WatchDogTrigger(collectors,
+                                        terminator,
+                                        decoder,
+                                        [glob],
+                                        observer_class,
+                                        publish_topic=publish_topic)
 
         else:
             LOGGER.debug("Using posttroll for %s", section)
             granule_trigger = trigger.PostTrollTrigger(
                 collectors, terminator,
                 CONFIG.get(section, 'service').split(','),
-                CONFIG.get(section, 'topics').split(','))
+                CONFIG.get(section, 'topics').split(','),
+                publish_topic=publish_topic)
         granule_triggers.append(granule_trigger)
 
     return granule_triggers
