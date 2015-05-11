@@ -98,7 +98,7 @@ def terminator(metadata, publish_topic=None):
         LOGGER.info("Composing topic.")
         subject = compose(publish_topic, mda)
     else:
-        LOGGER.warning("Using default topic.")
+        LOGGER.info("Using default topic.")
         subject = "/".join(("", mda["format"], mda["data_processing_level"],
                             ''))
 
