@@ -533,7 +533,7 @@ def pps_rolling_runner():
 
     files4pps = {}
     threads = []
-    with posttroll.subscriber.Subscribe("", ['AAPP-HRPT', 'EOS/1', 'SDR/1B'],
+    with posttroll.subscriber.Subscribe("", ['AAPP-HRPT/1B', 'EOS/1B', 'SDR/1B'],
                                         True) as subscr:
         with Publish('pps_runner', 0, ['PPS', ]) as publisher:
             while True:
