@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014
+# Copyright (c) 2014, 2015
 
 # Author(s):
 
-#   Panu Lahtinen <pnuu+git@iki.fi>
+#   Panu Lahtinen <panu.lahtinen@fmi.fi>
+#   Martin Raspaud <martin.raspaud@smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,11 +28,12 @@ import xml.etree.ElementTree as etree
 import os
 import logging
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class InfoObject(object):
-
+    """InfoObject class.
+    """
     def __init__(self, **attributes):
         self.info = attributes
 
@@ -42,11 +44,14 @@ class InfoObject(object):
             raise AttributeError
 
     def get(self, key, default=None):
+        """Return the requested info.
+        """
         return self.info.get(key, default)
 
 
 class Dataset(InfoObject):
-
+    """Dataset class.
+    """
     def __init__(self, data, **attributes):
         InfoObject.__init__(self, **attributes)
         self.data = data
@@ -58,6 +63,8 @@ class Dataset(InfoObject):
         return repr(self.data) + "\n" + repr(self.info)
 
     def copy(self, copy_data=True):
+        """Return a copy of the data.
+        """
         if copy_data:
             data = self.data.copy()
         else:
@@ -66,13 +73,14 @@ class Dataset(InfoObject):
 
 
 class ProductList(object):
-
+    """Class for reading and storing product lists.
+    """
     def __init__(self, fname):
         self.fname = fname
 
         tree = etree.parse(fname)
         self._xml = tree.getroot()
-        self.pl = None
+        self.prodlist = None
         self.attrib = {}
         self.vars = {}
         self.aliases = {}
@@ -82,16 +90,17 @@ class ProductList(object):
     def insert_vars(self):
         """Variable replacement
         """
-        for item in self.pl.getiterator():
+        for item in self.prodlist.getiterator():
             for key in self.vars:
                 if key in item.attrib and item.attrib[key] in self.vars[key]:
                     item.set(key, self.vars[key][item.attrib[key]])
 
     def check_groups(self):
-
+        """Check area groups.
+        """
         # create the "rest" group
         last_group = []
-        for area in self.pl:
+        for area in self.prodlist:
             assigned = False
             for group in self.groups:
                 if area.attrib["id"] in group.data:
@@ -108,21 +117,23 @@ class ProductList(object):
             new_group = Dataset([], **group.info)
             for area_id in group.data:
                 assigned = False
-                for area in self.pl:
+                for area in self.prodlist:
                     if area.attrib["id"] == area_id:
                         new_group.data.append(area)
                         assigned = True
                         break
                 if not assigned:
-                    logger.warning("Couldn't find area %s in product list",
+                    LOGGER.warning("Couldn't find area %s in product list",
                                    area_id)
             groups.append(new_group)
         self.groups = groups
 
     def parse(self):
+        """Parse product list XML file.
+        """
         for item in self._xml:
             if item.tag == "product_list":
-                self.pl = item
+                self.prodlist = item
             elif item.tag == "common":
                 for citem in item:
                     self.attrib[citem.tag] = citem.text
@@ -163,7 +174,7 @@ def parse_xml(tree, also_empty=False):
     '''
     xml_dict = {}
 
-    # this tags will always be lists, if they are present and non-empty
+    # these tags will always be lists, if they are present and non-empty
     listify = ['area', 'product', 'valid_satellite', 'invalid_satellite',
                'pattern', 'file_tag', 'directory']
     children = list(tree)
