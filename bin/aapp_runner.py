@@ -236,7 +236,7 @@ class AappLvl1Processor(object):
         for fname in filenames:
             mstr = os.path.basename(fname).split('_')[0]
             if mstr == 'hrpt':
-                lvl = '1b'
+                lvl = '1B'
                 instr = 'avhrr/3'
             else:
                 lvl = mstr[-2:]
@@ -721,7 +721,7 @@ def pack_aapplvl1_files(aappfiles, base_dir, subdir, satnum):
             firstname = name_converter.get(in_name)
             instr = 'avhrr/3'
             # Could also be 'avhrr'. Will anyhow be converted below...
-            level = '1b'
+            level = '1B'
         else:
             instr = name_converter.get(in_name, in_name)
             LOG.debug("Sensor = " + str(instr) + " from " + str(in_name))
