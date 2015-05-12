@@ -716,7 +716,7 @@ def pack_aapplvl1_files(aappfiles, base_dir, subdir, satnum):
             except ValueError:
                 pass
             firstname = instr + ext
-            level = ext.strip('l')
+            level = ext.strip('l').upper()
         elif in_name == 'hrpt':
             firstname = name_converter.get(in_name)
             instr = 'avhrr/3'
@@ -726,7 +726,7 @@ def pack_aapplvl1_files(aappfiles, base_dir, subdir, satnum):
             instr = name_converter.get(in_name, in_name)
             LOG.debug("Sensor = " + str(instr) + " from " + str(in_name))
             firstname = instr + ext
-            level = ext.strip('l')
+            level = ext.strip('l').upper()
 
         newfilename = os.path.join(path, "%s_%s.%s" % (firstname,
                                                        subdir, ext))
