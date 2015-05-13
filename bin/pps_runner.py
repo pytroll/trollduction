@@ -324,6 +324,7 @@ class FilePublisher(threading.Thread):
                     5 * 60.0, reset_job_registry, args=(self.jobs, keyname))
                 t__.start()
 
+                LOG.info("Publish the files with publish_level2...")
                 publish_level2(publisher, result_files,
                                scene['satid'],
                                scene['orbit_number'],
@@ -341,6 +342,8 @@ def publish_level2(publisher, result_files, sat, orb, instr, start_t, end_t):
     # Now publish:
     for result_file in result_files:
         filename = os.path.split(result_file)[1]
+        LOG.info("file to publish = " + str(filename))
+
         to_send = {}
         to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
         to_send['uid'] = filename
@@ -366,6 +369,7 @@ def publish_level2(publisher, result_files, sat, orb, instr, start_t, end_t):
                       '/norrköping/' + environment + '/polar/direct_readout/',
                       "file", to_send).encode()
         LOG.debug("sending: " + str(msg))
+        LOG.info("Sending: " + str(msg))
         publisher.send(msg)
 
 
