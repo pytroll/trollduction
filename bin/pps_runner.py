@@ -40,7 +40,7 @@ OPTIONS = {}
 for option, value in CONF.items(MODE, raw=True):
     OPTIONS[option] = value
 
-#PPS_OUTPUT_DIR = os.environ.get('SM_PRODUCT_DIR', OPTIONS['pps_outdir'])
+# PPS_OUTPUT_DIR = os.environ.get('SM_PRODUCT_DIR', OPTIONS['pps_outdir'])
 PPS_OUTPUT_DIR = OPTIONS['pps_outdir']
 LVL1_NPP_PATH = os.environ.get('LVL1_NPP_PATH', None)
 LVL1_EOS_PATH = os.environ.get('LVL1_EOS_PATH', None)
@@ -251,8 +251,10 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
 
     if do_time_control:
         LOG.info("Read time control ascii file and generate XML")
+        platform_id = SATELLITE_NAME.get(scene['satid'], scene['satid'])
+        LOG.info("pps platform_id = " + str(platform_id))
         txt_time_file = (os.path.join(pps_control_path, 'S_NWC_timectrl_') +
-                         str(METOP_NAME_LETTER.get(scene['satid'], scene['satid'])) +
+                         str(METOP_NAME_LETTER.get(platform_id, platform_id)) +
                          '_' + str(scene['orbit_number']) + '*.txt')
         LOG.info("glob string = " + str(txt_time_file))
         infiles = glob(txt_time_file)
@@ -452,7 +454,7 @@ def ready2run(msg, files4pps, job_register, sceneid):
     orbit_number = int(msg.data['orbit_number'])
     LOG.debug("Orbit number: " + str(orbit_number))
 
-    #sensor = (msg.data['sensor'])
+    # sensor = (msg.data['sensor'])
     platform_name = msg.data['platform_name']
 
     if platform_name not in SATELLITE_NAME:
