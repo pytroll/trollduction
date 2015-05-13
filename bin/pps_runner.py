@@ -154,7 +154,7 @@ def get_outputfiles(path, satid, orb):
         "Match string to do a file globbing on netcdf output files: " + str(nc_output))
     xml_output = (os.path.join(path, 'S_NWC') + '*' +
                   str(METOP_NAME_LETTER.get(satid, satid)) +
-                  '_' + str(orb) + '*statistics.xml')
+                  '_' + str(orb) + '*.xml')
     LOG.info(
         "Match string to do a file globbing on xml output files: " + str(xml_output))
     return glob(h5_output) + glob(nc_output) + glob(xml_output)
@@ -238,14 +238,34 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
     LOG.info(
         "Ready with PPS level-2 processing on scene: " + str(scene))
 
+    # Now try perform som time statistics editing with ppsTimeControl.py from
+    # pps:
+    do_time_control = True
+    try:
+        from pps_time_control import PPSTimeControl
+    except ImportError:
+        LOG.warning("Failed to import the PPSTimeControl from pps")
+        do_time_control = False
+
+    pps_control_path = my_env.get('STATISTICS_DIR', PPS_OUTPUT_DIR)
+
+    if do_time_control:
+        LOG.info("Read time control ascii file and generate XML")
+        txt_time_file = (os.path.join(pps_control_path, 'S_NWC_timectrl_') +
+                         str(METOP_NAME_LETTER.get(satid, satid)) +
+                         '_' + str(orb) + '*.txt')
+        infile = glob(txt_time_file)[0]
+        ppstime_con = PPSTimeControl(infile)
+        ppstime_con.sum_up_processing_times()
+        ppstime_con.write_xml()
+
     # Now check what netCDF/hdf5 output was produced and publish them:
     pps_path = my_env.get('SM_PRODUCT_DIR', PPS_OUTPUT_DIR)
     result_files = get_outputfiles(
         pps_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
     LOG.info("PPS Output files: " + str(result_files))
-    pps_path = my_env.get('STATISTICS_DIR', PPS_OUTPUT_DIR)
     xml_files = get_outputfiles(
-        pps_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
+        pps_control_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
     LOG.info("PPS summary statistics files: " + str(xml_files))
     queue.put((publisher, scene, result_files + xml_files))
     semaphore_obj.release()
