@@ -252,12 +252,17 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
     if do_time_control:
         LOG.info("Read time control ascii file and generate XML")
         txt_time_file = (os.path.join(pps_control_path, 'S_NWC_timectrl_') +
-                         str(METOP_NAME_LETTER.get(satid, satid)) +
-                         '_' + str(orb) + '*.txt')
-        infile = glob(txt_time_file)[0]
-        ppstime_con = PPSTimeControl(infile)
-        ppstime_con.sum_up_processing_times()
-        ppstime_con.write_xml()
+                         str(METOP_NAME_LETTER.get(scene['satid'], scene['satid'])) +
+                         '_' + str(scene['orbit_number']) + '*.txt')
+        LOG.info("glob string = " + str(txt_time_file))
+        infiles = glob(txt_time_file)
+        LOG.info("Time control xml file candidates: " + str(infiles))
+        if len(infiles) == 1:
+            infile = infiles[0]
+            LOG.info("Time control xml file: " + str(infile))
+            ppstime_con = PPSTimeControl(infile)
+            ppstime_con.sum_up_processing_times()
+            ppstime_con.write_xml()
 
     # Now check what netCDF/hdf5 output was produced and publish them:
     pps_path = my_env.get('SM_PRODUCT_DIR', PPS_OUTPUT_DIR)
