@@ -414,11 +414,14 @@ def ready2run(msg, files4pps, job_register, sceneid):
                 'Sensor ' + str(msg.data['sensor']) + ' not required...')
             return False
         if (msg.data['sensor'] in ['amsu-a', 'amsu-b', 'mhs'] and
-                msg.data['data_processing_level'] != '1c'):
-            LOG.info('Level not the required type for PPS for this sensor: ' +
-                     str(msg.data['sensor']) + ' ' +
-                     str(msg.data['data_processing_level']))
-            return False
+                msg.data['data_processing_level'] != '1C'):
+            if msg.data['data_processing_level'] == '1c':
+                LOG.warning("Level should be in upper case!")
+            else:
+                LOG.info('Level not the required type for PPS for this sensor: ' +
+                         str(msg.data['sensor']) + ' ' +
+                         str(msg.data['data_processing_level']))
+                return False
 
     # The orbit number is mandatory!
     orbit_number = int(msg.data['orbit_number'])
