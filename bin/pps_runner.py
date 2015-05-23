@@ -121,6 +121,8 @@ from subprocess import Popen, PIPE, STDOUT
 import threading
 from datetime import datetime, timedelta
 
+from nwcsafpps_runner.prepare_nwp import update_nwp
+
 
 def nonblock_read(output):
     """An attempt to catch any hangup in reading the output (stderr/stdout)
