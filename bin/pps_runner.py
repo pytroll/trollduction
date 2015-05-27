@@ -111,7 +111,6 @@ _PPS_LOG_FILE = OPTIONS.get('pps_log_file', os.environ['PPSRUNNER_LOG_FILE'])
 import sys
 from glob import glob
 import shutil
-
 from urlparse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
@@ -119,9 +118,11 @@ from posttroll.message import Message
 
 from subprocess import Popen, PIPE, STDOUT
 import threading
+import Queue
 from datetime import datetime, timedelta
 
 from nwcsafpps_runner.prepare_nwp import update_nwp
+SATNAME = {'Aqua': 'EOS-Aqua'}
 
 
 def nonblock_read(output):
@@ -187,7 +188,7 @@ def terminate_process(popen_obj, scene):
     return
 
 
-def pps_worker(publisher, scene, semaphore_obj, queue):
+def pps_worker(publisher, scene, queue):
     """Spawn/Start a PPS run on a new thread if available
 
         scene = {'satid': satid, 'orbit_number': orbit,
@@ -195,7 +196,7 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
                  'starttime': starttime, 'endtime': endtime}
     """
 
-    semaphore_obj.acquire()
+    # semaphore_obj.acquire()
     if scene['satid'] in SUPPORTED_EOS_SATELLITES:
         cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
                                      scene['orbit_number'], scene['satday'],
@@ -220,7 +221,7 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
     LOG.debug("...from config file = " + str(OPTIONS['pps_outdir']))
     pps_proc = Popen(myargs, shell=False, stderr=PIPE, stdout=PIPE)
     t__ = threading.Timer(
-        25 * 60.0, terminate_process, args=(pps_proc, scene, ))
+        20 * 60.0, terminate_process, args=(pps_proc, scene, ))
     t__.start()
 
     while True:
@@ -277,7 +278,7 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
         pps_control_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
     LOG.info("PPS summary statistics files: " + str(xml_files))
     queue.put((publisher, scene, result_files + xml_files))
-    semaphore_obj.release()
+    # semaphore_obj.release()
     return
 
 
@@ -538,23 +539,86 @@ def ready2run(msg, files4pps, job_register, sceneid):
         return True
 
 
-def check_threads(threads):
-    """Scan all threads and join those that are finished (dead)"""
+# def check_threads(threads):
+#     """Scan all threads and join those that are finished (dead)"""
 
-    # LOG.debug(str(threading.enumerate()))
-    for i, thread in enumerate(threads):
-        if thread.is_alive():
-            LOG.info("Thread " + str(i) + " alive...")
-        else:
-            LOG.info(
-                "Thread " + str(i) + " is no more alive...")
-            thread.join()
-            threads.remove(thread)
+#     # LOG.debug(str(threading.enumerate()))
+#     for i, thread in enumerate(threads):
+#         if thread.is_alive():
+#             LOG.info("Thread " + str(i) + " alive...")
+#         else:
+#             LOG.info(
+#                 "Thread " + str(i) + " is no more alive...")
+#             thread.join()
+#             threads.remove(thread)
 
-    return
+#     return
 
 
-def pps_rolling_runner():
+class PPSProcessor(threading.Thread):
+
+    def __init__(self, queue):
+        threading.Thread.__init__(self)
+        self.loop = True
+        self.queue = queue
+        self.jobs = {}
+        self.files4pps = {}
+
+    def stop(self):
+        """Stops the Processor"""
+        self.loop = False
+        self.queue.put(None)
+        self.files4pps = {}
+
+    def run(self):
+
+        while self.loop:
+            retv = None
+            try:
+                retv = self.queue.get(timeout=1)
+            except Queue.Empty:
+                continue
+
+            # Do something
+            if retv:
+                msg, publisher, publisher_thread, keyname = retv
+                platform_name = msg.data['platform_name']
+                LOG.info(msg)
+                satid = SATNAME.get(platform_name, platform_name)
+                start_time = msg.data['start_time']
+                end_time = msg.data['end_time']
+
+                LOG.info("Start running a PPS processor for the scene")
+
+                orbit_number = int(msg.data['orbit_number'])
+                LOG.debug("Orbit number: = " + str(orbit_number))
+
+                if platform_name not in SATELLITE_NAME:
+                    raise IOError(
+                        "Satellite not supported: " + str(platform_name))
+
+                sensors = SENSOR_LIST.get(platform_name, None)
+                satday = start_time.strftime('%Y%m%d')
+                sathour = start_time.strftime('%H%M')
+                scene = {'satid': satid, 'orbit_number': orbit_number,
+                         'satday': satday, 'sathour': sathour,
+                         'starttime': start_time, 'endtime': end_time,
+                         'sensor': sensors}
+                pps_worker(publisher, scene, publisher_thread.queue)
+                LOG.info("PPS processor for the scene with keyname " +
+                         str(keyname) + " ready")
+
+                # Clean the files4pps dict:
+                LOG.debug("files4pps: " + str(self.files4pps))
+                try:
+                    self.files4pps.pop(keyname)
+                except KeyError:
+                    LOG.warning("Failed trying to remove key " + str(keyname) +
+                                " from dictionary files4pps")
+                LOG.debug("After cleaning: files4pps = " + str(self.files4pps))
+
+
+def pps():
     """The PPS runner. Triggers processing of PPS main script once AAPP or CSPP
     is ready with a level-1 file"""
 
@@ -564,22 +628,21 @@ def pps_rolling_runner():
     now = datetime.utcnow()
     update_nwp(now - timedelta(days=1),
                [3, 6, 9, 12, 15, 18, 21, 24])
+    LOG.info("Ready with nwp preparation...")
 
-    sema = threading.Semaphore(3)
-    import Queue
-    q__ = Queue.Queue()
+    listener_q = Queue.Queue()
+    publisher_q = Queue.Queue()
+    p__ = PPSProcessor(listener_q)
+    p__.start()
 
-    pub_thread = FilePublisher(q__)
+    pub_thread = FilePublisher(publisher_q)
     pub_thread.start()
 
-    files4pps = {}
-    threads = []
     with posttroll.subscriber.Subscribe("", ['AAPP-HRPT', 'EOS/1B', 'SDR/1B'],
                                         True) as subscr:
         with Publish('pps_runner', 0, ['PPS', ]) as publisher:
             while True:
                 status = False
-                check_threads(threads)
                 for msg in subscr.recv(timeout=90):
                     keyname = None
                     if (msg and
@@ -597,68 +660,127 @@ def pps_rolling_runner():
                             keyname = (str(platform_name) + '_' +
                                        str(orbit_number))
 
-                    status = ready2run(msg, files4pps,
-                                       pub_thread.jobs, keyname)
-                    if status:
-                        # end the loop and spawn a pps process on the scene
-                        message = msg
-                        break
+                        status = ready2run(msg, p__.files4pps,
+                                           pub_thread.jobs, keyname)
+                        if status:
+                            listener_q.put(
+                                (msg, publisher, pub_thread, keyname))
 
-                    check_threads(threads)
+                    else:
+                        LOG.warning(
+                            "Some fields lacking in message: " + str(msg))
 
-                LOG.info("Start spawning a PPS processor for the scene")
-                orbit_number = int(message.data['orbit_number'])
-                LOG.debug("Orbit number: = " + str(orbit_number))
-
-                starttime = message.data['start_time']
-                try:
-                    endtime = message.data['end_time']
-                except KeyError:
-                    LOG.warning(
-                        "No end_time in message! Guessing start_time + 14 minutes...")
-                    endtime = message.data['start_time'] + \
-                        timedelta(seconds=60 * 14)
-
-                platform_name = message.data['platform_name']
-                if platform_name not in SATELLITE_NAME:
-                    raise IOError(
-                        "Satellite not supported: " + str(platform_name))
-
-                sensors = SENSOR_LIST.get(platform_name, None)
-                satday = starttime.strftime('%Y%m%d')
-                sathour = starttime.strftime('%H%M')
-                scene = {'satid': platform_name, 'orbit_number': orbit_number,
-                         'satday': satday, 'sathour': sathour,
-                         'starttime': starttime, 'endtime': endtime,
-                         'sensor': sensors}
-
-                t__ = threading.Thread(target=pps_worker, args=(publisher, scene,
-                                                                sema, q__))
-                threads.append(t__)
-                t__.start()
-
-                # Clean the files4pps dict:
-                LOG.debug("files4pps: " + str(files4pps))
-                try:
-                    files4pps.pop(keyname)
-                except KeyError:
-                    LOG.warning("Failed trying to remove key " + str(keyname) +
-                                " from dictionary files4pps")
-                LOG.debug("After cleaning: files4pps = " + str(files4pps))
-
-    LOG.info("Wait till all threads are dead...")
-    while True:
-        workers_ready = True
-        for thread in threads:
-            if thread.is_alive():
-                workers_ready = False
-
-        if workers_ready:
-            break
-
+    p__.stop()
     pub_thread.stop()
 
     return
+
+
+# def pps_rolling_runner():
+#     """The PPS runner. Triggers processing of PPS main script once AAPP or CSPP
+#     is ready with a level-1 file"""
+
+#     LOG.info("*** Start the PPS level-2 runner:")
+
+#     LOG.info("First check if NWP data should be downloaded and prepared")
+#     now = datetime.utcnow()
+#     update_nwp(now - timedelta(days=1),
+#                [3, 6, 9, 12, 15, 18, 21, 24])
+
+#     sema = threading.Semaphore(3)
+#     import Queue
+#     q__ = Queue.Queue()
+
+#     pub_thread = FilePublisher(q__)
+#     pub_thread.start()
+
+#     files4pps = {}
+#     threads = []
+#     with posttroll.subscriber.Subscribe("", ['AAPP-HRPT', 'EOS/1B', 'SDR/1B'],
+#                                         True) as subscr:
+#         with Publish('pps_runner', 0, ['PPS', ]) as publisher:
+#             while True:
+#                 status = False
+#                 check_threads(threads)
+#                 for msg in subscr.recv(timeout=90):
+#                     keyname = None
+#                     if (msg and
+#                             'platform_name' in msg.data and
+#                             'orbit_number' in msg.data):
+#                         orbit_number = int(msg.data['orbit_number'])
+#                         platform_name = msg.data['platform_name']
+#                         starttime = None
+#                         if 'start_time' in msg.data:
+#                             starttime = msg.data['start_time']
+#                             keyname = (str(platform_name) + '_' +
+#                                        str(orbit_number) + '_' +
+#                                        str(starttime.strftime('%Y%m%d%H%M')))
+#                         else:
+#                             keyname = (str(platform_name) + '_' +
+#                                        str(orbit_number))
+
+#                     status = ready2run(msg, files4pps,
+#                                        pub_thread.jobs, keyname)
+#                     if status:
+#                         # end the loop and spawn a pps process on the scene
+#                         message = msg
+#                         break
+
+#                     check_threads(threads)
+
+#                 LOG.info("Start spawning a PPS processor for the scene")
+#                 orbit_number = int(message.data['orbit_number'])
+#                 LOG.debug("Orbit number: = " + str(orbit_number))
+
+#                 starttime = message.data['start_time']
+#                 try:
+#                     endtime = message.data['end_time']
+#                 except KeyError:
+#                     LOG.warning(
+#                         "No end_time in message! Guessing start_time + 14 minutes...")
+#                     endtime = message.data['start_time'] + \
+#                         timedelta(seconds=60 * 14)
+
+#                 platform_name = message.data['platform_name']
+#                 if platform_name not in SATELLITE_NAME:
+#                     raise IOError(
+#                         "Satellite not supported: " + str(platform_name))
+
+#                 sensors = SENSOR_LIST.get(platform_name, None)
+#                 satday = starttime.strftime('%Y%m%d')
+#                 sathour = starttime.strftime('%H%M')
+#                 scene = {'satid': platform_name, 'orbit_number': orbit_number,
+#                          'satday': satday, 'sathour': sathour,
+#                          'starttime': starttime, 'endtime': endtime,
+#                          'sensor': sensors}
+
+#                 t__ = threading.Thread(target=pps_worker, args=(publisher, scene,
+#                                                                 sema, q__))
+#                 threads.append(t__)
+#                 t__.start()
+
+#                 # Clean the files4pps dict:
+#                 LOG.debug("files4pps: " + str(files4pps))
+#                 try:
+#                     files4pps.pop(keyname)
+#                 except KeyError:
+#                     LOG.warning("Failed trying to remove key " + str(keyname) +
+#                                 " from dictionary files4pps")
+#                 LOG.debug("After cleaning: files4pps = " + str(files4pps))
+
+#     LOG.info("Wait till all threads are dead...")
+#     while True:
+#         workers_ready = True
+#         for thread in threads:
+#             if thread.is_alive():
+#                 workers_ready = False
+
+#         if workers_ready:
+#             break
+
+#     pub_thread.stop()
+
+#     return
 
 if __name__ == "__main__":
 
