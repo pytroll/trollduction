@@ -64,8 +64,6 @@ def run_command(cmdstr):
 
     LOG.debug("Command: " + str(cmdstr))
     LOG.debug('Command sequence= ' + str(myargs))
-    import pdb
-    pdb.set_trace()
     proc = Popen(myargs, shell=False, stderr=PIPE, stdout=PIPE)
     while True:
         line = proc.stdout.readline()
