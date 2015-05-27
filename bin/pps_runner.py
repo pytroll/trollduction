@@ -560,6 +560,11 @@ def pps_rolling_runner():
 
     LOG.info("*** Start the PPS level-2 runner:")
 
+    LOG.info("First check if NWP data should be downloaded and prepared")
+    now = datetime.utcnow()
+    update_nwp(now - timedelta(days=1),
+               [3, 6, 9, 12, 15, 18, 21, 24])
+
     sema = threading.Semaphore(3)
     import Queue
     q__ = Queue.Queue()
