@@ -51,6 +51,8 @@ import socket
 servername = socket.gethostname()
 SERVERNAME = OPTIONS.get('servername', servername)
 
+NWP_FLENS = [3, 6, 9, 12, 15, 18, 21, 24]
+
 
 SUPPORTED_NOAA_SATELLITES = ['NOAA-15', 'NOAA-18', 'NOAA-19']
 SUPPORTED_METOP_SATELLITES = ['Metop-B', 'Metop-A']
@@ -574,6 +576,19 @@ def check_threads(threads):
     return
 
 
+def prepare_nwp4pps(sphor_obj, starttime, flens):
+    """Prepare NWP data for pps"""
+
+    LOG.debug("Waiting for acquired semaphore for nwp prepare...")
+    with sphor_obj:
+        LOG.debug("Acquired semaphore for nwp preparation...")
+        update_nwp(starttime, flens)
+        LOG.info("Ready with nwp preparation")
+
+    LOG.debug("Leaving prepare_nwp4pps...")
+    return
+
+
 def pps():
     """The PPS runner. Triggers processing of PPS main script once AAPP or CSPP
     is ready with a level-1 file"""
@@ -582,10 +597,10 @@ def pps():
 
     LOG.info("First check if NWP data should be downloaded and prepared")
     now = datetime.utcnow()
-    update_nwp(now - timedelta(days=1),
-               [3, 6, 9, 12, 15, 18, 21, 24])
+    update_nwp(now - timedelta(days=1), NWP_FLENS)
     LOG.info("Ready with nwp preparation...")
 
+    nwp_pp_sema = threading.Semaphore(1)
     sema = threading.Semaphore(5)
     listener_q = Queue.Queue()
     publisher_q = Queue.Queue()
@@ -632,6 +647,14 @@ def pps():
             if keyname not in jobs_dict:
                 LOG.warning("Scene-run seems unregistered! Forget it...")
                 continue
+
+            LOG.info('Start a thread preparing the nwp data...')
+            now = datetime.utcnow()
+
+            t_nwp_pp = threading.Thread(target=prepare_nwp4pps,
+                                        args=(nwp_pp_sema,
+                                              now - timedelta(days=1), NWP_FLENS))
+            t_nwp_pp.start()
 
             t__ = threading.Thread(target=pps_worker, args=(sema, scene,
                                                             jobs_dict[
