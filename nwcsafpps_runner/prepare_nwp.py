@@ -129,8 +129,8 @@ def update_nwp(starttime, nlengths):
             LOG.warning("Corresponding nhsp-file not there: " + str(nhsp_file))
             continue
 
-        cmd = (
-            "grib_copy -w gridType=regular_ll " + nhsp_file + " " + tmp_file)
+        cmd = ("grib_copy -w gridType=regular_ll " +
+               nhsp_file + " " + tmp_file)
         run_command(cmd)
 
         tmpresult = tempfile.mktemp()
