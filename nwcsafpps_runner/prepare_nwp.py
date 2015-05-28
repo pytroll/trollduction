@@ -94,7 +94,7 @@ def update_nwp(starttime, nlengths):
         LOG.info("No input files! dir = " + str(nhsf_path))
         return
 
-    LOG.debug('Files = ' + str(filelist))
+    # LOG.debug('Files = ' + str(filelist))
     for filename in filelist:
         timeinfo = filename.rsplit("_", 1)[-1]
         timestamp, step = timeinfo.split("+")
@@ -114,8 +114,13 @@ def update_nwp(starttime, nlengths):
         tmp_file = os.path.join(nwp_outdir, "tmp." + timestamp + "+" + step)
         LOG.info("result and tmp files: " +
                  str(result_file) + " " + str(tmp_file))
-        cmd = ("grib_copy -w gridType=regular_ll " +
-               os.path.join(nhsp_path, nhsp_prefix + timeinfo) + " " + tmp_file)
+        nhsp_file = os.path.join(nhsp_path, nhsp_prefix + timeinfo)
+        if not os.path.exists(nhsp_file):
+            LOG.warning("Corresponding nhsp-file not there: " + str(nhsp_file))
+            continue
+
+        cmd = (
+            "grib_copy -w gridType=regular_ll " + nhsp_file + " " + tmp_file)
         run_command(cmd)
 
         tmpresult = tempfile.mktemp()
