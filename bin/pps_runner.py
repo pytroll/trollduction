@@ -650,7 +650,6 @@ def pps():
 
             LOG.info('Start a thread preparing the nwp data...')
             now = datetime.utcnow()
-
             t_nwp_pp = threading.Thread(target=prepare_nwp4pps,
                                         args=(nwp_pp_sema,
                                               now - timedelta(days=1), NWP_FLENS))

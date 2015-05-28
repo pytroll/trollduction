@@ -35,20 +35,30 @@ LOG = logging.getLogger(__name__)
 
 CONFIG_PATH = os.environ.get('PPSRUNNER_CONFIG_DIR', './')
 CONF = ConfigParser.ConfigParser()
-CONF.read(os.path.join(CONFIG_PATH, "pps_config.cfg"))
+ppsconf_path = os.path.join(CONFIG_PATH, "pps_config.cfg")
+LOG.debug("Path to config file = " + str(ppsconf_path))
+CONF.read(ppsconf_path)
 
 MODE = os.getenv("SMHI_MODE")
 if MODE is None:
     MODE = "offline"
 
+LOG.debug('MODE = ' + str(MODE))
 
 OPTIONS = {}
 for option, value in CONF.items(MODE, raw=True):
     OPTIONS[option] = value
 
 
-nhsp_path = OPTIONS.get('nhsp_path', None)
-nhsp_prefix = OPTIONS.get('nhsp_prefix', None)
+try:
+    nhsp_path = OPTIONS['nhsp_path']
+except KeyError:
+    LOG.exception('Parameter not set in config file: ' + 'nhsp_path')
+try:
+    nhsp_prefix = OPTIONS['nhsp_prefix']
+except KeyError:
+    LOG.exception('Parameter not set in config file: ' + 'nhsp_prefix')
+
 nhsf_path = OPTIONS.get('nhsf_path', None)
 nhsf_prefix = OPTIONS.get('nhsf_prefix', None)
 nwp_outdir = OPTIONS.get('nwp_outdir', None)
