@@ -104,7 +104,7 @@ Setting things up cheat sheet
 
 .. _mpop: https://github.com/mraspaud/mpop
 .. _mipp: https://github.com/loerum/mipp
-.. _pyresample: https://code.google.com/p/pyresample/
+.. _pyresample: https://github.com/mraspaud/pyresample
 .. _posttroll: https://github.com/mraspaud/posttroll
 .. _pyorbital: https://github.com/mraspaud/pyorbital
 .. _trollsift: https://github.com/pnuu/trollsift
@@ -112,7 +112,7 @@ Setting things up cheat sheet
 .. _pytroll-schedule: https://github.com/mraspaud/pytroll-schedule
 .. _pyspectral: https://github.com/adybbroe/pyspectral
 .. _pykdtree: https://github.com/storpipfugl/pykdtree
-.. _python-geotiepoints: https://github.com/addybroe/python-geotiepoints
+.. _python-geotiepoints: https://github.com/adybbroe/python-geotiepoints
 .. _trollimage: https://github.com/mraspaud/trollimage
 .. _pycoast: https://github.com/mraspaud/pycoast 
 
