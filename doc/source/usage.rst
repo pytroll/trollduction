@@ -21,7 +21,7 @@ trollstalker
 Start *trollstalker*::
 
   $ cd trollduction/bin/
-  $ ./trollstalker.py -c ../examples/master_config.ini -C noaa_hrpt
+  $ ./trollstalker.py -c ../examples/trollstalker_config.ini -C noaa_hrpt
 
 Now you can test if the messaging works by copying a data file to your input directory. *Trollstalker* should send a message, and depending on the configuration, also print the message on the terminal. If there's no message, check the configuration files that the input directory and file pattern are set correctly.
 
@@ -33,7 +33,7 @@ The *main* command that actually runs *trollduction* is called *l2processor.py*.
 Start *l2processor* by::
 
   $ cd trollduction/bin/
-  $ ./l2processor.py -c ../examples/master_config.ini -C noaa_hrpt
+  $ ./l2processor.py -c ../examples/l2processor_config.ini -C noaa_hrpt
 
 Now copy a file to the input directory, and the production should start and the terminal should show lots of text. After the file has been processed, check the image output directory for the products.
 
