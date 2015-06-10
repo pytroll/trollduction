@@ -7,7 +7,7 @@ format = SDR
 type = HDF5
 level = 1B
 platform_name = Suomi-NPP
-instrument = viirs
+sensor = viirs
 timeliness = 30
 duration = 85.4
 publish_topic = 
@@ -18,7 +18,7 @@ format = SDR_compact
 type = HDF5
 level = 1B
 platform_name = Suomi-NPP
-instrument = viirs
+sensor = viirs
 timeliness = 30
 duration = 85.4
 # NOTE: be sure to have EARSSuomi-NPP.cfg in PPP_CONFIG_DIR
@@ -32,7 +32,7 @@ type = binary
 level = 0
 duration = 60
 platform_name = NOAA-18
-instrument = avhrr/3
+sensor = avhrr/3
 timeliness = 15
 # NOTE: be sure to have EARSNOAA-18.cfg in PPP_CONFIG_DIR
 variant = EARS
@@ -45,7 +45,7 @@ type = binary
 level = 0
 duration = 60
 platform_name = NOAA-18
-instrument = avhrr/3
+sensor = avhrr/3
 timeliness = 15
 # NOTE: be sure to have EARSNOAA-19.cfg in PPP_CONFIG_DIR
 variant = EARS
@@ -56,7 +56,7 @@ pattern = /data/prod/satellit/ears/avhrr/AVHR_HRP_{data_processing_level:2s}_M01
 format = EPS
 type = binary
 platform_name = Metop-B
-instrument = avhrr/3
+sensor = avhrr/3
 timeliness = 15
 level = 0
 # NOTE: be sure to have EARSMetop-B.cfg in PPP_CONFIG_DIR
@@ -68,7 +68,7 @@ pattern = /data/prod/satellit/ears/avhrr/AVHR_HRP_{data_processing_level:2s}_M02
 format = EPS
 type = binary
 platform_name = Metop-A
-instrument = avhrr/3
+sensor = avhrr/3
 timeliness = 15
 level = 0
 # NOTE: be sure to have EARSMetop-A.cfg in PPP_CONFIG_DIR
@@ -80,7 +80,7 @@ pattern = /data/prod/satellit/metop2/AVHR_xxx_{data_processing_level:2s}_M01_{st
 format = EPS
 type = binary
 platform_name = Metop-B
-instrument = avhrr/3
+sensor = avhrr/3
 timeliness = 100
 # NOTE: be sure to have GDSMetop-B.cfg in PPP_CONFIG_DIR
 variant = GDS
@@ -92,7 +92,7 @@ pattern = /data/prod/satellit/metop2/AVHR_xxx_{level:2s}_M02_{start_time:%Y%m%d%
 format = EPS
 type = PDS
 platform_name = Metop-A
-instrument = avhrr/3
+sensor = avhrr/3
 timeliness = 100
 # NOTE: be sure to have GDSMetop-B.cfg in PPP_CONFIG_DIR
 variant = GDS
@@ -104,7 +104,7 @@ format = EOS_thinned
 type = HDF4
 level = 1B
 platform_name = EOS-Terra
-instrument = modis
+sensor = modis
 timeliness = 180
 duration = 300
 # NOTE: be sure to have EARSEOS-Terra.cfg in PPP_CONFIG_DIR
@@ -116,7 +116,7 @@ format = EOS_thinned
 type = HDF4
 level = 1B
 platform_name = EOS-Aqua
-instrument = modis
+sensor = modis
 timeliness = 180
 duration = 300
 # NOTE: be sure to have EARSEOS-Aqua.cfg in PPP_CONFIG_DIR
