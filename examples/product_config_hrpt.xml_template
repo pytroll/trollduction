@@ -11,10 +11,14 @@
     <!-- To remove all area coverage checks, eg. for running without
          TLE data, uncomment the following row. -->
     <!-- <check_coverage>False</check_coverage> -->
+    <!-- number of processors used for parallel work -->
+    <nprocs>1</nprocs>
   </common>
   
 
-  <!-- aliases: substitutions to make in the filenames. E.g. replace in "platform_name" items. -->
+  <!-- aliases: substitutions to make in the filenames. E.g. replace
+       in "platform_name" items.
+  -->
   <aliases>
     <platform_name src="Metop-A" dst="metop02" />
     <platform_name src="Metop-B" dst="metop01" />
@@ -26,7 +30,10 @@
     <platform_name src="Suomi-NPP" dst="npp" />
   </aliases>
 
-  <!-- variables: substitution to make in the xlm attributes. E.g. replate "output_dir" items matching with real path -->
+  <!-- variables: substitution to make in the xml
+       attributes. E.g. replate "output_dir" items matching with real
+       path
+  -->
   <variables>
     <output_dir id="path0">/san1/sir</output_dir>
     <output_dir id="path3">/san1/pps/www/latest</output_dir>
@@ -35,7 +42,11 @@
     <overlay id="white">#ffffff</overlay>
   </variables>
 
-  <!-- variables section with attribute. E.g. if the "MODE" environment variable is defined to "offline", the items should take these values instead. This takes of course precedence over the standart "variables" section. -->
+  <!-- variables section with attribute. E.g. if the "MODE"
+       environment variable is defined to "offline", the items should
+       take these values instead. This takes of course precedence over
+       the standart "variables" section.
+  -->
   <variables MODE="offline">
     <output_dir id="path0">/local_disk/data/out/sir</output_dir>
     <output_dir id="path1">/local_disk/data/out/sir</output_dir>
@@ -44,20 +55,21 @@
     <output_dir id="path4">/local_disk/data/out/rgb</output_dir>
   </variables>
 
-  <!-- areas to group together for processing -->
+  <!-- Example how to group production to areas with similar coverage.
+       Note that these are not implemented in the product list below!
+  -->
   <groups>
     <group id="africa">afhorn,mali</group>
     <group id="asia">afghanistan</group>
     <group id="eport">eport</group>
     <group id="highres" unload="True" resolution="250">baws250</group>
   </groups>
-
   
   <product_list>
     <!-- dump to netcdf -->
     <!-- calibrated, satellite projection -->
     <dump>
-      <file format="netcdf4">{time:%Y%m%d_%H%M}_{platform}{satnumber}.nc</file>
+      <file format="netcdf4">{time:%Y%m%d_%H%M}_{platform_name}.nc</file>
     </dump>
 
     <area id="eurol" name="Europe_large">
@@ -73,7 +85,7 @@
       </product>
 
       <!-- Generate also thumbnails -->
-      <product id="natural" name="dnc" output_dir="path1" thumbnail_size="640x640" thumbnail_name="{platform_name}_{start_time:%Y%m%d_%H%M}_{orbit_number:05d}_{areaname}_dnc_thumbnail.png" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
+      <product id="natural" name="dnc" output_dir="path1" thumbnail_size="640x640" thumbnail_name="{platform_name}_{time:%Y%m%d_%H%M}_{orbit_number:05d}_{areaname}_dnc_thumbnail.png" sunzen_day_maximum="90" sunzen_lonlat="25, 60">
         <file>{time:%Y%m%d_%H%M}_{platform_name}_{areaname}_{productname}.png</file>
       </product>
 

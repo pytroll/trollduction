@@ -2,50 +2,56 @@
 <?xml-stylesheet type="text/xsl" href="prodlist2.xsl"?>
 <product_config>
 
-  <common>
-    <output_dir>/tmp</output_dir>
-    <unload>False</unload>
-    <!-- To remove all area coverage checks, eg. for running without
-         TLE data, uncomment the following row. -->
-    <!-- <check_coverage>False</check_coverage> -->
-  </common>
+    <common>
+        <output_dir>/tmp</output_dir>
+        <unload>False</unload>
+        <!-- To remove all area coverage checks, eg. for running without
+                 TLE data, uncomment the following row. -->
+        <!-- <check_coverage>False</check_coverage> -->
+        <!-- number of processor used for parallel work -->
+        <nprocs>1</nprocs>
+    </common>
 
-  <variables>
-    <overlay id="black">#000000</overlay>
-    <overlay id="white">#ffffff</overlay>
-  </variables>
+    <variables>
+        <overlay id="black">#000000</overlay>
+        <overlay id="white">#ffffff</overlay>
+    </variables>
 
+    <!-- Example how to group production to areas with similar coverage.
+             Note that these are not implemented in the product list below!
+    -->
+    <groups>
+        <group id="africa">afhorn,mali</group>
+        <group id="asia">afghanistan</group>
+        <group id="eport">eport</group>
+        <group id="highres" unload="True" resolution="250">baws250</group>
+    </groups>
 
-  <groups>
-    <group id="africa">afhorn,mali</group>
-    <group id="asia">afghanistan</group>
-    <group id="eport">eport</group>
-    <group id="highres" unload="True" resolution="250">baws250</group>
-  </groups>
-
-  <product_list>
-    <area id="eurol" name="eurol" min_coverage="25">
-      <product id="cloudtop" name="cloudtop">
-        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_rgb_{productname}.png</file>
-      </product>
-      <product id="green_snow" name="green_snow">
-        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_rgb_greensnow.png</file>
-      </product>
-      <product id="ir108" name="ir108">
-        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_bw_ir4.png</file>
-      </product>
-      <product id="overview" name="overview">
-        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_afghan_rgb_{productname}.png</file>
-      </product>
-    </area>
-    <area id="euro4" name="euro4" min_coverage="25">
-      <product id="ir108" name="ir108">
-        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_{areaname}_bw_ir4.png</file>
-      </product>
-      <product id="overview" name="overview">
-        <file output_dir="path2">{platform_name}_{nominal_time:%Y%m%d_%H%M}_{areaname}_rgb_{productname}.png</file>
-      </product>
-    </area>
-  </product_list>
+    <product_list>
+        <area id="eurol" name="eurol" min_coverage="25">
+            <product id="cloudtop" name="cloudtop">
+                <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
+            </product>
+            <product id="green_snow" name="green_snow"
+		     sunzen_day_maximum="90" sunzen_lonlat="25, 60">
+                <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
+            </product>
+            <product id="ir108" name="ir108">
+                <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
+            </product>
+            <product id="overview" name="overview">
+                <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
+            </product>
+        </area>
+        <area id="euro4" name="euro4" min_coverage="25">
+            <product id="ir108" name="ir108">
+                <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
+            </product>
+            <product id="night_overview" name="night_overview"
+		     sunzen_night_minimum="90" sunzen_lonlat="25, 60">
+                <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
+            </product>
+        </area>
+    </product_list>
 </product_config>
 
