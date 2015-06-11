@@ -284,7 +284,7 @@ def coverage(scene, area):
 
     coverages = []
 
-    from trollsched.satpass import Mapper
+    # from trollsched.satpass import Mapper
 
     for shape in shapes:
 
@@ -475,7 +475,7 @@ class DataProcessor(object):
         if precompute:
             LOGGER.debug("Saving projection mapping for re-use")
 
-        for area_item in self.product_config.pl:
+        for area_item in self.product_config.prodlist:
             if area_item.tag == "dump":
                 self.global_data.load(filename=filename)
                 self.save_to_netcdf(self.global_data,
@@ -499,8 +499,8 @@ class DataProcessor(object):
                     else:
                         skip_group = False
                 except AttributeError:
-                    LOGGER.exception(
-                        "Can't compute coverage from unloaded data, continuing")
+                    LOGGER.exception("Can't compute coverage from "
+                                     "unloaded data, continuing")
                     do_generic_coverage = True
                     skip_group = False
                 for product in area_item:
@@ -584,7 +584,7 @@ class DataProcessor(object):
 
         if not self._data_ok:
             LOGGER.warning("File %s not processed due to "
-                           "incomplete/missing/corrupted data." %
+                           "incomplete/missing/corrupted data.",
                            uri)
 
         # Release memory
@@ -613,7 +613,7 @@ class DataProcessor(object):
         config to a list.
         '''
 
-        pl = group or self.product_config.pl
+        pl = group or self.product_config.prodlist
 
         def_names = [item.attrib["id"]
                      for item in pl
@@ -944,8 +944,8 @@ class DataWriter(Thread):
 
     """Writes data to disk.
 
-    This is separate from the DataProcessor since it takes IO time and we don't
-    want to block processing.
+    This is separate from the DataProcessor since it takes IO time and
+    we don't want to block processing.
     """
 
     def __init__(self):
@@ -975,7 +975,8 @@ class DataWriter(Thread):
                                 del attrib[key]
                         if 'format' not in attrib:
                             attrib.setdefault('format',
-                                              os.path.splitext(item.text)[1][1:])
+                                              os.path.splitext(\
+                                                    item.text)[1][1:])
 
                         key = tuple(sorted(attrib.items()))
                         sorted_items.setdefault(key, []).append(item)
@@ -1079,6 +1080,7 @@ class Trollduction(object):
             if not managed:
                 self.config_watcher = \
                     ConfigWatcher(config['config_file'],
+                                  config['config_item'],
                                   self.update_td_config_from_file)
                 self.config_watcher.start()
 
@@ -1110,13 +1112,12 @@ class Trollduction(object):
             LOGGER.info("Listener restarted")
 
         try:
-            self.update_product_config(self.td_config['product_config_file'],
-                                       self.td_config['config_item'])
+            self.update_product_config(self.td_config['product_config_file'])
         except KeyError:
-            LOGGER.exception("Key 'product_config_file' or 'config_item' is "
+            LOGGER.exception("Key 'product_config_file' is "
                              "missing from Trollduction config")
 
-    def update_product_config(self, fname, config_item):
+    def update_product_config(self, fname):
         '''Update area definitions, associated product names, output
         filename prototypes and other relevant information from the
         given file.
@@ -1180,9 +1181,11 @@ class Trollduction(object):
                     sensors = set((msg.data['sensor'], ))
 
                 if (msg.type in ["file", 'collection', 'dataset'] and
-                        sensors.intersection(self.td_config['instruments'].split(','))):
-                    self.update_product_config(self.td_config['product_config_file'],
-                                               self.td_config['config_item'])
+                    sensors.intersection(\
+                        self.td_config['instruments'].split(','))):
+
+                    self.update_product_config(\
+                        self.td_config['product_config_file'])
                     self.data_processor.run(self.product_config, msg)
 
         finally:

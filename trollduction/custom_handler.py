@@ -108,11 +108,13 @@ class PanusTimedRotatingFileHandler(TimedRotatingFileHandler):
                 not self.utc:
             dst_at_rollover = time.localtime(new_rollover_at)[-1]
             if now != dst_at_rollover:
-                if not now:  # DST kicks in before next rollover,
-                             # so we need to deduct an hour
+                # DST kicks in before next rollover,
+                # so we need to deduct an hour
+                if not now:
                     addend = -3600
-                else:           # DST bows out before next rollover,
-                                # so we need to add an hour
+                # DST bows out before next rollover,
+                # so we need to add an hour
+                else:
                     addend = 3600
                 new_rollover_at += addend
         self.rolloverAt = new_rollover_at

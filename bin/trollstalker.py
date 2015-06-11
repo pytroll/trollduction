@@ -115,7 +115,7 @@ class EventHandler(ProcessEvent):
             self.parse_file_info(event)
             if len(self.info) > 0:
                 message = self.create_message()
-                LOGGER.info("Publishing message %s" % str(message))
+                LOGGER.info("Publishing message %s", str(message))
                 self.pub.send(str(message))
             self.__clean__()
 
