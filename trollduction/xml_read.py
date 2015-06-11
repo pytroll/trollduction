@@ -72,7 +72,7 @@ class ProductList(object):
 
         tree = etree.parse(fname)
         self._xml = tree.getroot()
-        self.pl = None
+        self.prodlist = None
         self.attrib = {}
         self.vars = {}
         self.aliases = {}
@@ -82,7 +82,7 @@ class ProductList(object):
     def insert_vars(self):
         """Variable replacement
         """
-        for item in self.pl.getiterator():
+        for item in self.prodlist.getiterator():
             for key in self.vars:
                 if key in item.attrib and item.attrib[key] in self.vars[key]:
                     item.set(key, self.vars[key][item.attrib[key]])
@@ -91,9 +91,12 @@ class ProductList(object):
 
         # create the "rest" group
         last_group = []
-        for area in self.pl:
+        for area in self.prodlist:
             assigned = False
             for group in self.groups:
+                if len(area.attrib.keys()) == 0:
+                    assigned = True
+                    continue
                 if area.attrib["id"] in group.data:
                     assigned = True
                     break
@@ -108,7 +111,10 @@ class ProductList(object):
             new_group = Dataset([], **group.info)
             for area_id in group.data:
                 assigned = False
-                for area in self.pl:
+                for area in self.prodlist:
+                    if len(area.attrib.keys()) == 0:
+                        assigned = True
+                        continue
                     if area.attrib["id"] == area_id:
                         new_group.data.append(area)
                         assigned = True
@@ -122,7 +128,7 @@ class ProductList(object):
     def parse(self):
         for item in self._xml:
             if item.tag == "product_list":
-                self.pl = item
+                self.prodlist = item
             elif item.tag == "common":
                 for citem in item:
                     self.attrib[citem.tag] = citem.text
