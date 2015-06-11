@@ -25,11 +25,12 @@ for pytroll messages from Nimbus (NOAA/Metop file dispatch) and triggers
 processing on direct readout HRPT level 0 files (full swaths - no granules at
 the moment)
 """
-#from ConfigParser import RawConfigParser
+from ConfigParser import RawConfigParser
 import os
 import sys
 import logging
 from logging import handlers
+from read_aapp_config import read_config_file_options
 
 LOG = logging.getLogger(__name__)
 
@@ -130,23 +131,23 @@ class AappLvl1Processor(object):
         """
         Init with config file options
         """
-        self.noaa_data_out_dir = runner_config['NOAA_DATA_OUT_DIR']
-        self.metop_data_out_dir = runner_config['METOP_DATA_OUT_DIR']
-        self.noaa_run_script = runner_config['NOAA_RUN_SCRIPT']
-        self.metop_run_script = runner_config['METOP_RUN_SCRIPT']
-        self.pps_out_dir = runner_config['PPS_OUT_DIR']
-        self.aapp_prefix = runner_config['AAPP_PREFIX']
-        self.aapp_workdir = runner_config['AAPP_WORKDIR']
-        self.use_dyn_work_dir = runner_config['USE_DYN_WORK_DIR']
-        self.subscribe_topics = runner_config['SUBSCRIBE_TOPICS']
-        self.publish_pps_format = runner_config['PUBLISH_PPS_FORMAT']
-        self.publish_l1_format = runner_config['PUBLISH_L1_FORMAT']
-        self.aapp_log_files_dir = runner_config['AAPP_LOG_FILES_DIR']
-        self.aapp_log_files_backup = runner_config['AAPP_LOG_FILES_BACKUP']
-        self.servername = runner_config['SERVERNAME']
-        self.dataserver = runner_config['DATASERVER']
-        self.station = runner_config['STATION']
-        self.environment = runner_config['ENVIRONMENT']
+        self.noaa_data_out_dir = runner_config['noaa_data_out_dir']
+        self.metop_data_out_dir = runner_config['metop_data_out_dir']
+        self.noaa_run_script = runner_config['aapp_run_noaa_script']
+        self.metop_run_script = runner_config['aapp_run_metop_script']
+        self.pps_out_dir = runner_config['pps_out_dir']
+        self.aapp_prefix = runner_config['aapp_prefix']
+        self.aapp_workdir = runner_config['aapp_workdir']
+        self.use_dyn_work_dir = runner_config['use_dyn_work_dir']
+        self.subscribe_topics = runner_config['subscribe_topics']
+        self.publish_pps_format = runner_config['publish_pps_format']
+        self.publish_l1_format = runner_config['publish_l1_format']
+        self.aapp_log_files_dir = runner_config['aapp_log_files_dir']
+        self.aapp_log_files_backup = runner_config['aapp_log_files_backup']
+        self.servername = runner_config['servername']
+        self.dataserver = runner_config['dataserver']
+        self.station = runner_config['station']
+        self.environment = runner_config['environment']
         self.fullswath = True  # Always a full swath (never HRPT granules)
         self.ishmf = False
         self.working_dir = None
@@ -1107,186 +1108,10 @@ def copy_aapplvl1_files(aappfiles, output_data_basepath, satnum):
 
     return sensor_and_level
 
-#def check_configuration(config_dict):
-#    """
-#    Checks users input from configuration file
-#    """
-#    
 
-#def check_directories(checklist):
-#    """
-#    checklist [dirname] = {chk_read : true, chk_write : true
-#    readable : true, writable : true
-#    """
-
-def check_dir(directory):
-    """ Check if directory exists and it is writable
-    Return error message if fails
-    """
-    error_message = ""
-    if not os.path.exists(directory):
-        error_message = ("ERROR: Directory doesn't exist! " +
-                         directory +
-                         "\n Please, check your aapp_runner config file")
-    else:
-
-        test_file = "tmp_write_test"
-        filename = os.path.join(directory, test_file)
-        try:
-            test = open(filename, "w")
-            test.close()
-            os.remove(filename)
-        except IOError:
-            error_message = ("ERROR: Cannot access to directory! " +
-                             directory +
-                             "\n Please, check your aapp_runner config file")
-        LOG.debug("OK, writable directory " + directory)
-
-    return error_message
 
 # ----------------------------------
 
-def read_config_file_options(filename, station, env):
-    """
-    Read and checks config file
-    If ok, return configuration dictionary
-    """
-    #from ConfigParser import RawConfigParser
-    #config = RawConfigParser()
-    from ConfigParser import SafeConfigParser
-    config = SafeConfigParser()
-
-    configuration = {}
-    configuration['STATION'] = station
-    configuration['ENVIRONMENT'] = env
-    config.read(filename)
-# TODO try: [env] exists in config file
-    try:
-        config_opts = dict(config.items(env))
-    except Exception as err:
-        print " Section %s %s" %  (env,
-                                   "is not defined in your aapp_runner config file!")
-        return None
-    #Read and check config file
-    try:
-        configuration['AAPP_PREFIX'] = config_opts["aapp_prefix"]
-        configuration['AAPP_WORKDIR'] = config_opts["aapp_workdir"]
-        configuration['NOAA_RUN_SCRIPT'] = config_opts["aapp_run_noaa_script"]
-        configuration['METOP_RUN_SCRIPT'] = config_opts["aapp_run_metop_script"]
-        configuration['USE_DYN_WORK_DIR'] = config_opts["use_dyn_work_dir"]
-        configuration['SUBSCRIBE_TOPICS'] = \
-            config_opts["subscribe_topics"].split(',')
-        configuration['PUBLISH_PPS_FORMAT'] = config_opts["publish_pps_format"]
-        configuration['PUBLISH_L1_FORMAT'] = config_opts["publish_l1_format"]
-    except KeyError as err:
-        print "%s %s %s" %  (err.args,
-                             "is missing. Please, check your config file",
-                             filename)
-#        return None
-    try:
-        configuration['PPS_OUT_DIR'] = config_opts["pps_out_dir"]
-    except KeyError as err:
-        print "%s %s %s" %  (err.args,
-                             "is missing. Please, check your config file",
-                             filename)
-#        return None
-    try:
-        configuration['METOP_DATA_OUT_DIR'] = config_opts["metop_data_out_dir"]
-        configuration['NOAA_DATA_OUT_DIR'] = config_opts["noaa_data_out_dir"]
-    except KeyError as err:
-        print "%s %s %s" %  (err.args,
-                             "is missing. Please, check your config file",
-                             filename)
-#        return None
-    try:
-        configuration['AAPP_LOG_FILES_DIR'] = config_opts["aapp_log_files"]
-        configuration['AAPP_LOG_FILES_BACKUP'] = \
-            int(config_opts["aapp_log_files_backup"])
-    except KeyError:
-        configuration['AAPP_LOG_FILES_DIR'] = ""
-    try:
-        configuration['SERVERNAME'] = config_opts["servername"]
-    except KeyError as err:
-        print "%s %s %s" %  (err.args,
-                             "is missing. Please, check your config file",
-                             filename)
- #       return None
-    try:
-        configuration['DATASERVER'] = config_opts["dataserver"]
-    except KeyError:
-        configuration['DATASERVER'] = configuration['SERVERNAME']
-
- #   if configuration['PPS_OUT_DIR'] == '':
- #       LOG.warning("No PPS_OUT_DIR specified.")
- #   else:
- #   if not configuration['PPS_OUT_DIR'] == '':
- #       check = check_dir(configuration['PPS_OUT_DIR'])
- #       if check:
- #           print check
- #           return None
-
- #   if not ((configuration['METOP_DATA_OUT_DIR'] and
- #            configuration['NOAA_DATA_OUT_DIR']) or
- #           (configuration['METOP_DATA_OUT_DIR'] == '' and
- #            configuration['NOAA_DATA_OUT_DIR'] == '')):
- #       print ("ERROR: Please check " +
- #              "METOP_DATA_OUT_DIR and NOAA_DATA_OUT_DIR in your config file", \#
- #                  os.path.abspath(filename))
- #       return None
-  #  elif (configuration['METOP_DATA_OUT_DIR'] and
-  #           configuration['NOAA_DATA_OUT_DIR']):
-  #      check = check_dir(configuration['METOP_DATA_OUT_DIR'])
-  #      if check:
-  #          print check
-  #          return None
-  #      check = check_dir(configuration['NOAA_DATA_OUT_DIR'])
-  #      if check:
-  #          print check
-  #          return None
-
-  #  if (configuration['PPS_OUT_DIR'] == '' and
-  #      (configuration['METOP_DATA_OUT_DIR'] == '' or
-  #       configuration['NOAA_DATA_OUT_DIR'] == '')):
-  #      print ("ERROR: No output directories defined." +
-  #             "Please check your config file ",
-  #             os.path.abspath(filename))
-  #      return None
-
-    #TODO?: Read AAPP WRK from ATOVS_ENV?
-
-  #  if not os.path.exists(configuration['AAPP_PREFIX']):
-  #      print "ERROR: aapp_prefix : "\
-  #             "Directory doesn't exist! Please, check your config file",\
-  #             os.path.abspath(filename)
-  #      return None
-    # checks for os.env try:
- #   check = check_dir(configuration['AAPP_WORKDIR'])
- #   if check:
- #       print check
-  #      return None
-
- #   if not os.path.isfile(configuration['NOAA_RUN_SCRIPT']):
- #       print "ERROR: aapp_run_noaa_script doesn't exist!" \
- #              "\n Please check your config file: ",\
- #              os.path.abspath(filename)
- #       return None
- #   if not os.path.isfile(configuration['METOP_RUN_SCRIPT']):
- #       print "ERROR: aapp_run_noaa_script doesn't exist!" \
- #              "\n Please check your config file: ",\
- #              os.path.abspath(filename)
- #       return None
-
-#    LOG.debug("Config file %s read succesfully.", filename)
-#    LOG.debug("CONFIGURATION:")
-#    LOG.debug("--------------")
-#    for item in configuration.items():
-#        LOG.debug(item)
-#        for value in configuration[item]:
-#            if value:
-#                LOG.debug(value)
-#    LOG.debug("--------------")
-
-    return configuration
 
 def read_arguments():
     """
@@ -1410,7 +1235,7 @@ if __name__ == "__main__":
     # Used when the name doesn't match the regular expression
     # associated to its type (constant, variable, class...).
 
-   # config = RawConfigParser()
+    config = RawConfigParser()
 
     (station_name, environment, config_filename, log_file) = read_arguments()
 
@@ -1423,41 +1248,17 @@ if __name__ == "__main__":
     run_options = read_config_file_options(config_filename,
                                            station_name, environment)
     if not isinstance(run_options, dict):
+        print "Reading config file failed: ", config_filename 
         sys.exit()
-    # template check
-#    try:
-#        log_config = config.get(args.config_item, "td_log_config")
-#        if 'template' in log_config:
-#            print "Template file given as Trollduction logging config," \
-#                " aborting!"
-#            sys.exit()
-
-#    except NoOptionError:
-#        logging.basicConfig()
-#    else:
-#        logging.config.fileConfig(log_config)
-
-# READ config file
-#    config_opts = dict(config.items(environment))
-#    print config_opts
-    logging_cfg = dict(config.items("logging"))
-    print "----------------------------------------\n"
-    print logging_cfg
-#    sys.exit()
-
-#    for option, value in config.items(args.environment):
-#        print option, value
-
-#    if args.station == 'norrköping':
-#        # norrköping specific settings here!
-#        CONFIG_PATH = os.environ.get('AAPP_CONFIG_DIR', '')
-
-    # First read stuff from config related to logging
-
-
+    #FIXME: how to read logging stuff
+    log_file = "TEST_aapp_runner.log"
     # Logging
 
     if log_file:
+        config.read(config_filename)
+        logging_cfg = dict(config.items("logging"))
+        print "----------------------------------------\n"
+        print logging_cfg
         try:
             ndays = int(logging_cfg["log_rotation_days"])
             ncount = int(logging_cfg["log_rotation_backup"])
@@ -1501,7 +1302,10 @@ if __name__ == "__main__":
 
 
 
-    if run_options['PPS_OUT_DIR'] == '':
-        LOG.warning("No PPS_OUT_DIR specified.")
+    if run_options['pps_out_dir'] == '':
+        LOG.warning("No pps_out_dir specified.")
  
+    for key in run_options:
+        print key, "=", run_options[key]
+
     aapp_rolling_runner(run_options)

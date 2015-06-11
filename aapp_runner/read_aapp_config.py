@@ -20,6 +20,7 @@ valid_config_variables = [
     'metop_data_out_dir',
     'noaa_data_out_dir',
     'aapp_log_files_dir',
+    'aapp_log_files_backup',
     'servername',
     'dataserver'
     ]
@@ -131,7 +132,7 @@ def check_dir_permissions(config, dir_permissions):
     test_results = []
 
     for dirname, perm, required in dir_permissions:
-        print dirname, config[dirname]
+#        print dirname, config[dirname]
 
         if required == 'm':
             check = check_dir(config[dirname], perm)
@@ -148,6 +149,7 @@ def check_dir_permissions(config, dir_permissions):
     if all(test_results):
         return True
     else:
+        print "Number of failures: ", len(test_results) - sum(test_results)
         return False
 
 def check_file(filename):
@@ -158,46 +160,47 @@ def check_readable_files(config, files_to_check):
     """
     Check files_to_check[] are readable
     """
-    print "------------------------------"
+#    print "------------------------------"
     test_results = []
     for filename in files_to_check:
         check = check_file(config[filename])
         test_results.append(check)
-        print filename, " is ", check
+#        print filename, " is ", check
 
-# TODO: number of failures
     if all(test_results):
         return True
     else:
+        print "Number of failures: ", len(test_results) - sum(test_results)
         return False
 
 def check_config_file_options(config, valid_config=None):
     """
     Check input config dictionary
     """
-    print "Cheking directories..."
 
     dir_permissions = valid_config['valid_dir_permissions']
     readable_files = valid_config['valid_readable_files']
     servers = valid_config['valid_servers']
 
+    print "Checking directories..."
     if not check_dir_permissions(config, dir_permissions):
         print "Checking directories failed."
         return False
-    print "Checking files..."
 
+    print "Checking files..."
     if not check_readable_files(config, readable_files):
         return False
 
     if servers:
+        print "Checking servers..."
         for server, server_type  in servers:
- #           print "SERVERS:", server, server_type
+            #           print "SERVERS:", server, server_type
  #           print "Check:", config[server]
-            if server_type == 'host':
+            if config[server] and server_type == 'host':
                 if not check_hostserver(config[server]):
                     print "Unknown host server: ", config[server]
                     return False
-            if server_type == 'server':
+            if config[server] and server_type == 'server':
                 if not check_dataserver(config[server]):
                     print "Unknown server: ", config[server]
                     return False
@@ -233,23 +236,29 @@ def read_config_file_options(filename, station, env, valid_config=None):
     for item in mandatory_config_variables:
         try:
             configuration[item] = config_opts[item]
-            print "Required variable: ", item
-        except KeyError as err:
-            print "---------"
-            if item in optional_config_variables:
-                #print "This will be replaced:", item
+#            print "Required variable: ", item
+            if item in optional_config_variables and config_opts[item] == '':
+#                print "This will be replaced:", item
                 new_item = optional_config_variables.get(item, item)
                 print (item, "was not defined. Value from",
                        new_item, "will be used.")
                 configuration[item] = config_opts[new_item]
-            else:
-                print "%s %s %s" %  (err.args,
-                                     "is missing." \
-                                         "Please, check your config file",
-                                     filename)
-                return None
+        except KeyError as err:
+ #           print "---------"
+ #           if item in optional_config_variables:
+ #               #print "This will be replaced:", item
+ #               new_item = optional_config_variables.get(item, item)
+ #               print (item, "was not defined. Value from",
+ #                      new_item, "will be used.")
+ #               configuration[item] = config_opts[new_item]
+ #           else:
+            print "%s %s %s" %  (err.args,
+                                 "is missing." \
+                                     "Please, check your config file",
+                                 filename)
+            return None
 
-    print "DATASERVER is", configuration['dataserver']
+#    print "DATASERVER is", configuration['dataserver']
 
     if not check_config_file_options(configuration, valid_config):
         return None

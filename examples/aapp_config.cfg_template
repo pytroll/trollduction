@@ -26,7 +26,7 @@ pps_out_dir = /lustre/tmp/data/oper/safnwc_test/pps/data/import/PPS_data/source
 #pps_out_dir =
 # optional
 # data will be here under directories leve1b, level1c and level1d
-metop_data_out_dir = /lustre/tmp/data/oper/metop_test3
+metop_data_out_dir = /lustre/tmp/data/oper/metop_test
 noaa_data_out_dir = /lustre/tmp/data/oper/hrpt_test2
 #metop_data_out_dir =
 #noaa_data_out_dir = 
@@ -42,7 +42,7 @@ servername = sat-polar-aapp.fmi.fi
 # if not defined, dataserver = servername
 # check scisys_receiver.py output for dataservername
 # sat-polar-test
-#dataserver = X193.166.211.183
+dataserver = 193.166.211.183
 #dataserver =
 
 # sat-polar-aapp
