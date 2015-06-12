@@ -30,7 +30,7 @@ import os
 import sys
 import logging
 from logging import handlers
-from read_aapp_config import read_config_file_options
+from aapp_runner.read_aapp_config import read_config_file_options
 
 LOG = logging.getLogger(__name__)
 
