@@ -143,13 +143,15 @@ def check_dir_permissions(config, dir_permissions):
         if required == 'm':
             check = check_dir(config[dirname], perm)
         else:
+            check = True
             if config[required]:
                 check = check_dir(config[dirname], perm)
-            else:
-                print "%s %s %s %s %s" % ("ERROR: ", dirname,
-                                          "requires", required,
-                                          "but it's NOT defined!")
-                check = False
+
+            # else:
+            #     print "%s %s %s %s %s" % ("ERROR: ", dirname,
+            #                               "requires", required,
+            #                               "but it's NOT defined!")
+            #     check = False
         test_results.append(check)
 
     if all(test_results):
