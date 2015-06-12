@@ -203,18 +203,19 @@ def check_config_file_options(config, valid_config=None):
         return False
 
     if servers:
-        print "Checking servers..."
-        for server, server_type in servers:
-            #           print "SERVERS:", server, server_type
-         #           print "Check:", config[server]
-            if config[server] and server_type == 'host':
-                if not check_hostserver(config[server]):
-                    print "Unknown host server: ", config[server]
-                    return False
-            if config[server] and server_type == 'server':
-                if not check_dataserver(config[server]):
-                    print "Unknown server: ", config[server]
-                    return False
+        return True
+        # print "Checking servers..."
+        # for server, server_type in servers:
+        #     #           print "SERVERS:", server, server_type
+        #  #           print "Check:", config[server]
+        #     if config[server] and server_type == 'host':
+        #         if not check_hostserver(config[server]):
+        #             print "Unknown host server: ", config[server]
+        #             return False
+        #     if config[server] and server_type == 'server':
+        #         if not check_dataserver(config[server]):
+        #             print "Unknown server: ", config[server]
+        #             return False
 
     return True
 
