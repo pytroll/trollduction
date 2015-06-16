@@ -499,7 +499,7 @@ class DataProcessor(object):
             area_def_names = self.get_area_def_names(group.data)
             if msg.type == 'collection' and \
                not msg.data['collection_area_id'] in area_def_names:
-                LOGGER.info('Collection data does not cover this area group. '\
+                LOGGER.info('Collection data does not cover this area group. '
                             'Skipping.')
                 return
             products = []
