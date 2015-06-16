@@ -474,10 +474,14 @@ class DataProcessor(object):
             ["true", "yes", "1"]
         if precompute:
             LOGGER.debug("Saving projection mapping for re-use")
+        use_extern_calib = \
+            self.product_config.attrib.get("use_extern_calib", "").lower() in \
+            ["true", "yes", "1"]
+        keywords = {"use_extern_calib": use_extern_calib}
 
         for area_item in self.product_config.prodlist:
             if area_item.tag == "dump":
-                self.global_data.load(filename=filename)
+                self.global_data.load(filename=filename, **keywords)
                 self.save_to_netcdf(self.global_data,
                                     area_item,
                                     self.get_parameters(area_item))
@@ -518,7 +522,8 @@ class DataProcessor(object):
                 req_channels = self.get_req_channels(products)
                 LOGGER.debug("loading channels: %s", str(req_channels))
                 keywords = {"filename": filename,
-                            "area_def_names": area_def_names}
+                            "area_def_names": area_def_names,
+                            "use_extern_calib": use_extern_calib}
                 try:
                     keywords["time_interval"] = (msg.data["start_time"],
                                                  msg.data["end_time"])
