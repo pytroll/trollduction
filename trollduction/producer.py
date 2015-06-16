@@ -627,31 +627,27 @@ class DataProcessor(object):
         '''
 
         # Check the list of valid satellites
-        if 'valid_satellite' in config:
-            if self.global_data.info['satname'] +\
-                    self.global_data.info['satnumber'] not in\
-                    config['valid_satellite']:
+        if 'valid_satellite' in config.keys():
+            if self.global_data.info['platform_name'] not in +\
+                    config.attrib['valid_satellite']:
 
                 info = 'Satellite %s not in list of valid ' \
                     'satellites, skipping product %s.' % \
-                    (self.global_data.info['satname'] +
-                     self.global_data.info['satnumber'],
-                     config['name'])
+                    (self.global_data.info['platform_name'],
+                     config.attrib['name'])
                 LOGGER.info(info)
 
                 return False
 
         # Check the list of invalid satellites
-        if 'invalid_satellite' in config:
-            if self.global_data.info['satname'] +\
-                    self.global_data.info['satnumber'] in\
-                    config['invalid_satellite']:
+        if 'invalid_satellite' in config.keys():
+            if self.global_data.info['platform_name'] in \
+                    config.attrib['invalid_satellite']:
 
                 info = 'Satellite %s is in the list of invalid ' \
                     'satellites, skipping product %s.' % \
-                    (self.global_data.info['satname'] +
-                     self.global_data.info['satnumber'],
-                     config['name'])
+                    (self.global_data.info['platform_name'],
+                     config.attrib['name'])
                 LOGGER.info(info)
 
                 return False
@@ -694,9 +690,9 @@ class DataProcessor(object):
                 continue
             # TODO
             # Check if satellite is one that should be processed
-            # if not self.check_satellite(product):
+            if not self.check_satellite(product):
                 # Skip this product, if the return value is True
-                # continue
+                continue
 
             # Check if Sun zenith angle limits match this product
             if 'sunzen_night_minimum' in product.attrib or \
