@@ -1211,8 +1211,7 @@ class Trollduction(object):
                     sensors.intersection(\
                             self.td_config['instruments'].split(','))):
                     self.update_product_config(\
-                            self.td_config['product_config_file'],
-                                               self.td_config['config_item'])
+                            self.td_config['product_config_file'])
                     self.data_processor.run(self.product_config, msg)
 
         finally:
