@@ -1152,14 +1152,9 @@ class Trollduction(object):
         filename prototypes and other relevant information from the
         given file.
         '''
-        del config_item
         import xml_read
 
         self.product_config = xml_read.ProductList(fname)
-
-        # product_config = \
-        #    helper_functions.read_config_file(fname,
-        # config_item=config_item)
 
         # add checks, or do we just assume the config to be valid at
         # this point?
