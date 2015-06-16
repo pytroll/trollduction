@@ -103,7 +103,7 @@ def terminator(metadata, publish_topic=None):
                             ''))
 
     mda['end_time'] = sorted_mda[-1]['end_time']
-
+    mda['collection_area_id'] = sorted_mda[-1]['collection_area_id']
     mda['collection'] = []
 
     for meta in sorted_mda:

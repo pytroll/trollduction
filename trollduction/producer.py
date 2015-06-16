@@ -258,6 +258,8 @@ def get_polygons_positions(datas, frequency=1):
 
 
 def get_polygons(datas, area, frequency=1):
+    """Get a list of polygons describing the boundary of the area.
+    """
     polygons = get_polygons_positions(datas, frequency)
 
     llpolygons = []
@@ -276,7 +278,8 @@ def get_polygons(datas, area, frequency=1):
 
 
 def coverage(scene, area):
-
+    """Calculate coverages.
+    """
     shapes = set()
     for channel in scene.channels:
         if channel.is_loaded():
@@ -316,6 +319,8 @@ def coverage(scene, area):
 
 
 def generic_covers(scene, area_item):
+    """Check if scene covers area_item with high enough percentage.
+    """
     area_def = get_area_def(area_item.attrib['id'])
     min_coverage = float(area_item.attrib.get('min_coverage', 0))
     if min_coverage == 0:
@@ -347,6 +352,8 @@ class DataProcessor(object):
         self.writer.start()
 
     def stop(self):
+        '''Stop data writer.
+        '''
         self.writer.stop()
 
     def create_scene_from_message(self, msg):
@@ -408,6 +415,8 @@ class DataProcessor(object):
         return global_data
 
     def save_to_netcdf(self, data, item, params):
+        """Save data to netCDF4.
+        """
         LOGGER.debug("Save full data to netcdf4")
         try:
             params["time_slot"] = data.time_slot
@@ -431,11 +440,18 @@ class DataProcessor(object):
         """Process the data
         """
 
+        self.product_config = product_config
+
         if msg.type == "file":
             uri = msg.data['uri']
         elif msg.type == "dataset":
             uri = [mda['uri'] for mda in msg.data['dataset']]
         elif msg.type == 'collection':
+            all_areas = self.get_area_def_names()
+            if not msg.data['collection_area_id'] in all_areas:
+                LOGGER.info('Collection does not contain data for '
+                            'current areas. Skipping.')
+                return
             if 'dataset' in msg.data['collection'][0]:
                 uri = []
                 for dataset in msg.data['collection']:
@@ -458,12 +474,8 @@ class DataProcessor(object):
             LOGGER.info("Skipping...")
             return
 
-        self.product_config = product_config
-
         self.global_data = self.create_scene_from_message(msg)
         self._data_ok = True
-
-        area_def_names = self.get_area_def_names()
 
         nprocs = int(self.product_config.attrib.get("nprocs", 1))
         proj_method = self.product_config.attrib.get("proj_method", "nearest")
@@ -489,7 +501,12 @@ class DataProcessor(object):
         for group in self.product_config.groups:
             LOGGER.debug("processing %s", group.info['id'])
             area_def_names = self.get_area_def_names(group.data)
-            LOGGER.debug("areas: %s", str(area_def_names))
+            if msg.type == 'collection' and \
+               not msg.data['collection_area_id'] in area_def_names:
+                LOGGER.info('Collection data does not cover this area group. '
+                            'Skipping.')
+                return
+
             products = []
             skip = []
             skip_group = True
@@ -547,8 +564,8 @@ class DataProcessor(object):
                     continue
 
                 # reproject to local domain
-                LOGGER.debug(
-                    "Projecting data to area " + area_item.attrib['name'])
+                LOGGER.debug("Projecting data to area %s",
+                             area_item.attrib['name'])
                 try:
                     self.local_data = \
                         self.global_data.project(
@@ -564,8 +581,8 @@ class DataProcessor(object):
                                    area_item.attrib['id'])
                     continue
 
-                LOGGER.info(
-                    'Data reprojected for area: %s', area_item.attrib['name'])
+                LOGGER.info('Data reprojected for area: %s',
+                            area_item.attrib['name'])
 
                 # Draw requested images for this area.
                 self.draw_images(area_item)
@@ -599,7 +616,8 @@ class DataProcessor(object):
         self.global_data = None
 
     def get_req_channels(self, products):
-        # Get a list of required channels
+        """Get a list of required channels
+        """
         reqs = set()
         for product in products:
             if product.tag == "dump":
@@ -618,10 +636,10 @@ class DataProcessor(object):
         config to a list.
         '''
 
-        pl = group or self.product_config.prodlist
+        prodlist = group or self.product_config.prodlist
 
         def_names = [item.attrib["id"]
-                     for item in pl
+                     for item in prodlist
                      if item.tag == "area"]
 
         return def_names
@@ -836,6 +854,8 @@ class DataProcessor(object):
 
 
 def _create_message(obj, filename, uri, params, uid=None):
+    """Create posttroll message.
+    """
     to_send = obj.info.copy()
 
     for key in ['collection', 'dataset']:
@@ -904,6 +924,8 @@ def _create_message(obj, filename, uri, params, uid=None):
 
 
 def link_or_copy(src, dst):
+    """Create a symlink from *src* to *dst*, or if that fails, copy.
+    """
     if src == dst:
         LOGGER.warning("Trying to copy a file over itself: %s", src)
         return
@@ -923,10 +945,12 @@ def link_or_copy(src, dst):
 
 
 def thumbnail(filename, thname, size, fformat):
+    """Create a thumbnail image and save it.
+    """
     from PIL import Image
-    im = Image.open(filename)
-    im.thumbnail(size, Image.ANTIALIAS)
-    im.save(thname, fformat)
+    img = Image.open(filename)
+    img.thumbnail(size, Image.ANTIALIAS)
+    img.save(thname, fformat)
 
 
 def hash_color(colorstring):
@@ -936,9 +960,9 @@ def hash_color(colorstring):
         colorstring = colorstring[1:]
     if len(colorstring) != 6:
         raise ValueError("input #%s is not in #RRGGBB format" % colorstring)
-    r, g, b = colorstring[:2], colorstring[2:4], colorstring[4:]
-    r, g, b = [int(n, 16) for n in (r, g, b)]
-    return (r, g, b)
+    r_col, g_col, b_col = colorstring[:2], colorstring[2:4], colorstring[4:]
+    r_col, g_col, b_col = [int(n, 16) for n in (r_col, g_col, b_col)]
+    return (r_col, g_col, b_col)
 
 
 class DataWriter(Thread):
@@ -976,8 +1000,7 @@ class DataWriter(Thread):
                                 del attrib[key]
                         if 'format' not in attrib:
                             attrib.setdefault('format',
-                                              os.path.splitext(\
-                                                    item.text)[1][1:])
+                                os.path.splitext(item.text)[1][1:])
 
                         key = tuple(sorted(attrib.items()))
                         sorted_items.setdefault(key, []).append(item)
@@ -1007,7 +1030,8 @@ class DataWriter(Thread):
                             if not saved:
                                 obj.save(fname,
                                          fformat=fformat,
-                                         compression=copy.attrib.get("compression", 6))
+                                         compression=copy.attrib.get(\
+                                                            "compression", 6))
                                 LOGGER.info("Saved %s to %s", str(obj), fname)
                                 saved = fname
                                 uid = os.path.basename(fname)
@@ -1018,11 +1042,14 @@ class DataWriter(Thread):
                             if ("thumbnail_name" in copy.attrib and
                                     "thumbnail_size" in copy.attrib):
                                 thsize = [int(val) for val
-                                          in copy.attrib["thumbnail_size"].split("x")]
+                                          in copy.attrib[\
+                                                "thumbnail_size"].split("x")]
                                 copy.attrib["thumbnail_size"] = thsize
-                                thname = compose(os.path.join(output_dir,
-                                                              copy.attrib["thumbnail_name"]),
-                                                 local_params)
+                                thname = \
+                                    compose(os.path.join(\
+                                                output_dir,
+                                                copy.attrib["thumbnail_name"]),
+                                            local_params)
                                 copy.attrib["thumbnail_name"] = thname
                                 thumbnail(fname, thname, thsize, fformat)
 
@@ -1030,15 +1057,17 @@ class DataWriter(Thread):
                                                   fname, params, uid=uid)
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
-                except:
+                except Exception as e:
                     for item in file_items:
                         if "thumbnail_size" in item.attrib:
                             item.attrib["thumbnail_size"] = str(
                                 item.attrib["thumbnail_size"])
-                    LOGGER.exception("Something wrong happened saving %s to %s",
+                    LOGGER.exception("Something wrong happened saving " \
+                                     "%s to %s: %s",
                                      str(obj),
                                      str([tostring(item)
-                                          for item in file_items]))
+                                          for item in file_items]),
+                                     e.message)
                 finally:
                     self.prod_queue.task_done()
 
@@ -1123,7 +1152,9 @@ class Trollduction(object):
         filename prototypes and other relevant information from the
         given file.
         '''
+        del config_item
         import xml_read
+
         self.product_config = xml_read.ProductList(fname)
 
         # product_config = \
@@ -1183,10 +1214,10 @@ class Trollduction(object):
 
                 if (msg.type in ["file", 'collection', 'dataset'] and
                     sensors.intersection(\
-                        self.td_config['instruments'].split(','))):
-
+                            self.td_config['instruments'].split(','))):
                     self.update_product_config(\
-                        self.td_config['product_config_file'])
+                            self.td_config['product_config_file'],
+                                               self.td_config['config_item'])
                     self.data_processor.run(self.product_config, msg)
 
         finally:
