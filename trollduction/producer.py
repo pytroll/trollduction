@@ -449,7 +449,7 @@ class DataProcessor(object):
         elif msg.type == 'collection':
             all_areas = self.get_area_def_names()
             if not msg.data['collection_area_id'] in all_areas:
-                LOGGER.info('Collection does not contain data for ' \
+                LOGGER.info('Collection does not contain data for '
                             'current areas. Skipping.')
                 return
             if 'dataset' in msg.data['collection'][0]:
@@ -558,8 +558,8 @@ class DataProcessor(object):
                     continue
 
                 # reproject to local domain
-                LOGGER.debug(
-                    "Projecting data to area " + area_item.attrib['name'])
+                LOGGER.debug("Projecting data to area %s",
+                             area_item.attrib['name'])
                 try:
                     self.local_data = \
                         self.global_data.project(
@@ -575,8 +575,8 @@ class DataProcessor(object):
                                    area_item.attrib['id'])
                     continue
 
-                LOGGER.info(
-                    'Data reprojected for area: %s', area_item.attrib['name'])
+                LOGGER.info('Data reprojected for area: %s',
+                            area_item.attrib['name'])
 
                 # Draw requested images for this area.
                 self.draw_images(area_item)
@@ -600,7 +600,7 @@ class DataProcessor(object):
 
         if not self._data_ok:
             LOGGER.warning("File %s not processed due to "
-                           "incomplete/missing/corrupted data." %
+                           "incomplete/missing/corrupted data.",
                            uri)
 
         # Release memory
