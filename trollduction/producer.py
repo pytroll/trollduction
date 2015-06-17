@@ -93,7 +93,10 @@ def check_uri(uri):
         url_ip = socket.gethostbyname(url.netloc)
 
         if url_ip not in get_local_ips() and url.netloc != '':
-            raise IOError("Data file %s unaccessible from this host" % uri)
+            try:
+                os.stat(url.path)
+            except OSError:
+                raise IOError("Data file %s unaccessible from this host" % uri)
 
     except socket.gaierror:
         LOGGER.warning("Couldn't check file location, running anyway")
