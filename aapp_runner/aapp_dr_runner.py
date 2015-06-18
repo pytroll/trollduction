@@ -591,7 +591,7 @@ class AappLvl1Processor(object):
 # FIXME:            LOG.info("Process the scene " +
 #                     self.platform_name + self.orbit)
 # TypeError: coercing to Unicode: need string or buffer, int found
-            LOG.info("Process the file %s" + str(self.level0_filename))
+            LOG.info("Process the file " + str(self.level0_filename))
 
             if self.platform_name == 'NOAA-15':
                 # AMSU amsubcl fails
