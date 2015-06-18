@@ -229,7 +229,7 @@ class AappLvl1Processor(object):
         path = os.path.dirname(self.result_files[0])
         subd = os.path.basename(path)
         LOG.debug("path = " + str(path))
-        LOG.debug("lvl1_home = " + self.lvl1_home)
+        LOG.debug("lvl1_home = " + str(self.lvl1_home))
         try:
             shutil.move(path, self.lvl1_home)
         except shutil.Error:
@@ -758,7 +758,7 @@ def aapp_rolling_runner(runner_config):
     """The AAPP runner. Listens and triggers processing on Metop/NOAA HRPT
     level 0 files dispatched from reception."""
     LOG.info("*** Start the NOAA/Metop HRPT AAPP runner:")
-    LOG.info("--------------------------------------")
+    LOG.info("-" * 50)
 
     # init
     aapp_proc = AappLvl1Processor(runner_config)
@@ -766,9 +766,6 @@ def aapp_rolling_runner(runner_config):
     with posttroll.subscriber.Subscribe('',
                                         aapp_proc.subscribe_topics,
                                         True) as subscr:
-        #    with posttroll.subscriber.Subscribe('',
-        #                                        ['HRPT/0', 'EPS/0'],
-        #                                        True) as subscr:
         with Publish('aapp_runner', 0) as publisher:
             while True:
                 aapp_proc.initialise()
@@ -871,20 +868,6 @@ def aapp_rolling_runner(runner_config):
                         else:
                             LOG.error("Nofile copied to " + data_out_dir)
 
-                # else:
-                #    LOG.info("Move sub-directory with NOAA level-1 files")
-                #    LOG.debug(
-                #        "Orbit BEFORE call to move_lvl1dir: " + str(aapp_proc.orbit))
-                #    level1_files = aapp_proc.move_lvl1dir()
-                #    LOG.debug(
-                #        "Orbit AFTER call to move_lvl1dir: " + str(aapp_proc.orbit))
-
-#                publish_level1(publisher, level1_files,
-#                               aapp_proc.platform_name,
-#                               aapp_proc.orbit,
-#                               aapp_proc.starttime,
-#                               aapp_proc.endtime)
-
                 if (aapp_proc.working_dir and
                         not aapp_proc.aapp_log_files_dir == ""):
                     LOG.info("Move AAPP log files")
@@ -893,18 +876,9 @@ def aapp_rolling_runner(runner_config):
                     path_to_clean = aapp_proc.aapp_log_files_dir
                     older_than_days = int(aapp_proc.aapp_log_files_backup)
                     cleanup(older_than_days, path_to_clean)
-                    # older_than_this = \
-                    #    int(aapp_proc.aapp_log_files_backup)*60*60*24
-                    #LOG.debug("older_than_this: " + chr(older_than_this))
-                    # LOG.debug("aapp_proc.aapp_log_files_dir: " +
-                    #          aapp_proc.aapp_log_files_dir)
-                    # aapp_proc.delete_old_log_files()
-                    # delete_old_dirs(clean_this,
-                    #                older_than_this)
-                    # sys.exit()
                     LOG.info("Cleaning up directory " +
                              str(aapp_proc.working_dir))
-                    # aapp_proc.cleanup_aapp_workdir()
+                    aapp_proc.cleanup_aapp_workdir()
                 elif aapp_proc.working_dir:
                     LOG.info("NOT Cleaning up directory %s",
                              aapp_proc.working_dir)
