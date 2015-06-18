@@ -35,7 +35,7 @@ from subprocess import Popen, PIPE
 LOG = logging.getLogger(__name__)
 
 
-def do_tleing(tle_in, tle_out, tle_call):
+def do_tleing(aapp_prefix, tle_in, tle_out, tle_call):
     """Get the tle-file and copy them to the AAPP data structure 
        and run the AAPP tleing script and executable"""
 
@@ -66,6 +66,7 @@ def do_tleing(tle_in, tle_out, tle_call):
         print "tle files have been found and copied. Do the tleing..."
 
         my_env = os.environ.copy()
+        my_env['AAPP_PREFIX'] = aapp_prefix
         import shlex
         myargs = shlex.split(str(tle_call))
         LOG.debug('Command sequence= ' + str(myargs))

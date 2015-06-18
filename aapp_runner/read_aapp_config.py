@@ -16,7 +16,8 @@ valid_config_variables = [
     'aapp_run_metop_script',
     'tle_indir',
     'tle_outdir',
-    'tle_call',
+    'tle_script',
+    'alleph_script',
     'use_dyn_work_dir',
     'subscribe_topics',
     'publish_pps_format',
@@ -47,7 +48,8 @@ valid_dir_permissions = [
 
 valid_readable_files = ['aapp_run_noaa_script',
                         'aapp_run_metop_script',
-                        'tle_call']
+                        'alleph_script',
+                        'tle_script']
 
 valid_servers = [
     ('servername', 'host'),
