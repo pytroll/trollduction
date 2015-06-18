@@ -720,8 +720,14 @@ class AappLvl1Processor(object):
         LOG.info(
             "working dir: self.working_dir = " + str(self.working_dir))
 
-        self.result_files = get_aapp_lvl1_files(
-            self.working_dir, msg.data['platform_name'])
+        dirlist = glob(os.path.join(
+            self.working_dir, str(self.platform_name) + "_*" + str(self.orbit)))
+        if len(dirlist) != 1:
+            LOG.error("Cannot find output files in working dir!")
+            self.result_files = []
+        else:
+            self.result_files = get_aapp_lvl1_files(
+                dirlist[0], msg.data['platform_name'])
 
         LOG.info("Output files: " + str(self.result_files))
         # FIXME: if STATION == 'norrköping':
