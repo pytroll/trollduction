@@ -720,8 +720,10 @@ class AappLvl1Processor(object):
         LOG.info(
             "working dir: self.working_dir = " + str(self.working_dir))
 
-        dirlist = glob(os.path.join(
-            self.working_dir, str(self.platform_name) + "_*" + str(self.orbit)))
+        globstr = os.path.join(
+            self.working_dir, str(self.platform_name) + "_*" + str(self.orbit))
+        LOG.debug("Glob strig = " + str(globstr))
+        dirlist = glob(globstr)
         if len(dirlist) != 1:
             LOG.error("Cannot find output files in working dir!")
             self.result_files = []
