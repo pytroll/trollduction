@@ -879,7 +879,7 @@ def aapp_rolling_runner(runner_config):
                     aapp_proc.move_aapp_log_files()
                     LOG.info("Cleaning old log files...")
                     path_to_clean = aapp_proc.aapp_log_files_dir
-                    older_than_days = aapp_proc.aapp_log_files_backup
+                    older_than_days = int(aapp_proc.aapp_log_files_backup)
                     cleanup(older_than_days, path_to_clean)
                     # older_than_this = \
                     #    int(aapp_proc.aapp_log_files_backup)*60*60*24
@@ -1327,7 +1327,7 @@ def cleanup(number_of_days, path):
     Removes files from the passed in path that are older than or equal
     to the number_of_days
     """
-    time_in_secs = _time() - (number_of_days * 24 * 60 * 60)
+    time_in_secs = _time() - number_of_days * 24 * 60 * 60
     for root, dirs, files in os.walk(path, topdown=False):
         LOG.debug("root dirs files: " + root)
         for file_ in files:
