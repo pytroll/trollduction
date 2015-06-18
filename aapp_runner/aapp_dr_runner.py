@@ -1247,9 +1247,6 @@ def copy_aapplvl1_files(aappfiles, output_data_basepath, satnum):
     return sensor_and_level
 
 
-# ----------------------------------
-
-
 def read_arguments():
     """
     Read command line arguments
@@ -1305,8 +1302,6 @@ def read_arguments():
 
     return station, env, args.config_file, args.log
 
-#----------------------------------------------------------------------
-
 
 def remove(path):
     """
@@ -1325,8 +1320,6 @@ def remove(path):
                 os.remove(path)
         except OSError:
             LOG.debug("Unable to remove file: " + path)
-
-#----------------------------------------------------------------------
 
 
 def cleanup(number_of_days, path):
@@ -1348,7 +1341,6 @@ def cleanup(number_of_days, path):
             if not os.listdir(root):
                 #LOG.debug("Removing root: " + root)
                 remove(root)
-#----------------------------------------------------------------------
 
 
 def delete_old_dirs(dir_path, older_than_days):
@@ -1392,15 +1384,14 @@ if __name__ == "__main__":
     if not isinstance(run_options, dict):
         print "Reading config file failed: ", config_filename
         sys.exit()
-    # FIXME: how to read logging stuff
-    log_file = "TEST_aapp_runner.log"
-    # Logging
 
-    if log_file:
-        config.read(config_filename)
-        logging_cfg = dict(config.items("logging"))
-        print "----------------------------------------\n"
-        print logging_cfg
+    # Logging
+    config.read(config_filename)
+    logging_cfg = dict(config.items("logging"))
+    print "----------------------------------------\n"
+    print logging_cfg
+
+    if log_file is not None:
         try:
             ndays = int(logging_cfg["log_rotation_days"])
             ncount = int(logging_cfg["log_rotation_backup"])
@@ -1408,12 +1399,11 @@ if __name__ == "__main__":
             print err.args, \
                 "is missing. Please, check your config file",\
                 config_filename
-            sys.exit()
-            print "ERROR: Log file was given but "
-        aapp_log_file = log_file
 
-    if aapp_log_file:
-        handler = handlers.TimedRotatingFileHandler(aapp_log_file,
+            raise IOError("Log file was given but doesn't " +
+                          "know how to backup and rotate")
+
+        handler = handlers.TimedRotatingFileHandler(log_file,
                                                     when='midnight',
                                                     interval=ndays,
                                                     backupCount=ncount,
