@@ -598,13 +598,14 @@ class AappLvl1Processor(object):
                 cmdseq = (self.noaa_run_script +
                           ' -i AVHRR ' +
                           '-Y ' + str(year) +
-                          ' ' +
-                          self.level0_filename)
+                          ' ' + self.level0_filename +
+                          '-n ' + str(self.orbit))
             else:
                 cmdseq = (self.noaa_run_script +
                           ' -Y ' + str(year) +
-                          ' ' +
-                          self.level0_filename)
+                          ' ' + self.level0_filename +
+                          '-n ' + str(self.orbit))
+
             LOG.info("Command sequence: " + str(cmdseq))
             # Run the command:
             # FIXME: shell=False https://docs.python.org/2/library/subprocess.html
@@ -770,12 +771,13 @@ def aapp_rolling_runner(runner_config):
                          str(tobj.strftime("%Y-%m-%d %H:%M")))
 
                 # Site specific processing
+                LOG.info("Station = " + str(aapp_proc.station))
                 if ('norrkoping' in aapp_proc.station or
                         'nkp' in aapp_proc.station):
                     if aapp_proc.platform_name.startswith('Metop'):
                         subd = create_pps_subdirname(tobj, aapp_proc.platform_name,
                                                      aapp_proc.orbit)
-                        LOG.info("Create sub-directory for level-1 files: %s" %
+                        LOG.info("Create sub-directory for level-1 files: " +
                                  str(subd))
                         level1_files = aapp_proc.spack_aapplvl1_files(subd)
                     else:
@@ -892,7 +894,7 @@ def aapp_rolling_runner(runner_config):
                     # sys.exit()
                     LOG.info("Cleaning up directory " +
                              str(aapp_proc.working_dir))
-                    aapp_proc.cleanup_aapp_workdir()
+                    # aapp_proc.cleanup_aapp_workdir()
                 elif aapp_proc.working_dir:
                     LOG.info("NOT Cleaning up directory %s",
                              aapp_proc.working_dir)
