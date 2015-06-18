@@ -279,9 +279,6 @@ def read_config_file_options(filename, station, env, valid_config=None):
     configuration['subscribe_topics'] = topiclist
 
     # print "DATASERVER is", configuration['dataserver']
-    import pdb
-    pdb.set_trace()
-
     if not check_config_file_options(configuration, valid_config):
         return None
 
