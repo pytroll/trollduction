@@ -5,6 +5,8 @@ from socket import gethostname, gethostbyaddr, gaierror
 
 from ConfigParser import SafeConfigParser
 
+MANDATORY = 'm'
+
 supported_stations = ['kumpula', 'helsinki', 'norrkoping', 'nkp']
 
 valid_config_variables = [
@@ -12,6 +14,9 @@ valid_config_variables = [
     'aapp_workdir',
     'aapp_run_noaa_script',
     'aapp_run_metop_script',
+    'tle_indir',
+    'tle_outdir',
+    'tle_call',
     'use_dyn_work_dir',
     'subscribe_topics',
     'publish_pps_format',
@@ -33,13 +38,16 @@ valid_dir_permissions = [
     ('noaa_data_out_dir', 'rw', 'publish_l1_format'),
     ('metop_data_out_dir', 'rw', 'publish_l1_format'),
     ('pps_out_dir', 'rw', 'publish_pps_format'),
-    ('aapp_prefix', 'r', 'm'),
-    ('aapp_workdir', 'rw', 'm'),
-    ('aapp_log_files_dir', 'rw', 'm')
+    ('aapp_prefix', 'r', MANDATORY),
+    ('aapp_workdir', 'rw', MANDATORY),
+    ('tle_indir', 'r', MANDATORY),
+    ('tle_outdir', 'rw', MANDATORY),
+    ('aapp_log_files_dir', 'rw', MANDATORY)
 ]
 
 valid_readable_files = ['aapp_run_noaa_script',
-                        'aapp_run_metop_script']
+                        'aapp_run_metop_script',
+                        'tle_call']
 
 valid_servers = [
     ('servername', 'host'),
@@ -140,7 +148,7 @@ def check_dir_permissions(config, dir_permissions):
     for dirname, perm, required in dir_permissions:
         #        print dirname, config[dirname]
 
-        if required == 'm':
+        if required == MANDATORY:
             check = check_dir(config[dirname], perm)
         else:
             check = True
