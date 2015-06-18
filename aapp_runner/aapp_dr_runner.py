@@ -894,6 +894,12 @@ def aapp_rolling_runner(runner_config):
                              aapp_proc.working_dir)
                    # aapp_proc.cleanup_aapp_workdir()
 
+                LOG.info("Do the tleing now that aapp has finished...")
+                do_tleing(aapp_proc.aapp_prefix,
+                          aapp_proc.tle_indir, aapp_proc.tle_outdir,
+                          aapp_proc.tle_script)
+                LOG.info("...tleing done")
+
     return
 
 
