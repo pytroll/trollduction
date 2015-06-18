@@ -31,6 +31,7 @@ import sys
 import logging
 from logging import handlers
 from aapp_runner.read_aapp_config import read_config_file_options
+from aapp_runner.tle_satpos_prepare import do_tleing
 
 LOG = logging.getLogger(__name__)
 
@@ -135,6 +136,9 @@ class AappLvl1Processor(object):
         self.metop_data_out_dir = runner_config['metop_data_out_dir']
         self.noaa_run_script = runner_config['aapp_run_noaa_script']
         self.metop_run_script = runner_config['aapp_run_metop_script']
+        self.tle_indir = runner_config['tle_indir']
+        self.tle_outdir = runner_config['tle_outdir']
+        self.tle_call = runner_config['tle_call']
         self.pps_out_dir = runner_config['pps_out_dir']
         self.aapp_prefix = runner_config['aapp_prefix']
         self.aapp_workdir = runner_config['aapp_workdir']
@@ -762,6 +766,10 @@ def aapp_rolling_runner(runner_config):
 
     # init
     aapp_proc = AappLvl1Processor(runner_config)
+
+    LOG.info("Do the tleing first...")
+    do_tleing(aapp_proc.tle_indir, aapp_proc.tle_outdir, aapp_proc.tle_call)
+    LOG.info("...tleing done")
 
     with posttroll.subscriber.Subscribe('',
                                         aapp_proc.subscribe_topics,
