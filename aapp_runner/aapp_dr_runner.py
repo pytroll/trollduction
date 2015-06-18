@@ -159,7 +159,7 @@ class AappLvl1Processor(object):
         self.orbit = "00000"
         self.result_files = None
         self.level0files = None
-
+        self.lvl1_home = self.pps_out_dir
         self.job_register = {}
 
         self.initialise()
