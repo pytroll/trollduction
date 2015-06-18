@@ -599,12 +599,12 @@ class AappLvl1Processor(object):
                           ' -i AVHRR ' +
                           '-Y ' + str(year) +
                           ' ' + self.level0_filename +
-                          '-n ' + str(self.orbit))
+                          ' -n ' + str(self.orbit))
             else:
                 cmdseq = (self.noaa_run_script +
                           ' -Y ' + str(year) +
                           ' ' + self.level0_filename +
-                          '-n ' + str(self.orbit))
+                          ' -n ' + str(self.orbit))
 
             LOG.info("Command sequence: " + str(cmdseq))
             # Run the command:
