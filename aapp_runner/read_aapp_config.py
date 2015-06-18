@@ -239,7 +239,7 @@ def read_config_file_options(filename, station, env, valid_config=None):
     configuration['environment'] = env
     config.read(filename)
     try:
-        config_opts = dict(config.items(env))
+        config_opts = dict(config.items(env, raw=False))
     except Exception as err:
         print " Section %s %s" % (env,
                                   "is not defined in your" +
@@ -271,7 +271,16 @@ def read_config_file_options(filename, station, env, valid_config=None):
                                 filename)
             return None
 
-#    print "DATASERVER is", configuration['dataserver']
+    # Fix the list of subscribe topics:
+    topics = configuration['subscribe_topics'].split(',')
+    topiclist = []
+    for topic in topics:
+        topiclist.append(topic.strip(' '))
+    configuration['subscribe_topics'] = topiclist
+
+    # print "DATASERVER is", configuration['dataserver']
+    import pdb
+    pdb.set_trace()
 
     if not check_config_file_options(configuration, valid_config):
         return None
