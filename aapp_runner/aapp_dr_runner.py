@@ -721,7 +721,9 @@ class AappLvl1Processor(object):
             "working dir: self.working_dir = " + str(self.working_dir))
 
         globstr = os.path.join(
-            self.working_dir, str(self.platform_name) + "_*" + str(self.orbit))
+            self.working_dir,
+            str(SATELLITE_NAME.get(self.platform_name, self.platform_name)) +
+            "_*" + str(self.orbit))
         LOG.debug("Glob strig = " + str(globstr))
         dirlist = glob(globstr)
         if len(dirlist) != 1:
