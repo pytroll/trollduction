@@ -728,7 +728,7 @@ class AappLvl1Processor(object):
             self.working_dir,
             str(SATELLITE_NAME.get(self.platform_name, self.platform_name)) +
             "_*" + str(self.orbit))
-        LOG.debug("Glob strig = " + str(globstr))
+        LOG.debug("Glob string = " + str(globstr))
         dirlist = glob(globstr)
         if len(dirlist) != 1:
             LOG.error("Cannot find output files in working dir!")
@@ -796,7 +796,8 @@ def aapp_rolling_runner(runner_config):
                                                      aapp_proc.orbit)
                         LOG.info("Create sub-directory for level-1 files: " +
                                  str(subd))
-                        level1_files = aapp_proc.spack_aapplvl1_files(subd)
+                        level1_files = aapp_proc.smove_lvl1dir()
+                        #level1_files = aapp_proc.spack_aapplvl1_files(subd)
                     else:
                         LOG.info("Move sub-directory with NOAA level-1 files")
                         LOG.debug(
