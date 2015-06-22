@@ -25,8 +25,13 @@
 import os
 import ConfigParser
 
+import logging
+LOG = logging.getLogger(__name__)
+
 CONFIG_PATH = os.environ.get('PPSRUNNER_CONFIG_DIR', './')
 PPS_SCRIPT = os.environ['PPS_SCRIPT']
+
+LOG.debug("PPS_SCRIPT = " + str(PPS_SCRIPT))
 
 CONF = ConfigParser.ConfigParser()
 CONF.read(os.path.join(CONFIG_PATH, "pps_config.cfg"))
@@ -99,9 +104,6 @@ METOP_SENSOR = {'amsu-a': 'amsua', 'avhrr/3': 'avhrr',
 METOP_NUMBER = {'b': '01', 'a': '02'}
 
 
-import logging
-LOG = logging.getLogger(__name__)
-
 #: Default time format
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
@@ -124,6 +126,8 @@ import threading
 import Queue
 from datetime import datetime, timedelta
 
+print sys.path
+LOG.debug("PYTHONPATH: " + str(sys.path))
 from nwcsafpps_runner.prepare_nwp import update_nwp
 SATNAME = {'Aqua': 'EOS-Aqua'}
 
