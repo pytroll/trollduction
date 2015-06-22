@@ -927,7 +927,16 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
                             to_send["format"],
                             to_send["data_processing_level"]))
     else:
-        subject = compose(publish_topic, to_send)
+        # TODO: this is ugly, but still the easiest way to get area id
+        # for the compose as dict key "id"
+        compose_dict = {}
+        for key in to_send:
+            if isinstance(to_send[key], dict):
+                for key2 in to_send[key]:
+                    compose_dict[key2] = to_send[key][key2]
+            else:
+                compose_dict[key] = to_send[key]
+        subject = compose(publish_topic, compose_dict)
 
     msg = Message(subject, "file", to_send)
 
