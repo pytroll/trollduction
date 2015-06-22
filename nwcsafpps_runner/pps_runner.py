@@ -108,7 +108,8 @@ _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 #: Default log format
 _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
-_PPS_LOG_FILE = OPTIONS.get('pps_log_file', os.environ['PPSRUNNER_LOG_FILE'])
+_PPS_LOG_FILE = os.environ.get('PPSRUNNER_LOG_FILE', None)
+_PPS_LOG_FILE = OPTIONS.get('pps_log_file', _PPS_LOG_FILE)
 
 import sys
 from glob import glob
