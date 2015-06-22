@@ -48,8 +48,8 @@ setup(name="trollduction",
                'npp_runner/viirs_dr_runner.py',
                'modis_runner/modis_dr_runner.py',
                'aapp_runner/aapp_dr_runner.py',
-               'nwcsafpps_runner/pps_runner.py'
-               'nwcsafpps_runner/pps_run.sh'
+               'nwcsafpps_runner/pps_runner.py',
+               'nwcsafpps_runner/pps_run.sh',
                'bin/l2processor.py',
                'bin/scisys_receiver.py',
                ],
