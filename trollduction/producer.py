@@ -346,13 +346,19 @@ class DataProcessor(object):
     """Process the data.
     """
 
-    def __init__(self):
+    def __init__(self, publish_topic=None):
         self.global_data = None
         self.local_data = None
         self.product_config = None
+        self._publish_topic = publish_topic
         self._data_ok = True
-        self.writer = DataWriter()
+        self.writer = DataWriter(publish_topic=self._publish_topic)
         self.writer.start()
+
+    def set_publish_topic(self, publish_topic):
+        '''Set published topic.'''
+        self._publish_topic = publish_topic
+        self.writer.set_publish_topic(publish_topic)
 
     def stop(self):
         '''Stop data writer.
@@ -856,7 +862,7 @@ class DataProcessor(object):
         return True
 
 
-def _create_message(obj, filename, uri, params, uid=None):
+def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
     """Create posttroll message.
     """
     to_send = obj.info.copy()
@@ -916,13 +922,15 @@ def _create_message(obj, filename, uri, params, uid=None):
         to_send["data_processing_level"] = "3"
         to_send["product_name"] = "cloudproduct"
 
-    subject = "/".join(("",
-                        to_send["format"],
-                        to_send["data_processing_level"]))
+    if publish_topic is None:
+        subject = "/".join(("",
+                            to_send["format"],
+                            to_send["data_processing_level"]))
+    else:
+        subject = compose(publish_topic, to_send)
 
-    msg = Message(subject,
-                  "file",
-                  to_send)
+    msg = Message(subject, "file", to_send)
+
     return msg
 
 
@@ -976,10 +984,15 @@ class DataWriter(Thread):
     we don't want to block processing.
     """
 
-    def __init__(self):
+    def __init__(self, publish_topic=None):
         Thread.__init__(self)
         self.prod_queue = Queue.Queue()
+        self._publish_topic = publish_topic
         self._loop = True
+
+    def set_publish_topic(publish_topic):
+        '''Set published topic.'''
+        self._publish_topic = publish_topic
 
     def run(self):
         """Run the thread.
@@ -1057,7 +1070,10 @@ class DataWriter(Thread):
                                 thumbnail(fname, thname, thsize, fformat)
 
                             msg = _create_message(obj, os.path.basename(fname),
-                                                  fname, params, uid=uid)
+                                                  fname, params,
+                                                  publish_topic=\
+                                                  self._publish_topic,
+                                                  uid=uid)
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
                 except Exception as e:
@@ -1103,7 +1119,8 @@ class Trollduction(object):
 
         self._loop = True
         self.thr = None
-        self.data_processor = DataProcessor()
+
+        self.data_processor = None
         self.config_watcher = None
 
         # read everything from the Trollduction config file
@@ -1120,6 +1137,10 @@ class Trollduction(object):
         except AttributeError:
             self.td_config = config
             self.update_td_config()
+
+        self.data_processor = \
+            DataProcessor(publish_topic=self.td_config.get('publish_topic',
+                                                           None))
 
     def update_td_config_from_file(self, fname, config_item=None):
         '''Read Trollduction config file and use the new parameters.
