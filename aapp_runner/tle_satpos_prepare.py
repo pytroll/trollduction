@@ -67,6 +67,8 @@ def do_tleing(aapp_prefix, tle_in, tle_out, tle_call):
 
         my_env = os.environ.copy()
         my_env['AAPP_PREFIX'] = aapp_prefix
+        for key in my_env:
+            LOG.debug("ENV: " + str(key) + ": " + str(my_env[key]))
         import shlex
         myargs = shlex.split(str(tle_call))
         LOG.debug('Command sequence= ' + str(myargs))
