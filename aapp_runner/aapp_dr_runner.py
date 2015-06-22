@@ -455,7 +455,7 @@ class AappLvl1Processor(object):
                         str(start_orbnum) + " Before = " + str(self.orbit))
             self.orbit = start_orbnum
         else:
-            LOG.debug("Orbit number in message determined"
+            LOG.debug("Orbit number in message determined " +
                       "to be okay and not changed...")
 
         if self.platform_name in SUPPORTED_METOP_SATELLITES:
@@ -888,7 +888,7 @@ def aapp_rolling_runner(runner_config):
                     cleanup(older_than_days, path_to_clean)
                     LOG.info("Cleaning up directory " +
                              str(aapp_proc.working_dir))
-                    aapp_proc.cleanup_aapp_workdir()
+                    # aapp_proc.cleanup_aapp_workdir()
                 elif aapp_proc.working_dir:
                     LOG.info("NOT Cleaning up directory %s",
                              aapp_proc.working_dir)
