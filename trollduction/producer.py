@@ -990,7 +990,7 @@ class DataWriter(Thread):
         self._publish_topic = publish_topic
         self._loop = True
 
-    def set_publish_topic(publish_topic):
+    def set_publish_topic(self, publish_topic):
         '''Set published topic.'''
         self._publish_topic = publish_topic
 
