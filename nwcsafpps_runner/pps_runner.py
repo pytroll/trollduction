@@ -146,7 +146,6 @@ def get_outputfiles(path, satid, orb):
     directory and find all pps output files matching that scene and return the
     full filenames"""
 
-    from glob import glob
     h5_output = (os.path.join(path, 'S_NWC') + '*' +
                  str(METOP_NAME_LETTER.get(satid, satid)) +
                  '_' + str(orb) + '*.h5')
