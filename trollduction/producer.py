@@ -1132,6 +1132,8 @@ class Trollduction(object):
         self.data_processor = None
         self.config_watcher = None
 
+        self._previous_file = None
+
         # read everything from the Trollduction config file
         try:
             self.update_td_config_from_file(config['config_file'],
@@ -1243,6 +1245,18 @@ class Trollduction(object):
                 if (msg.type in ["file", 'collection', 'dataset'] and
                     sensors.intersection(\
                             self.td_config['instruments'].split(','))):
+                    try:
+                        if self._previous_file in msg.data["uri"] and \
+                           self.td_config.get('process_only_once',
+                                              "false").lower() in \
+                           ["true", "yes", "1"]:
+                            LOGGER.info("File was already processed. Skipping.")
+                            continue
+                        else:
+                            self._previous_file = msg.data["uri"]
+                    except TypeError:
+                        self._previous_file = msg.data["uri"]
+
                     self.update_product_config(\
                             self.td_config['product_config_file'])
                     self.data_processor.run(self.product_config, msg)
