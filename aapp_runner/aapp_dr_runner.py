@@ -254,7 +254,7 @@ class AappLvl1Processor(object):
                 lvl = '1B'
                 instr = 'avhrr/3'
             else:
-                lvl = mstr[-2:]
+                lvl = mstr[-2:].upper()
                 try:
                     instr = SENSOR_NAME_CONVERTER[mstr[0:-3]]
                 except KeyError:
