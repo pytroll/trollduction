@@ -224,11 +224,16 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
             myargs = shlex.split(str(cmdstr))
             LOG.info("Command " + str(myargs))
             my_env = os.environ.copy()
-            for envkey in my_env:
-                LOG.debug("ENV: " + str(envkey) + " " + str(my_env[envkey]))
-
+            # for envkey in my_env:
+            #    LOG.debug("ENV: " + str(envkey) + " " + str(my_env[envkey]))
             LOG.debug("PPS_OUTPUT_DIR = " + str(PPS_OUTPUT_DIR))
             LOG.debug("...from config file = " + str(OPTIONS['pps_outdir']))
+            if not os.path.isfile(PPS_SCRIPT):
+                raise IOError("PPS script" + PPS_SCRIPT + " is not there!")
+            elif not os.access(PPS_SCRIPT, os.X_OK):
+                raise IOError(
+                    "PPS script" + PPS_SCRIPT + " cannot be executed!")
+
             pps_proc = Popen(myargs, shell=False, stderr=PIPE, stdout=PIPE)
             t__ = threading.Timer(
                 20 * 60.0, terminate_process, args=(pps_proc, scene, ))
