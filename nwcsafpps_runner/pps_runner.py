@@ -202,138 +202,142 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
                  'starttime': starttime, 'endtime': endtime}
     """
 
-    LOG.debug("Waiting for acquired semaphore...")
-    with semaphore_obj:
-        LOG.debug("Acquired semaphore")
-        if scene['satid'] in SUPPORTED_EOS_SATELLITES:
-            cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
-                                         scene['orbit_number'], scene[
-                                             'satday'],
-                                         scene['sathour'])
-        else:
-            cmdstr = "%s %s %s 0 0" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
-                                       scene['orbit_number'])
-
-        if scene['satid'] in SUPPORTED_JPSS_SATELLITES and LVL1_NPP_PATH:
-            cmdstr = cmdstr + ' ' + str(LVL1_NPP_PATH)
-        elif scene['satid'] in SUPPORTED_EOS_SATELLITES and LVL1_EOS_PATH:
-            cmdstr = cmdstr + ' ' + str(LVL1_EOS_PATH)
-
-        import shlex
-        myargs = shlex.split(str(cmdstr))
-        LOG.info("Command " + str(myargs))
-        my_env = os.environ.copy()
-        for envkey in my_env:
-            LOG.debug("ENV: " + str(envkey) + " " + str(my_env[envkey]))
-
-        LOG.debug("PPS_OUTPUT_DIR = " + str(PPS_OUTPUT_DIR))
-        LOG.debug("...from config file = " + str(OPTIONS['pps_outdir']))
-        pps_proc = Popen(myargs, shell=False, stderr=PIPE, stdout=PIPE)
-        t__ = threading.Timer(
-            20 * 60.0, terminate_process, args=(pps_proc, scene, ))
-        t__.start()
-
-        while True:
-            line = pps_proc.stdout.readline()
-            if not line:
-                break
-            LOG.info(line)
-
-        while True:
-            errline = pps_proc.stderr.readline()
-            if not errline:
-                break
-            LOG.info(errline)
-
-        pps_proc.wait()
-
-        LOG.info(
-            "Ready with PPS level-2 processing on scene: " + str(scene))
-
-        # Now try perform som time statistics editing with ppsTimeControl.py from
-        # pps:
-        do_time_control = True
-        try:
-            from pps_time_control import PPSTimeControl
-        except ImportError:
-            LOG.warning("Failed to import the PPSTimeControl from pps")
-            do_time_control = False
-
-        pps_control_path = my_env.get('STATISTICS_DIR', PPS_OUTPUT_DIR)
-
-        if do_time_control:
-            LOG.info("Read time control ascii file and generate XML")
-            platform_id = SATELLITE_NAME.get(scene['satid'], scene['satid'])
-            LOG.info("pps platform_id = " + str(platform_id))
-            txt_time_file = (os.path.join(pps_control_path, 'S_NWC_timectrl_') +
-                             str(METOP_NAME_LETTER.get(platform_id, platform_id)) +
-                             '_' + str(scene['orbit_number']) + '*.txt')
-            LOG.info("glob string = " + str(txt_time_file))
-            infiles = glob(txt_time_file)
-            LOG.info("Time control xml file candidates: " + str(infiles))
-            if len(infiles) == 1:
-                infile = infiles[0]
-                LOG.info("Time control xml file: " + str(infile))
-                ppstime_con = PPSTimeControl(infile)
-                ppstime_con.sum_up_processing_times()
-                ppstime_con.write_xml()
-
-        # Now check what netCDF/hdf5 output was produced and publish them:
-        pps_path = my_env.get('SM_PRODUCT_DIR', PPS_OUTPUT_DIR)
-        result_files = get_outputfiles(
-            pps_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
-        LOG.info("PPS Output files: " + str(result_files))
-        xml_files = get_outputfiles(
-            pps_control_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
-        LOG.info("PPS summary statistics files: " + str(xml_files))
-
-        # Now publish:
-        for result_file in result_files + xml_files:
-            filename = os.path.split(result_file)[1]
-            LOG.info("file to publish = " + str(filename))
-
-            to_send = {}
-            to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
-            to_send['uid'] = filename
-            to_send['sensor'] = scene.get('instrument', None)
-            if not to_send['sensor']:
-                to_send['sensor'] = scene.get('sensor', None)
-
-            to_send['platform_name'] = scene['platform_name']
-            to_send['orbit_number'] = scene['orbit']
-            if result_file.endswith("xml"):
-                to_send['format'] = 'PPS'
-                to_send['type'] = 'XML'
-            if result_file.endswith("nc"):
-                to_send['format'] = 'CF'
-                to_send['type'] = 'netCDF4'
-            if result_file.endswith("h5"):
-                to_send['format'] = 'PPS'
-                to_send['type'] = 'HDF5'
-            to_send['data_processing_level'] = '2'
-
-            environment = MODE
-            to_send['start_time'], to_send['end_time'] = scene[
-                'starttime'], scene['endtime']
-            pubmsg = Message('/' + to_send['format'] + '/' + to_send['data_processing_level'] +
-                             '/norrköping/' + environment +
-                             '/polar/direct_readout/',
-                             "file", to_send).encode()
-            LOG.debug("sending: " + str(pubmsg))
-            LOG.info("Sending: " + str(pubmsg))
-            publish_q.put(pubmsg)
-
-            if isinstance(job_id, datetime):
-                dt_ = datetime.utcnow() - job_id
-                LOG.info("PPS on scene " + str(job_id) +
-                         " finished. It took: " + str(dt_))
+    try:
+        LOG.debug("Waiting for acquired semaphore...")
+        with semaphore_obj:
+            LOG.debug("Acquired semaphore")
+            if scene['satid'] in SUPPORTED_EOS_SATELLITES:
+                cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
+                                             scene['orbit_number'], scene[
+                                                 'satday'],
+                                             scene['sathour'])
             else:
-                LOG.warning(
-                    "Job entry is not a datetime instance: " + str(job_id))
+                cmdstr = "%s %s %s 0 0" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
+                                           scene['orbit_number'])
 
-        t__.cancel()
+            if scene['satid'] in SUPPORTED_JPSS_SATELLITES and LVL1_NPP_PATH:
+                cmdstr = cmdstr + ' ' + str(LVL1_NPP_PATH)
+            elif scene['satid'] in SUPPORTED_EOS_SATELLITES and LVL1_EOS_PATH:
+                cmdstr = cmdstr + ' ' + str(LVL1_EOS_PATH)
 
-    return
+            import shlex
+            myargs = shlex.split(str(cmdstr))
+            LOG.info("Command " + str(myargs))
+            my_env = os.environ.copy()
+            for envkey in my_env:
+                LOG.debug("ENV: " + str(envkey) + " " + str(my_env[envkey]))
+
+            LOG.debug("PPS_OUTPUT_DIR = " + str(PPS_OUTPUT_DIR))
+            LOG.debug("...from config file = " + str(OPTIONS['pps_outdir']))
+            pps_proc = Popen(myargs, shell=False, stderr=PIPE, stdout=PIPE)
+            t__ = threading.Timer(
+                20 * 60.0, terminate_process, args=(pps_proc, scene, ))
+            t__.start()
+
+            while True:
+                line = pps_proc.stdout.readline()
+                if not line:
+                    break
+                LOG.info(line)
+
+            while True:
+                errline = pps_proc.stderr.readline()
+                if not errline:
+                    break
+                LOG.info(errline)
+
+            pps_proc.wait()
+
+            LOG.info(
+                "Ready with PPS level-2 processing on scene: " + str(scene))
+
+            # Now try perform som time statistics editing with ppsTimeControl.py from
+            # pps:
+            do_time_control = True
+            try:
+                from pps_time_control import PPSTimeControl
+            except ImportError:
+                LOG.warning("Failed to import the PPSTimeControl from pps")
+                do_time_control = False
+
+            pps_control_path = my_env.get('STATISTICS_DIR', PPS_OUTPUT_DIR)
+
+            if do_time_control:
+                LOG.info("Read time control ascii file and generate XML")
+                platform_id = SATELLITE_NAME.get(
+                    scene['satid'], scene['satid'])
+                LOG.info("pps platform_id = " + str(platform_id))
+                txt_time_file = (os.path.join(pps_control_path, 'S_NWC_timectrl_') +
+                                 str(METOP_NAME_LETTER.get(platform_id, platform_id)) +
+                                 '_' + str(scene['orbit_number']) + '*.txt')
+                LOG.info("glob string = " + str(txt_time_file))
+                infiles = glob(txt_time_file)
+                LOG.info("Time control xml file candidates: " + str(infiles))
+                if len(infiles) == 1:
+                    infile = infiles[0]
+                    LOG.info("Time control xml file: " + str(infile))
+                    ppstime_con = PPSTimeControl(infile)
+                    ppstime_con.sum_up_processing_times()
+                    ppstime_con.write_xml()
+
+            # Now check what netCDF/hdf5 output was produced and publish them:
+            pps_path = my_env.get('SM_PRODUCT_DIR', PPS_OUTPUT_DIR)
+            result_files = get_outputfiles(
+                pps_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
+            LOG.info("PPS Output files: " + str(result_files))
+            xml_files = get_outputfiles(
+                pps_control_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
+            LOG.info("PPS summary statistics files: " + str(xml_files))
+
+            # Now publish:
+            for result_file in result_files + xml_files:
+                filename = os.path.split(result_file)[1]
+                LOG.info("file to publish = " + str(filename))
+
+                to_send = {}
+                to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
+                to_send['uid'] = filename
+                to_send['sensor'] = scene.get('instrument', None)
+                if not to_send['sensor']:
+                    to_send['sensor'] = scene.get('sensor', None)
+
+                to_send['platform_name'] = scene['platform_name']
+                to_send['orbit_number'] = scene['orbit']
+                if result_file.endswith("xml"):
+                    to_send['format'] = 'PPS'
+                    to_send['type'] = 'XML'
+                if result_file.endswith("nc"):
+                    to_send['format'] = 'CF'
+                    to_send['type'] = 'netCDF4'
+                if result_file.endswith("h5"):
+                    to_send['format'] = 'PPS'
+                    to_send['type'] = 'HDF5'
+                to_send['data_processing_level'] = '2'
+
+                environment = MODE
+                to_send['start_time'], to_send['end_time'] = scene[
+                    'starttime'], scene['endtime']
+                pubmsg = Message('/' + to_send['format'] + '/' + to_send['data_processing_level'] +
+                                 '/norrköping/' + environment +
+                                 '/polar/direct_readout/',
+                                 "file", to_send).encode()
+                LOG.debug("sending: " + str(pubmsg))
+                LOG.info("Sending: " + str(pubmsg))
+                publish_q.put(pubmsg)
+
+                if isinstance(job_id, datetime):
+                    dt_ = datetime.utcnow() - job_id
+                    LOG.info("PPS on scene " + str(job_id) +
+                             " finished. It took: " + str(dt_))
+                else:
+                    LOG.warning(
+                        "Job entry is not a datetime instance: " + str(job_id))
+
+            t__.cancel()
+
+    except:
+        LOG.exception('Failed in pps_worker...')
+        raise
 
 
 def ready2run(msg, files4pps, job_register, sceneid):
