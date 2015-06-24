@@ -583,14 +583,17 @@ def check_threads(threads):
 def prepare_nwp4pps(sphor_obj, starttime, flens):
     """Prepare NWP data for pps"""
 
-    LOG.debug("Waiting for acquired semaphore for nwp prepare...")
-    with sphor_obj:
-        LOG.debug("Acquired semaphore for nwp preparation...")
-        update_nwp(starttime, flens)
-        LOG.info("Ready with nwp preparation")
+    try:
+        LOG.debug("Waiting for acquired semaphore for nwp prepare...")
+        with sphor_obj:
+            LOG.debug("Acquired semaphore for nwp preparation...")
+            update_nwp(starttime, flens)
+            LOG.info("Ready with nwp preparation")
 
-    LOG.debug("Leaving prepare_nwp4pps...")
-    return
+        LOG.debug("Leaving prepare_nwp4pps...")
+    except:
+        LOG.exception("Something went wrong in update_nwp...")
+        raise
 
 
 def pps():
@@ -599,10 +602,10 @@ def pps():
 
     LOG.info("*** Start the PPS level-2 runner:")
 
-    LOG.info("First check if NWP data should be downloaded and prepared")
-    now = datetime.utcnow()
-    update_nwp(now - timedelta(days=1), NWP_FLENS)
-    LOG.info("Ready with nwp preparation...")
+    # LOG.info("First check if NWP data should be downloaded and prepared")
+    # now = datetime.utcnow()
+    # update_nwp(now - timedelta(days=1), NWP_FLENS)
+    # LOG.info("Ready with nwp preparation...")
 
     nwp_pp_sema = threading.Semaphore(1)
     sema = threading.Semaphore(5)
