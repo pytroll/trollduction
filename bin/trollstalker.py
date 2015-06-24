@@ -38,6 +38,7 @@ import logging
 import logging.config
 import os.path
 import datetime as dt
+from collections import deque
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class EventHandler(ProcessEvent):
     """
 
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
-                 aliases=None, tbus_orbit=False):
+                 aliases=None, tbus_orbit=False, history=0):
         super(EventHandler, self).__init__()
 
         self._pub = NoisyPublisher("trollstalker", posttroll_port, topic)
@@ -65,6 +66,7 @@ class EventHandler(ProcessEvent):
         self.instrument = instrument
         self.aliases = aliases
         self.tbus_orbit = tbus_orbit
+        self._deque = deque([], history)
 
     def stop(self):
         '''Stop publisher.
@@ -114,9 +116,14 @@ class EventHandler(ProcessEvent):
             # parse information and create self.info dict{}
             self.parse_file_info(event)
             if len(self.info) > 0:
-                message = self.create_message()
-                LOGGER.info("Publishing message %s", str(message))
-                self.pub.send(str(message))
+                # Check if this file has been recently dealt with
+                if event.pathname not in self._deque:
+                    self._deque.append(event.pathname)
+                    message = self.create_message()
+                    LOGGER.info("Publishing message %s", str(message))
+                    self.pub.send(str(message))
+                else:
+                    LOGGER.info("Data has been published recently, skipping.")
             self.__clean__()
 
     def create_message(self):
@@ -180,7 +187,7 @@ class NewThreadedNotifier(ThreadedNotifier):
 
 def create_notifier(topic, instrument, posttroll_port, filepattern,
                     event_names, monitored_dirs, aliases=None,
-                    tbus_orbit=False):
+                    tbus_orbit=False, history=0):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
@@ -200,7 +207,8 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
                                  posttroll_port=posttroll_port,
                                  filepattern=filepattern,
                                  aliases=aliases,
-                                 tbus_orbit=tbus_orbit)
+                                 tbus_orbit=tbus_orbit,
+                                 history=history)
 
     notifier = NewThreadedNotifier(manager, event_handler)
 
@@ -332,6 +340,11 @@ def main():
             instrument = instrument or config['instruments']
         except KeyError:
             pass
+        try:
+            history = int(config['history'])
+        except KeyError:
+            history = 0
+
         aliases = parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
 
@@ -366,7 +379,7 @@ def main():
     # Start watching for new files
     notifier = create_notifier(topic, instrument, posttroll_port, filepattern,
                                event_names, monitored_dirs, aliases=aliases,
-                               tbus_orbit=tbus_orbit)
+                               tbus_orbit=tbus_orbit, history=history)
     notifier.start()
 
     try:
