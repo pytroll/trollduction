@@ -146,23 +146,23 @@ def nonblock_read(output):
         return ''
 
 
-def get_outputfiles(path, satid, orb):
+def get_outputfiles(path, platform_name, orb):
     """From the directory path and satellite id and orbit number scan the
     directory and find all pps output files matching that scene and return the
     full filenames"""
 
     h5_output = (os.path.join(path, 'S_NWC') + '*' +
-                 str(METOP_NAME_LETTER.get(satid, satid)) +
+                 str(METOP_NAME_LETTER.get(platform_name, platform_name)) +
                  '_' + str(orb) + '*.h5')
     LOG.info(
         "Match string to do a file globbing on hdf5 output files: " + str(h5_output))
     nc_output = (os.path.join(path, 'S_NWC') + '*' +
-                 str(METOP_NAME_LETTER.get(satid, satid)) +
+                 str(METOP_NAME_LETTER.get(platform_name, platform_name)) +
                  '_' + str(orb) + '*.nc')
     LOG.info(
         "Match string to do a file globbing on netcdf output files: " + str(nc_output))
     xml_output = (os.path.join(path, 'S_NWC') + '*' +
-                  str(METOP_NAME_LETTER.get(satid, satid)) +
+                  str(METOP_NAME_LETTER.get(platform_name, platform_name)) +
                   '_' + str(orb) + '*.xml')
     LOG.info(
         "Match string to do a file globbing on xml output files: " + str(xml_output))
@@ -197,7 +197,8 @@ def terminate_process(popen_obj, scene):
 def pps_worker(semaphore_obj, scene, job_id, publish_q):
     """Spawn/Start a PPS run on a new thread if available
 
-        scene = {'satid': satid, 'orbit_number': orbit,
+        scene = {'platform_name': platform_name,
+                 'orbit_number': orbit,
                  'satday': satday, 'sathour': sathour,
                  'starttime': starttime, 'endtime': endtime}
     """
@@ -206,18 +207,22 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
         LOG.debug("Waiting for acquired semaphore...")
         with semaphore_obj:
             LOG.debug("Acquired semaphore")
-            if scene['satid'] in SUPPORTED_EOS_SATELLITES:
-                cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
+            if scene['platform_name'] in SUPPORTED_EOS_SATELLITES:
+                cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT,
+                                             SATELLITE_NAME[
+                                                 scene['platform_name']],
                                              scene['orbit_number'], scene[
                                                  'satday'],
                                              scene['sathour'])
             else:
-                cmdstr = "%s %s %s 0 0" % (PPS_SCRIPT, SATELLITE_NAME[scene['satid']],
+                cmdstr = "%s %s %s 0 0" % (PPS_SCRIPT,
+                                           SATELLITE_NAME[
+                                               scene['platform_name']],
                                            scene['orbit_number'])
 
-            if scene['satid'] in SUPPORTED_JPSS_SATELLITES and LVL1_NPP_PATH:
+            if scene['platform_name'] in SUPPORTED_JPSS_SATELLITES and LVL1_NPP_PATH:
                 cmdstr = cmdstr + ' ' + str(LVL1_NPP_PATH)
-            elif scene['satid'] in SUPPORTED_EOS_SATELLITES and LVL1_EOS_PATH:
+            elif scene['platform_name'] in SUPPORTED_EOS_SATELLITES and LVL1_EOS_PATH:
                 cmdstr = cmdstr + ' ' + str(LVL1_EOS_PATH)
 
             import shlex
@@ -270,7 +275,7 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
             if do_time_control:
                 LOG.info("Read time control ascii file and generate XML")
                 platform_id = SATELLITE_NAME.get(
-                    scene['satid'], scene['satid'])
+                    scene['platform_name'], scene['platform_name'])
                 LOG.info("pps platform_id = " + str(platform_id))
                 txt_time_file = (os.path.join(pps_control_path, 'S_NWC_timectrl_') +
                                  str(METOP_NAME_LETTER.get(platform_id, platform_id)) +
@@ -288,10 +293,10 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
             # Now check what netCDF/hdf5 output was produced and publish them:
             pps_path = my_env.get('SM_PRODUCT_DIR', PPS_OUTPUT_DIR)
             result_files = get_outputfiles(
-                pps_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
+                pps_path, SATELLITE_NAME[scene['platform_name']], scene['orbit_number'])
             LOG.info("PPS Output files: " + str(result_files))
             xml_files = get_outputfiles(
-                pps_control_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
+                pps_control_path, SATELLITE_NAME[scene['platform_name']], scene['orbit_number'])
             LOG.info("PPS summary statistics files: " + str(xml_files))
 
             # Now publish:
@@ -655,7 +660,8 @@ def pps():
             sensors = SENSOR_LIST.get(platform_name, None)
             satday = starttime.strftime('%Y%m%d')
             sathour = starttime.strftime('%H%M')
-            scene = {'satid': platform_name, 'orbit_number': orbit_number,
+            scene = {'platform_name': platform_name,
+                     'orbit_number': orbit_number,
                      'satday': satday, 'sathour': sathour,
                      'starttime': starttime, 'endtime': endtime,
                      'sensor': sensors}
