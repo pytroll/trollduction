@@ -198,7 +198,7 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
     """Spawn/Start a PPS run on a new thread if available
 
         scene = {'platform_name': platform_name,
-                 'orbit_number': orbit,
+                 'orbit_number': orbit_number,
                  'satday': satday, 'sathour': sathour,
                  'starttime': starttime, 'endtime': endtime}
     """
@@ -312,7 +312,7 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
                     to_send['sensor'] = scene.get('sensor', None)
 
                 to_send['platform_name'] = scene['platform_name']
-                to_send['orbit_number'] = scene['orbit']
+                to_send['orbit_number'] = scene['orbit_number']
                 if result_file.endswith("xml"):
                     to_send['format'] = 'PPS'
                     to_send['type'] = 'XML'
