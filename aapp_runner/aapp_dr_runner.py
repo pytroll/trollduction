@@ -375,385 +375,393 @@ class AappLvl1Processor(object):
         """Start the AAPP level 1 processing on either a NOAA HRPT file or a
         set of Metop HRPT files"""
 
-        # Avoid 'collections' and other stuff:
-        if msg is None or msg.type != 'file':
-            return True
-
-        LOG.debug("Received message: " + str(msg))
-        #msg.data['platform_name'] = "NOAA-19"
-        LOG.debug(
-            "Supported Metop satellites: " + str(SUPPORTED_METOP_SATELLITES))
-        LOG.debug(
-            "Supported NOAA satellites: " + str(SUPPORTED_NOAA_SATELLITES))
-
         try:
-            if (msg.data['platform_name'] not in
-                    SUPPORTED_NOAA_SATELLITES and
-                    msg.data['platform_name'] not in
-                    SUPPORTED_METOP_SATELLITES):
 
-                LOG.info("Not a NOAA/Metop scene. Continue...")
+            # Avoid 'collections' and other stuff:
+            if msg is None or msg.type != 'file':
                 return True
-            # FIXME:
-        except Exception, err:
-            LOG.warning(str(err))
-            return True
 
-        self.platform_name = msg.data['platform_name']
-        LOG.debug("Satellite = " + str(self.platform_name))
+            LOG.debug("Received message: " + str(msg))
+            #msg.data['platform_name'] = "NOAA-19"
+            LOG.debug(
+                "Supported Metop satellites: " + str(SUPPORTED_METOP_SATELLITES))
+            LOG.debug(
+                "Supported NOAA satellites: " + str(SUPPORTED_NOAA_SATELLITES))
 
-        LOG.debug("")
-        LOG.debug("\tMessage:")
-        LOG.debug(str(msg))
-        urlobj = urlparse(msg.data['uri'])
-        server = urlobj.netloc
-        LOG.debug('Server = <' + str(server) + '>')
-        if len(server) > 0 and server != self.dataserver:
-            LOG.warning("Server " + str(server))
-            LOG.warning("Is not the current dataserver one: " +
-                        str(self.dataserver))
-            return True
-
-        LOG.info("Ok... " + str(urlobj.netloc))
-        LOG.info("Sat and Sensor: " + str(msg.data['platform_name'])
-                 + " " + str(msg.data['sensor']))
-
-        self.starttime = msg.data['start_time']
-        try:
-            self.endtime = msg.data['end_time']
-        except KeyError:
-            LOG.warning(
-                "No end_time in message! Guessing start_time + 14 minutes...")
-            self.endtime = msg.data['start_time'] + timedelta(seconds=60 * 14)
-
-        start_orbnum = None
-        try:
-            import pyorbital.orbital as orb
-            sat = orb.Orbital(
-                TLE_SATNAME.get(self.platform_name, self.platform_name))
-            start_orbnum = sat.get_orbit_number(self.starttime)
-        except ImportError:
-            LOG.warning("Failed importing pyorbital, " +
-                        "cannot calculate orbit number")
-        except AttributeError:
-            LOG.warning("Failed calculating orbit number using pyorbital")
-            LOG.warning("platform name = " +
-                        str(TLE_SATNAME.get(self.platform_name,
-                                            self.platform_name)) +
-                        " " + str(self.platform_name))
-
-        LOG.info(
-            "Orbit number determined from pyorbital = " + str(start_orbnum))
-        try:
-            self.orbit = int(msg.data['orbit_number'])
-        except KeyError:
-            LOG.warning("No orbit_number in message! Set to none...")
-            self.orbit = None
-
-        if start_orbnum and self.orbit != start_orbnum:
-            LOG.warning("Correcting orbit number: Orbit now = " +
-                        str(start_orbnum) + " Before = " + str(self.orbit))
-            self.orbit = start_orbnum
-        else:
-            LOG.debug("Orbit number in message determined " +
-                      "to be okay and not changed...")
-
-        if self.platform_name in SUPPORTED_METOP_SATELLITES:
-            metop_id = SATELLITE_NAME[self.platform_name].split('metop')[1]
-            self.satnum = METOP_NUMBER.get(metop_id, metop_id)
-        else:
-            self.satnum = SATELLITE_NAME[self.platform_name].strip('noaa')
-
-        year = self.starttime.year
-        keyname = str(self.platform_name)
-        LOG.debug("Keyname = " + str(keyname))
-        LOG.debug("Start: job register = " + str(self.job_register))
-
-        # Use sat id, start and end time as the unique identifier of the scene!
-        if keyname in self.job_register and len(self.job_register[keyname]) > 0:
-            # Go through list of start,end time tuples and see if the current
-            # scene overlaps with any:
-            status = overlapping_timeinterval((self.starttime, self.endtime),
-                                              self.job_register[keyname])
-            if status:
-                LOG.warning("Processing of scene " + keyname +
-                            " " + str(status[0]) + " " + str(status[1]) +
-                            " with overlapping time have been"
-                            " launched previously")
-                LOG.info("Skip it...")
-                return True
-            else:
-                LOG.debug(
-                    "No overlap with any recently processed scenes...")
-
-        scene_id = (str(self.platform_name) + '_' +
-                    self.starttime.strftime('%Y%m%d%H%M%S') +
-                    '_' + self.endtime.strftime('%Y%m%d%H%M%S'))
-        LOG.debug("scene_id = " + str(scene_id))
-
-        # Check for keys representing the same scene (slightly different
-        # start/end times):
-        LOG.debug("Level-0files = " + str(self.level0files))
-        for key in self.level0files:
-            pltrfn, startt, endt = key.split('_')
-            if not self.platform_name == pltrfn:
-                continue
-            t1_ = datetime.strptime(startt, '%Y%m%d%H%M%S')
-            t2_ = datetime.strptime(endt, '%Y%m%d%H%M%S')
-            if (abs(self.starttime - t1_).seconds < 60 and
-                    abs(self.endtime - t2_).seconds < 60):
-                # It is the same scene!
-                LOG.debug(
-                    "It is the same scene,"
-                    " though the file times differ a bit...")
-                scene_id = key
-                break
-
-        LOG.debug("scene_id = " + str(scene_id))
-        if scene_id in self.level0files:
-            LOG.debug("Level-0files = " + str(self.level0files[scene_id]))
-        else:
-            LOG.debug("No level-0files yet...")
-
-        self.level0_filename = urlobj.path
-        dummy, fname = os.path.split(self.level0_filename)
-
-        if fname.find('.hmf') > 0:
-            self.ishmf = True
-        else:
-            LOG.info("File is not a hmf file, " +
-                     "probably a Metop file or a NOAA from DMI: " + str(fname))
-
-        LOG.debug("Sensor = " + str(msg.data['sensor']))
-        LOG.debug("type: " + str(type(msg.data['sensor'])))
-        if type(msg.data['sensor']) in [str, unicode]:
-            sensors = [msg.data['sensor']]
-        elif type(msg.data['sensor']) is list:
-            sensors = msg.data['sensor']
-        else:
-            sensors = []
-            LOG.warning('Failed interpreting sensor(s)!')
-
-        LOG.info("Sensor(s): " + str(sensors))
-        sensor_ok = False
-        for sensor in sensors:
-            if sensor in SENSOR_NAMES:
-                sensor_ok = True
-                break
-        if not sensor_ok:
-            LOG.info("No required sensors....")
-            return True
-
-        if scene_id not in self.level0files:
-            LOG.debug("Reset level0files: scene_id = " + str(scene_id))
-            self.level0files[scene_id] = []
-
-        for sensor in sensors:
-            item = (self.level0_filename, sensor)
-            if item not in self.level0files[scene_id]:
-                self.level0files[scene_id].append(item)
-                LOG.debug("Appending item to list: " + str(item))
-            else:
-                LOG.debug("item already in list: " + str(item))
-
-        if len(self.level0files[scene_id]) < 4:
-            LOG.info("Not enough sensor data available yet. " +
-                     "Level-0files = " +
-                     str(self.level0files[scene_id]))
-            return True
-        else:
-            LOG.info(
-                "Level 0 files ready: " + str(self.level0files[scene_id]))
-
-        if not self.working_dir and self.use_dyn_work_dir:
             try:
-                self.working_dir = tempfile.mkdtemp(dir=self.aapp_workdir)
-            except OSError:
-                self.working_dir = tempfile.mkdtemp()
-            finally:
-                LOG.info("Create new working dir...")
-        elif not self.working_dir:
-            self.working_dir = self.aapp_workdir
+                if (msg.data['platform_name'] not in
+                        SUPPORTED_NOAA_SATELLITES and
+                        msg.data['platform_name'] not in
+                        SUPPORTED_METOP_SATELLITES):
 
-        LOG.info("Working dir = " + str(self.working_dir))
-
-        # AAPP requires ENV variables
-        my_env = os.environ.copy()
-        my_env['AAPP_PREFIX'] = self.aapp_prefix
-        if self.use_dyn_work_dir:
-            my_env['DYN_WRK_DIR'] = self.working_dir
-
-        LOG.info(
-            "working dir: self.working_dir = " + str(self.working_dir))
-        LOG.info("Using AAPP_PREFIX:" + str(self.aapp_prefix))
-
-        for envkey in my_env:
-            LOG.debug("ENV: " + str(envkey) + " " + str(my_env[envkey]))
-
-        if self.platform_name in SUPPORTED_NOAA_SATELLITES:
-            LOG.info("This is a NOAA scene. Start the NOAA processing!")
-# FIXME:            LOG.info("Process the scene " +
-#                     self.platform_name + self.orbit)
-# TypeError: coercing to Unicode: need string or buffer, int found
-            LOG.info("Process the file " + str(self.level0_filename))
-
-            if self.platform_name == 'NOAA-15':
-                # AMSU amsubcl fails
-                cmdseq = (self.noaa_run_script +
-                          ' -i AVHRR ' +
-                          '-Y ' + str(year) +
-                          ' -n ' + str(self.orbit) +
-                          ' ' + self.level0_filename)
-            else:
-                cmdseq = (self.noaa_run_script +
-                          ' -Y ' + str(year) +
-                          ' -n ' + str(self.orbit) +
-                          ' ' + self.level0_filename)
-
-            LOG.info("Command sequence: " + str(cmdseq))
-            # Run the command:
-            # FIXME: shell=False https://docs.python.org/2/library/subprocess.html
-            # https://docs.python.org/2/library/subprocess.html#subprocess.Popen.communicate
-            aapplvl1_proc = Popen(shlex.split(cmdseq),
-                                  cwd=self.working_dir,
-                                  shell=False, env=my_env,
-                                  stderr=PIPE, stdout=PIPE)
-            aapplvl1_proc.wait()
-
-        elif self.platform_name in SUPPORTED_METOP_SATELLITES:
-            # Metop processing needs input directory
-            # as an argument for METOP_RUN_SCRIPT
-            metop_in_dir = os.path.dirname(self.level0_filename)
-            LOG.info("This is a Metop scene. Start the METOP processing!")
-# FIXME:            LOG.info("Process the scene %s %s" %
-#                     (self.platform_name, str(self.orbit)))
-# TypeError: cannot concatenate 'str' and 'tuple' objects
-            LOG.info("Data is coming from: " + metop_in_dir)
-
-            sensor_filename = {}
-            for (fname, instr) in self.level0files[scene_id]:
-                sensor_filename[instr] = os.path.basename(fname)
-
-            for instr in sensor_filename.keys():
-                if instr not in SENSOR_NAMES:
-                    LOG.error("Sensor name mismatch! name = " + str(instr))
+                    LOG.info("Not a NOAA/Metop scene. Continue...")
                     return True
+                # FIXME:
+            except Exception, err:
+                LOG.warning(str(err))
+                return True
 
-            cmdstr = (self.metop_run_script +
-                      " -d " + metop_in_dir +
-                      " -a " + sensor_filename['avhrr/3'] +
-                      " -u " + sensor_filename['amsu-a'] +
-                      " -m " + sensor_filename['mhs'] +
-                      " -h " + sensor_filename['hirs/4'] +
-                      " -o " + my_env['DYN_WRK_DIR'])
+            self.platform_name = msg.data['platform_name']
+            LOG.debug("Satellite = " + str(self.platform_name))
 
-#     "-d %s -a %s -u %s -m %s -h %s -o %s") %(METOP_RUN_SCRIPT,
-#                                            metop_in_dir,
-#                                           sensor_filename[
-#                                                'avhrr/3'],
-#                                           sensor_filename[
-#                                            'amsu-a'],
-#                                        sensor_filename[
-#                                                  'mhs'],
-#                                        sensor_filename[
-#                                                'hirs/4'],
-#                                   my_env['DYN_WRK_DIR'])
-#                                                                 AAPP_OUT_DIR)
-            LOG.info("Command sequence: " + str(cmdstr))
-            # Run the command:
-            aapplvl1_proc = Popen(shlex.split(cmdstr),
-                                  cwd=self.working_dir,
-                                  shell=False, env=my_env,
-                                  stderr=PIPE, stdout=PIPE)
-            aapplvl1_proc.wait()
+            LOG.debug("")
+            LOG.debug("\tMessage:")
+            LOG.debug(str(msg))
+            urlobj = urlparse(msg.data['uri'])
+            server = urlobj.netloc
+            LOG.debug('Server = <' + str(server) + '>')
+            if len(server) > 0 and server != self.dataserver:
+                LOG.warning("Server " + str(server))
+                LOG.warning("Is not the current dataserver one: " +
+                            str(self.dataserver))
+                return True
 
-        # Taking the stderr before stdout seems to be better preventing a
-        # hangup!  AD, 2013-03-07
+            LOG.info("Ok... " + str(urlobj.netloc))
+            LOG.info("Sat and Sensor: " + str(msg.data['platform_name'])
+                     + " " + str(msg.data['sensor']))
 
-        while True:
-            line = nonblock_read(aapplvl1_proc.stderr)
-            if not line:
-                break
-            LOG.info(line)
+            self.starttime = msg.data['start_time']
+            try:
+                self.endtime = msg.data['end_time']
+            except KeyError:
+                LOG.warning(
+                    "No end_time in message! Guessing start_time + 14 minutes...")
+                self.endtime = msg.data[
+                    'start_time'] + timedelta(seconds=60 * 14)
 
-        while True:
-            line = nonblock_read(aapplvl1_proc.stdout)
-            if not line:
-                break
-            LOG.info(line)
+            start_orbnum = None
+            try:
+                import pyorbital.orbital as orb
+                sat = orb.Orbital(
+                    TLE_SATNAME.get(self.platform_name, self.platform_name))
+                start_orbnum = sat.get_orbit_number(self.starttime)
+            except ImportError:
+                LOG.warning("Failed importing pyorbital, " +
+                            "cannot calculate orbit number")
+            except AttributeError:
+                LOG.warning("Failed calculating orbit number using pyorbital")
+                LOG.warning("platform name = " +
+                            str(TLE_SATNAME.get(self.platform_name,
+                                                self.platform_name)) +
+                            " " + str(self.platform_name))
 
-        aapplvl1_proc.poll()
-        dummy = aapplvl1_proc.returncode
-        LOG.info("Before call to communicate:")
-        out, err = aapplvl1_proc.communicate()
+            LOG.info(
+                "Orbit number determined from pyorbital = " + str(start_orbnum))
+            try:
+                self.orbit = int(msg.data['orbit_number'])
+            except KeyError:
+                LOG.warning("No orbit_number in message! Set to none...")
+                self.orbit = None
 
-        lines = out.splitlines()
-        for line in lines:
-            LOG.info(line)
+            if start_orbnum and self.orbit != start_orbnum:
+                LOG.warning("Correcting orbit number: Orbit now = " +
+                            str(start_orbnum) + " Before = " + str(self.orbit))
+                self.orbit = start_orbnum
+            else:
+                LOG.debug("Orbit number in message determined " +
+                          "to be okay and not changed...")
 
-        lines = err.splitlines()
-        for line in lines:
-            LOG.info(line)
+            if self.platform_name in SUPPORTED_METOP_SATELLITES:
+                metop_id = SATELLITE_NAME[self.platform_name].split('metop')[1]
+                self.satnum = METOP_NUMBER.get(metop_id, metop_id)
+            else:
+                self.satnum = SATELLITE_NAME[self.platform_name].strip('noaa')
 
-        LOG.info("Communicate done...")
+            year = self.starttime.year
+            keyname = str(self.platform_name)
+            LOG.debug("Keyname = " + str(keyname))
+            LOG.debug("Start: job register = " + str(self.job_register))
 
-        # Add to job register to avoid this to be run again
-        if keyname not in self.job_register.keys():
-            self.job_register[keyname] = []
+            # Use sat id, start and end time as the unique identifier of the
+            # scene!
+            if keyname in self.job_register and len(self.job_register[keyname]) > 0:
+                # Go through list of start,end time tuples and see if the current
+                # scene overlaps with any:
+                status = overlapping_timeinterval((self.starttime, self.endtime),
+                                                  self.job_register[keyname])
+                if status:
+                    LOG.warning("Processing of scene " + keyname +
+                                " " + str(status[0]) + " " + str(status[1]) +
+                                " with overlapping time have been"
+                                " launched previously")
+                    LOG.info("Skip it...")
+                    return True
+                else:
+                    LOG.debug(
+                        "No overlap with any recently processed scenes...")
 
-        self.job_register[keyname].append((self.starttime, self.endtime))
-        LOG.debug("End: job register = " + str(self.job_register))
+            scene_id = (str(self.platform_name) + '_' +
+                        self.starttime.strftime('%Y%m%d%H%M%S') +
+                        '_' + self.endtime.strftime('%Y%m%d%H%M%S'))
+            LOG.debug("scene_id = " + str(scene_id))
 
-        # Block any future run on this scene for x (e.g. 10) minutes from now
-        t__ = threading.Timer(
-            10 * 60.0, reset_job_registry, args=(self.job_register,
-                                                 str(self.platform_name),
-                                                 (self.starttime,
-                                                  self.endtime)))
-        t__.start()
+            # Check for keys representing the same scene (slightly different
+            # start/end times):
+            LOG.debug("Level-0files = " + str(self.level0files))
+            for key in self.level0files:
+                pltrfn, startt, endt = key.split('_')
+                if not self.platform_name == pltrfn:
+                    continue
+                t1_ = datetime.strptime(startt, '%Y%m%d%H%M%S')
+                t2_ = datetime.strptime(endt, '%Y%m%d%H%M%S')
+                if (abs(self.starttime - t1_).seconds < 60 and
+                        abs(self.endtime - t2_).seconds < 60):
+                    # It is the same scene!
+                    LOG.debug(
+                        "It is the same scene,"
+                        " though the file times differ a bit...")
+                    scene_id = key
+                    break
 
-        LOG.debug("After timer call: job register = " + str(self.job_register))
+            LOG.debug("scene_id = " + str(scene_id))
+            if scene_id in self.level0files:
+                LOG.debug("Level-0files = " + str(self.level0files[scene_id]))
+            else:
+                LOG.debug("No level-0files yet...")
 
-        if aapplvl1_proc.returncode > 0:
-            LOG.critical("AAPP processing failed!")
-            LOG.critical(err)
-            return True
+            self.level0_filename = urlobj.path
+            dummy, fname = os.path.split(self.level0_filename)
 
-        LOG.info(
-            "Ready with AAPP level-1 processing on NOAA scene: " + str(fname))
-        LOG.info(
-            "working dir: self.working_dir = " + str(self.working_dir))
+            if fname.find('.hmf') > 0:
+                self.ishmf = True
+            else:
+                LOG.info("File is not a hmf file, " +
+                         "probably a Metop file or a NOAA from DMI: " + str(fname))
 
-        globstr = os.path.join(
-            self.working_dir,
-            str(SATELLITE_NAME.get(self.platform_name, self.platform_name)) +
-            "_*" + str(self.orbit))
-        LOG.debug("Glob string = " + str(globstr))
-        dirlist = glob(globstr)
-        if len(dirlist) != 1:
-            LOG.error("Cannot find output files in working dir!")
-            self.result_files = []
-        else:
-            self.result_files = get_aapp_lvl1_files(
-                dirlist[0], msg.data['platform_name'])
+            LOG.debug("Sensor = " + str(msg.data['sensor']))
+            LOG.debug("type: " + str(type(msg.data['sensor'])))
+            if type(msg.data['sensor']) in [str, unicode]:
+                sensors = [msg.data['sensor']]
+            elif type(msg.data['sensor']) is list:
+                sensors = msg.data['sensor']
+            else:
+                sensors = []
+                LOG.warning('Failed interpreting sensor(s)!')
 
-        LOG.info("Output files: " + str(self.result_files))
-        # FIXME: if STATION == 'norrköping':
-        # statresult = aapp_stat.do_noaa_and_metop(self.level0_filename,
-        #                                         SATELLITE_NAME.get(self.platform_name,
-        #                                                            self.platform_name),
-        #                                         self.starttime)
-        # if os.path.exists(_AAPP_STAT_FILE):
-        #    fd = open(_AAPP_STAT_FILE, "r")
-        #    lines = fd.readlines()
-        #    fd.close()
-        # else:
-        #    lines = []
+            LOG.info("Sensor(s): " + str(sensors))
+            sensor_ok = False
+            for sensor in sensors:
+                if sensor in SENSOR_NAMES:
+                    sensor_ok = True
+                    break
+            if not sensor_ok:
+                LOG.info("No required sensors....")
+                return True
 
-        #lines = lines + [statresult + '\n']
-        #fd = open(_AAPP_STAT_FILE, "w")
-        # fd.writelines(lines)
-        # fd.close()
+            if scene_id not in self.level0files:
+                LOG.debug("Reset level0files: scene_id = " + str(scene_id))
+                self.level0files[scene_id] = []
+
+            for sensor in sensors:
+                item = (self.level0_filename, sensor)
+                if item not in self.level0files[scene_id]:
+                    self.level0files[scene_id].append(item)
+                    LOG.debug("Appending item to list: " + str(item))
+                else:
+                    LOG.debug("item already in list: " + str(item))
+
+            if len(self.level0files[scene_id]) < 4:
+                LOG.info("Not enough sensor data available yet. " +
+                         "Level-0files = " +
+                         str(self.level0files[scene_id]))
+                return True
+            else:
+                LOG.info(
+                    "Level 0 files ready: " + str(self.level0files[scene_id]))
+
+            if not self.working_dir and self.use_dyn_work_dir:
+                try:
+                    self.working_dir = tempfile.mkdtemp(dir=self.aapp_workdir)
+                except OSError:
+                    self.working_dir = tempfile.mkdtemp()
+                finally:
+                    LOG.info("Create new working dir...")
+            elif not self.working_dir:
+                self.working_dir = self.aapp_workdir
+
+            LOG.info("Working dir = " + str(self.working_dir))
+
+            # AAPP requires ENV variables
+            my_env = os.environ.copy()
+            my_env['AAPP_PREFIX'] = self.aapp_prefix
+            if self.use_dyn_work_dir:
+                my_env['DYN_WRK_DIR'] = self.working_dir
+
+            LOG.info(
+                "working dir: self.working_dir = " + str(self.working_dir))
+            LOG.info("Using AAPP_PREFIX:" + str(self.aapp_prefix))
+
+            for envkey in my_env:
+                LOG.debug("ENV: " + str(envkey) + " " + str(my_env[envkey]))
+
+            if self.platform_name in SUPPORTED_NOAA_SATELLITES:
+                LOG.info("This is a NOAA scene. Start the NOAA processing!")
+    # FIXME:            LOG.info("Process the scene " +
+    #                     self.platform_name + self.orbit)
+    # TypeError: coercing to Unicode: need string or buffer, int found
+                LOG.info("Process the file " + str(self.level0_filename))
+
+                if self.platform_name == 'NOAA-15':
+                    # AMSU amsubcl fails
+                    cmdseq = (self.noaa_run_script +
+                              ' -i AVHRR ' +
+                              '-Y ' + str(year) +
+                              ' -n ' + str(self.orbit) +
+                              ' ' + self.level0_filename)
+                else:
+                    cmdseq = (self.noaa_run_script +
+                              ' -Y ' + str(year) +
+                              ' -n ' + str(self.orbit) +
+                              ' ' + self.level0_filename)
+
+                LOG.info("Command sequence: " + str(cmdseq))
+                # Run the command:
+                # FIXME: shell=False https://docs.python.org/2/library/subprocess.html
+                # https://docs.python.org/2/library/subprocess.html#subprocess.Popen.communicate
+                aapplvl1_proc = Popen(shlex.split(cmdseq),
+                                      cwd=self.working_dir,
+                                      shell=False, env=my_env,
+                                      stderr=PIPE, stdout=PIPE)
+
+            elif self.platform_name in SUPPORTED_METOP_SATELLITES:
+                # Metop processing needs input directory
+                # as an argument for METOP_RUN_SCRIPT
+                metop_in_dir = os.path.dirname(self.level0_filename)
+                LOG.info("This is a Metop scene. Start the METOP processing!")
+    # FIXME:            LOG.info("Process the scene %s %s" %
+    #                     (self.platform_name, str(self.orbit)))
+    # TypeError: cannot concatenate 'str' and 'tuple' objects
+                LOG.info("Data is coming from: " + metop_in_dir)
+
+                sensor_filename = {}
+                for (fname, instr) in self.level0files[scene_id]:
+                    sensor_filename[instr] = os.path.basename(fname)
+
+                for instr in sensor_filename.keys():
+                    if instr not in SENSOR_NAMES:
+                        LOG.error("Sensor name mismatch! name = " + str(instr))
+                        return True
+
+                cmdstr = (self.metop_run_script +
+                          " -d " + metop_in_dir +
+                          " -a " + sensor_filename['avhrr/3'] +
+                          " -u " + sensor_filename['amsu-a'] +
+                          " -m " + sensor_filename['mhs'] +
+                          " -h " + sensor_filename['hirs/4'] +
+                          " -o " + my_env['DYN_WRK_DIR'])
+
+    #     "-d %s -a %s -u %s -m %s -h %s -o %s") %(METOP_RUN_SCRIPT,
+    #                                            metop_in_dir,
+    #                                           ensor_filename[
+    #                                                'avhrr/3'],
+    #                                           sensor_filename[
+    #                                            'amsu-a'],
+    #                                        sensor_filename[
+    #                                                  'mhs'],
+    #                                        sensor_filename[
+    #                                                'hirs/4'],
+    #                                   my_env['DYN_WRK_DIR'])
+    #                                                                 AAPP_OUT_DIR)
+                LOG.info("Command sequence: " + str(cmdstr))
+                # Run the command:
+                aapplvl1_proc = Popen(shlex.split(cmdstr),
+                                      cwd=self.working_dir,
+                                      shell=False, env=my_env,
+                                      stderr=PIPE, stdout=PIPE)
+
+            # Taking the stderr before stdout seems to be better preventing a
+            # hangup!  AD, 2013-03-07
+
+            while True:
+                line = nonblock_read(aapplvl1_proc.stderr)
+                if not line:
+                    break
+                LOG.info(line)
+
+            while True:
+                line = nonblock_read(aapplvl1_proc.stdout)
+                if not line:
+                    break
+                LOG.info(line)
+
+            aapplvl1_proc.poll()
+            dummy = aapplvl1_proc.returncode
+            LOG.info("Before call to communicate:")
+            out, err = aapplvl1_proc.communicate()
+
+            lines = out.splitlines()
+            for line in lines:
+                LOG.info(line)
+
+            lines = err.splitlines()
+            for line in lines:
+                LOG.info(line)
+
+            LOG.info("Communicate done...")
+
+            # Add to job register to avoid this to be run again
+            if keyname not in self.job_register.keys():
+                self.job_register[keyname] = []
+
+            self.job_register[keyname].append((self.starttime, self.endtime))
+            LOG.debug("End: job register = " + str(self.job_register))
+
+            # Block any future run on this scene for x (e.g. 10) minutes from
+            # now
+            t__ = threading.Timer(
+                10 * 60.0, reset_job_registry, args=(self.job_register,
+                                                     str(self.platform_name),
+                                                     (self.starttime,
+                                                      self.endtime)))
+            t__.start()
+
+            LOG.debug(
+                "After timer call: job register = " + str(self.job_register))
+
+            if aapplvl1_proc.returncode > 0:
+                LOG.critical("AAPP processing failed!")
+                LOG.critical(err)
+                return True
+
+            LOG.info(
+                "Ready with AAPP level-1 processing on NOAA scene: " + str(fname))
+            LOG.info(
+                "working dir: self.working_dir = " + str(self.working_dir))
+
+            globstr = os.path.join(
+                self.working_dir,
+                str(SATELLITE_NAME.get(self.platform_name, self.platform_name)) +
+                "_*" + str(self.orbit))
+            LOG.debug("Glob string = " + str(globstr))
+            dirlist = glob(globstr)
+            if len(dirlist) != 1:
+                LOG.error("Cannot find output files in working dir!")
+                self.result_files = []
+            else:
+                self.result_files = get_aapp_lvl1_files(
+                    dirlist[0], msg.data['platform_name'])
+
+            LOG.info("Output files: " + str(self.result_files))
+            # FIXME: if STATION == 'norrköping':
+            # statresult = aapp_stat.do_noaa_and_metop(self.level0_filename,
+            #                                         SATELLITE_NAME.get(self.platform_name,
+            #                                                            self.platform_name),
+            #                                         self.starttime)
+            # if os.path.exists(_AAPP_STAT_FILE):
+            #    fd = open(_AAPP_STAT_FILE, "r")
+            #    lines = fd.readlines()
+            #    fd.close()
+            # else:
+            #    lines = []
+
+            #lines = lines + [statresult + '\n']
+            #fd = open(_AAPP_STAT_FILE, "w")
+            # fd.writelines(lines)
+            # fd.close()
+
+        except:
+            LOG.exception("Failed in run...")
+            raise
 
         return False
 
@@ -1328,7 +1336,7 @@ def remove(path):
 def cleanup(number_of_days, path):
     """
     Removes files from the passed in path that are older than or equal
-    to the number_of_days
+    to number_of_days
     """
     time_in_secs = _time() - number_of_days * 24 * 60 * 60
     for root, dirs, files in os.walk(path, topdown=False):
@@ -1338,11 +1346,11 @@ def cleanup(number_of_days, path):
             stat = os.stat(full_path)
 
             if stat.st_mtime <= time_in_secs:
-                #LOG.debug("Removing: " + full_path)
+                LOG.debug("Removing: " + full_path)
                 remove(full_path)
 
             if not os.listdir(root):
-                #LOG.debug("Removing root: " + root)
+                LOG.debug("Removing root: " + root)
                 remove(root)
 
 
