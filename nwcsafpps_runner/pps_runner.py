@@ -616,10 +616,10 @@ def pps():
 
     LOG.info("*** Start the PPS level-2 runner:")
 
-    # LOG.info("First check if NWP data should be downloaded and prepared")
-    # now = datetime.utcnow()
-    # update_nwp(now - timedelta(days=1), NWP_FLENS)
-    # LOG.info("Ready with nwp preparation...")
+    LOG.info("First check if NWP data should be downloaded and prepared")
+    now = datetime.utcnow()
+    update_nwp(now - timedelta(days=1), NWP_FLENS)
+    LOG.info("Ready with nwp preparation...")
 
     nwp_pp_sema = threading.Semaphore(1)
     sema = threading.Semaphore(5)
