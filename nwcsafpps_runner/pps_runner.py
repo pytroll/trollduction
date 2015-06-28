@@ -115,13 +115,12 @@ _PPS_LOG_FILE = OPTIONS.get('pps_log_file', _PPS_LOG_FILE)
 
 import sys
 from glob import glob
-import shutil
 from urlparse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
 from posttroll.message import Message
 
-from subprocess import Popen, PIPE, STDOUT
+from subprocess import Popen, PIPE
 import threading
 import Queue
 from datetime import datetime, timedelta
@@ -130,6 +129,10 @@ print sys.path
 LOG.debug("PYTHONPATH: " + str(sys.path))
 from nwcsafpps_runner.prepare_nwp import update_nwp
 SATNAME = {'Aqua': 'EOS-Aqua'}
+
+
+class PpsRunError(Exception):
+    pass
 
 
 def nonblock_read(output):
@@ -239,7 +242,12 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
                 raise IOError(
                     "PPS script" + PPS_SCRIPT + " cannot be executed!")
 
-            pps_proc = Popen(myargs, shell=False, stderr=PIPE, stdout=PIPE)
+            try:
+                pps_proc = Popen(myargs, shell=False, stderr=PIPE, stdout=PIPE)
+            except PpsRunError:
+                LOG.exception("Failed in PPS")
+                pass
+
             t__ = threading.Timer(
                 20 * 60.0, terminate_process, args=(pps_proc, scene, ))
             t__.start()
