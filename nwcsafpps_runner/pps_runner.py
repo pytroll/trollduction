@@ -356,9 +356,33 @@ def ready2run(msg, files4pps, job_register, sceneid):
     # LOG.debug("Received message: " + str(msg))
 
     from trollduction.producer import check_uri
+    from socket import gethostbyaddr, gaierror
 
     LOG.debug("Ready to run...")
     LOG.info("Got message: " + str(msg))
+
+    urlobj = urlparse(msg.data['uri'])
+    server = urlobj.netloc
+    server_name = None
+    try:
+        server_name, dummy, dummy = gethostbyaddr(server)
+    except gaierror:
+        pass
+
+    LOG.debug('Server = <' + str(server) + '>')
+    if server_name and server_name == server:
+        LOG.debug('Server = <' + str(server_name) + '>')
+
+    if (len(server) > 0 and server == SERVERNAME or
+            server_name and server_name == SERVERNAME):
+        LOG.debug(
+            "We got a message from the same server: " + str(SERVERNAME))
+    else:
+        LOG.warning("The server " + str(server) +
+                    "is not the same as where we are runnning: " + str(SERVERNAME))
+        return False
+
+    LOG.info("Ok... " + str(server))
 
     uris = []
     if msg.type == 'dataset':
@@ -370,16 +394,13 @@ def ready2run(msg, files4pps, job_register, sceneid):
         if 'dataset' in msg.data['collection'][0]:
             for dataset in msg.data['collection']:
                 uris.extend([mda['uri'] for mda in dataset['dataset']])
+
     elif msg.type == 'file':
         uris = [(msg.data['uri'])]
     else:
         LOG.debug(
-            "Ignoring this type of message data: tyep = " + str(msg.type))
+            "Ignoring this type of message data: type = " + str(msg.type))
         return False
-
-    # server = urlobj.netloc
-    # server = urlparse(obj['uri']).netloc  # Assume server is the same for
-    # all uri's!
 
     try:
         level1_files = check_uri(uris)
