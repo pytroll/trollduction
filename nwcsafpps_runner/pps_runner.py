@@ -369,28 +369,28 @@ def ready2run(msg, files4pps, job_register, sceneid):
     LOG.debug("Ready to run...")
     LOG.info("Got message: " + str(msg))
 
-    urlobj = urlparse(msg.data['uri'])
-    server = urlobj.netloc
-    server_name = None
-    try:
-        server_name, dummy, dummy = gethostbyaddr(server)
-    except gaierror:
-        pass
+    # urlobj = urlparse(msg.data['uri'])
+    # server = urlobj.netloc
+    # server_name = None
+    # try:
+    #     server_name, dummy, dummy = gethostbyaddr(server)
+    # except gaierror:
+    #     pass
 
-    LOG.debug('Server = <' + str(server) + '>')
-    if server_name and server_name == server:
-        LOG.debug('Server = <' + str(server_name) + '>')
+    # LOG.debug('Server = <' + str(server) + '>')
+    # if server_name and server_name == server:
+    #     LOG.debug('Server = <' + str(server_name) + '>')
 
-    if (len(server) > 0 and server == SERVERNAME or
-            server_name and server_name == SERVERNAME):
-        LOG.debug(
-            "We got a message from the same server: " + str(SERVERNAME))
-    else:
-        LOG.warning("The server " + str(server) +
-                    "is not the same as where we are runnning: " + str(SERVERNAME))
-        return False
+    # if (len(server) > 0 and server == SERVERNAME or
+    #         server_name and server_name == SERVERNAME):
+    #     LOG.debug(
+    #         "We got a message from the same server: " + str(SERVERNAME))
+    # else:
+    #     LOG.warning("The server " + str(server) +
+    #                 "is not the same as where we are runnning: " + str(SERVERNAME))
+    #     return False
 
-    LOG.info("Ok... " + str(server))
+    # LOG.info("Ok... " + str(server))
 
     uris = []
     if msg.type == 'dataset':
