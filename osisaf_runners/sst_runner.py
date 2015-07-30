@@ -87,9 +87,6 @@ def start_sst_processing(sst_file,
     LOG.info(message)
     urlobj = urlparse(message.data['uri'])
 
-    LOG.info("Sat and Instrument: " + str(message.data['platform_name']) + " "
-             + str(message.data['instruments']))
-
     if 'start_time' in message.data and 'start_date' in message.data:
         dtdate = message.data['start_date']
         dttime = message.data['start_time']
@@ -123,7 +120,7 @@ def start_sst_processing(sst_file,
         path, fname = os.path.split(urlobj.path)
         LOG.debug("path " + str(path) + " filename = " + str(fname))
 
-        instrument = message.data['instruments']
+        instrument = str(message.data['instruments'])
         platform_name = message.data['platform_name']
         sst_file[scene_id] = os.path.join(path, fname)
 
@@ -133,8 +130,8 @@ def start_sst_processing(sst_file,
         path, fname = os.path.split(urlobj.path)
         LOG.debug("path " + str(path) + " filename = " + str(fname))
 
-        instrument = message.data['instruments']
-        platform_name = "Metop-" + str(message.data['metop_letter'])
+        instrument = str(message.data['instruments'])
+        platform_name = str("Metop-" + str(message.data['metop_letter']))
         sst_file[scene_id] = os.path.join(path, fname)
 
     else:
@@ -143,6 +140,8 @@ def start_sst_processing(sst_file,
                   str(message.data['platform_name']) + " " +
                   str(message.data['instruments']))
         return sst_file
+
+    LOG.info("Sat and Instrument: " + platform_name + " " + instrument)
 
     prfx = platform_name.lower() + start_time.strftime("_%Y%m%d_%H")
     outname = os.path.join(SST_OUTPUT_DIR, 'osisaf_sst_%s.tif' % prfx)
@@ -158,8 +157,10 @@ def start_sst_processing(sst_file,
         platform_name, "", INSTRUMENT_NAME.get(instrument, instrument),
         tslot, orbit)
 
+    LOG.debug("Load sst data...")
     glbd.load(['SST'], time_interval=(start_time, endtime))
 
+    LOG.debug("Project data...")
     localdata = glbd.project('baws')
     img = localdata.image.sst_with_overlay()
     img.save(outname)
