@@ -65,7 +65,7 @@ from posttroll.message import Message
 from mpop.utils import debug_on
 debug_on()
 from mpop.satellites import PolarFactory
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 
 class SstRunError(Exception):
@@ -85,16 +85,29 @@ def start_sst_processing(sst_file,
     LOG.info("Sat and Instrument: " + str(message.data['platform_name']) + " "
              + str(message.data['instruments']))
 
-    if 'start_time' in message.data:
-        start_time = message.data['start_time']
+    if 'start_time' in message.data and 'start_date' in message.data:
+        dtdate = message.data['start_date']
+        dttime = message.data['start_time']
+        start_time = datetime(dtdate.year,
+                              dtdate.month,
+                              dtdate.day,
+                              dttime.hour,
+                              dttime.minute)
         scene_id = start_time.strftime('%Y%m%d%H%M')
     else:
         LOG.warning("No start time in message!")
         start_time = None
         return sst_file
 
-    if 'end_time' in message.data:
-        end_time = message.data['end_time']
+    if 'end_time' in message.data and 'end_date' in message.data:
+        dtdate = message.data['end_date']
+        dttime = message.data['end_time']
+        end_time = datetime(dtdate.year,
+                            dtdate.month,
+                            dtdate.day,
+                            dttime.hour,
+                            dttime.minute)
+
     else:
         LOG.warning("No end time in message!")
         end_time = None
