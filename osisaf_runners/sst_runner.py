@@ -57,13 +57,15 @@ _DEFAULT_LOG_FORMAT = '[%(levelname)s: %(asctime)s : %(name)s] %(message)s'
 
 
 import sys
-from glob import glob
 from urlparse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
 from posttroll.message import Message
 
-from datetime import datetime, timedelta
+from mpop.utils import debug_on
+debug_on()
+from mpop.satellites import PolarFactory
+from datetime import timedelta
 
 
 class SstRunError(Exception):
@@ -79,10 +81,7 @@ def start_sst_processing(sst_file,
     LOG.info("\tMessage:")
     LOG.info(message)
     urlobj = urlparse(message.data['uri'])
-    LOG.info("Server = " + str(urlobj.netloc))
-    if urlobj.netloc != SERVERNAME:
-        return sst_file
-    LOG.info("Ok... " + str(urlobj.netloc))
+
     LOG.info("Sat and Instrument: " + str(message.data['platform_name']) + " "
              + str(message.data['sensor']))
 
@@ -106,7 +105,34 @@ def start_sst_processing(sst_file,
         path, fname = os.path.split(urlobj.path)
         LOG.debug("path " + str(path) + " filename = " + str(fname))
 
+        instrument = message.data['instruments']
+        platform_name = message.data['platform_name']
         sst_file[scene_id] = os.path.join(path, fname)
+
+    else:
+        LOG.debug("Scene is not supported")
+        LOG.debug("platform and instrument: " +
+                  str(message.data['platform_name']) + " " +
+                  str(message.data['instruments']))
+        return sst_file
+
+    prfx = platform_name.lower() + start_time.strftime("_%Y%m%d_%H")
+    outname = os.path.join(SST_OUTPUT_DIR, 'osisaf_sst_%s.tif' % prfx)
+    LOG.info("Output file name: " + str(outname))
+    if os.path.exists(outname):
+        LOG.warning("File " + str(outname) + " already there. Continue...")
+        return sst_file
+
+    orbit = "00000"
+    endtime = start_time + timedelta(seconds=60 * 12)
+    tslot = start_time
+    glbd = PolarFactory.create_scene(
+        platform_name, "", instrument, tslot, orbit)
+    glbd.load(['SST'], time_interval=(start_time, endtime))
+
+    localdata = glbd.project('baws')
+    img = localdata.image.sst_with_overlay()
+    img.save(outname)
 
     LOG.debug("...that was it :-)")
 
