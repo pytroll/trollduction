@@ -67,6 +67,9 @@ debug_on()
 from mpop.satellites import PolarFactory
 from datetime import timedelta, datetime
 
+#METOPS = ['Metop-A', 'Metop-B', 'Metop-C']
+METOP_NAMES = ['metop02', 'metop01', 'metop03']
+
 
 class SstRunError(Exception):
     pass
@@ -120,6 +123,16 @@ def start_sst_processing(sst_file,
 
         instrument = message.data['instruments']
         platform_name = message.data['platform_name']
+        sst_file[scene_id] = os.path.join(path, fname)
+
+    elif (message.data['satellite'] in METOP_NAMES and
+            message.data['instruments'] == 'avhrr/3'):
+
+        path, fname = os.path.split(urlobj.path)
+        LOG.debug("path " + str(path) + " filename = " + str(fname))
+
+        instrument = message.data['instruments']
+        platform_name = "Metop-" + str(message.data['metop_letter'])
         sst_file[scene_id] = os.path.join(path, fname)
 
     else:
