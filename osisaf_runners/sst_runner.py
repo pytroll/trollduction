@@ -70,6 +70,8 @@ from datetime import timedelta, datetime
 #METOPS = ['Metop-A', 'Metop-B', 'Metop-C']
 METOP_NAMES = ['metop02', 'metop01', 'metop03']
 
+INSTRUMENT_NAME = {'avhrr/3': 'avhrr'}
+
 
 class SstRunError(Exception):
     pass
@@ -153,7 +155,8 @@ def start_sst_processing(sst_file,
     endtime = start_time + timedelta(seconds=60 * 12)
     tslot = start_time
     glbd = PolarFactory.create_scene(
-        platform_name, "", instrument, tslot, orbit)
+        platform_name, "", INSTRUMENT_NAME.get(instrument, instrument),
+        tslot, orbit)
     glbd.load(['SST'], time_interval=(start_time, endtime))
 
     localdata = glbd.project('baws')
