@@ -83,7 +83,7 @@ def start_sst_processing(sst_file,
     urlobj = urlparse(message.data['uri'])
 
     LOG.info("Sat and Instrument: " + str(message.data['platform_name']) + " "
-             + str(message.data['sensor']))
+             + str(message.data['instruments']))
 
     if 'start_time' in message.data:
         start_time = message.data['start_time']
