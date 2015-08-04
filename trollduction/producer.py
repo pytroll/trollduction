@@ -61,7 +61,7 @@ from trollsched.satpass import Pass
 from trollsched.boundary import Boundary, AreaDefBoundary
 import errno
 import netifaces
-
+from mipp import DecodeError
 from xml.etree.ElementTree import tostring
 LOGGER = logging.getLogger(__name__)
 
@@ -502,10 +502,13 @@ class DataProcessor(object):
 
         for area_item in self.product_config.prodlist:
             if area_item.tag == "dump":
-                self.global_data.load(filename=filename, **keywords)
-                self.save_to_netcdf(self.global_data,
-                                    area_item,
-                                    self.get_parameters(area_item))
+                try:
+                    self.global_data.load(filename=filename, **keywords)
+                    self.save_to_netcdf(self.global_data,
+                                        area_item,
+                                        self.get_parameters(area_item))
+                except (IndexError, DecodeError):
+                    LOGGER.exception("Incomplete or corrupted input data.")
 
         for group in self.product_config.groups:
             LOGGER.debug("processing %s", group.info['id'])
@@ -560,7 +563,7 @@ class DataProcessor(object):
 
                 self.global_data.load(req_channels, **keywords)
                 LOGGER.debug("loaded data: %s", str(self.global_data))
-            except IndexError:
+            except (IndexError, DecodeError):
                 LOGGER.exception("Incomplete or corrupted input data.")
                 self._data_ok = False
                 break
@@ -607,22 +610,24 @@ class DataProcessor(object):
         if self._data_ok:
             LOGGER.debug("Waiting for the files to be saved")
         self.writer.prod_queue.join()
-        if self._data_ok:
-            LOGGER.debug("All files saved")
-
-            LOGGER.info('File %s processed in %.1f s', uri,
-                        time.time() - t1a)
-
-        if not self._data_ok:
-            LOGGER.warning("File %s not processed due to "
-                           "incomplete/missing/corrupted data.",
-                           uri)
 
         # Release memory
         del self.local_data
         del self.global_data
         self.local_data = None
         self.global_data = None
+
+        if self._data_ok:
+            LOGGER.debug("All files saved")
+            LOGGER.info("File %s processed in %.1f s", uri,
+                        time.time() - t1a)
+
+        if not self._data_ok:
+            LOGGER.warning("File %s not processed due to "
+                           "incomplete/missing/corrupted data.",
+                           uri)
+            raise IOError
+
 
     def get_req_channels(self, products):
         """Get a list of required channels
@@ -1242,6 +1247,7 @@ class Trollduction(object):
                 else:
                     sensors = set((msg.data['sensor'], ))
 
+                prev_file = self._previous_file
                 if (msg.type in ["file", 'collection', 'dataset'] and
                     sensors.intersection(\
                             self.td_config['instruments'].split(','))):
@@ -1259,7 +1265,12 @@ class Trollduction(object):
 
                     self.update_product_config(\
                             self.td_config['product_config_file'])
-                    self.data_processor.run(self.product_config, msg)
-
+                    try:
+                        self.data_processor.run(self.product_config, msg)
+                    except IOError:
+                        LOGGER.debug("History of processed files not updated "
+                                     "due to missing/corrupted/incomplete "
+                                     "data.")
+                        self._previous_file = prev_file
         finally:
             self.shutdown()
