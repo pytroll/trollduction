@@ -61,7 +61,10 @@ from trollsched.satpass import Pass
 from trollsched.boundary import Boundary, AreaDefBoundary
 import errno
 import netifaces
-from mipp import DecodeError
+try:
+    from mipp import DecodeError
+except ImportError:
+    DecodeError = IOError
 from xml.etree.ElementTree import tostring
 LOGGER = logging.getLogger(__name__)
 
@@ -507,7 +510,7 @@ class DataProcessor(object):
                     self.save_to_netcdf(self.global_data,
                                         area_item,
                                         self.get_parameters(area_item))
-                except (IndexError, DecodeError):
+                except (IndexError, IOError, DecodeError):
                     LOGGER.exception("Incomplete or corrupted input data.")
 
         for group in self.product_config.groups:
@@ -563,7 +566,7 @@ class DataProcessor(object):
 
                 self.global_data.load(req_channels, **keywords)
                 LOGGER.debug("loaded data: %s", str(self.global_data))
-            except (IndexError, DecodeError):
+            except (IndexError, IOError, DecodeError):
                 LOGGER.exception("Incomplete or corrupted input data.")
                 self._data_ok = False
                 break
@@ -1265,12 +1268,23 @@ class Trollduction(object):
 
                     self.update_product_config(\
                             self.td_config['product_config_file'])
-                    try:
-                        self.data_processor.run(self.product_config, msg)
-                    except IOError:
-                        LOGGER.debug("History of processed files not updated "
-                                     "due to missing/corrupted/incomplete "
-                                     "data.")
-                        self._previous_file = prev_file
+
+                    retried = False
+                    while True:
+                        try:
+                            self.data_processor.run(self.product_config, msg)
+                            break
+                        except IOError:
+                            if retried:
+                                LOGGER.debug("History of processed files not "
+                                             "updated due to "
+                                             "missing/corrupted/incomplete "
+                                             "data.")
+                                self._previous_file = prev_file
+                                break
+                            else:
+                                retried = True
+                                LOGGER.info("Retrying once in 2 seconds.")
+                                time.sleep(2)
         finally:
             self.shutdown()
