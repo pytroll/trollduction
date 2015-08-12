@@ -40,7 +40,7 @@ OPTIONS = {}
 for option, value in CONF.items(MODE, raw=True):
     OPTIONS[option] = value
 
-#PPS_OUTPUT_DIR = os.environ.get('SM_PRODUCT_DIR', OPTIONS['pps_outdir'])
+# PPS_OUTPUT_DIR = os.environ.get('SM_PRODUCT_DIR', OPTIONS['pps_outdir'])
 PPS_OUTPUT_DIR = OPTIONS['pps_outdir']
 LVL1_NPP_PATH = os.environ.get('LVL1_NPP_PATH', None)
 LVL1_EOS_PATH = os.environ.get('LVL1_EOS_PATH', None)
@@ -121,6 +121,8 @@ from subprocess import Popen, PIPE, STDOUT
 import threading
 from datetime import datetime, timedelta
 
+from nwcsafpps_runner.prepare_nwp import update_nwp
+
 
 def nonblock_read(output):
     """An attempt to catch any hangup in reading the output (stderr/stdout)
@@ -145,17 +147,17 @@ def get_outputfiles(path, satid, orb):
     h5_output = (os.path.join(path, 'S_NWC') + '*' +
                  str(METOP_NAME_LETTER.get(satid, satid)) +
                  '_' + str(orb) + '*.h5')
-    LOG.debug(
+    LOG.info(
         "Match string to do a file globbing on hdf5 output files: " + str(h5_output))
     nc_output = (os.path.join(path, 'S_NWC') + '*' +
                  str(METOP_NAME_LETTER.get(satid, satid)) +
                  '_' + str(orb) + '*.nc')
-    LOG.debug(
+    LOG.info(
         "Match string to do a file globbing on netcdf output files: " + str(nc_output))
     xml_output = (os.path.join(path, 'S_NWC') + '*' +
                   str(METOP_NAME_LETTER.get(satid, satid)) +
-                  '_' + str(orb) + '*statistics.xml')
-    LOG.debug(
+                  '_' + str(orb) + '*.xml')
+    LOG.info(
         "Match string to do a file globbing on xml output files: " + str(xml_output))
     return glob(h5_output) + glob(nc_output) + glob(xml_output)
 
@@ -238,11 +240,43 @@ def pps_worker(publisher, scene, semaphore_obj, queue):
     LOG.info(
         "Ready with PPS level-2 processing on scene: " + str(scene))
 
+    # Now try perform som time statistics editing with ppsTimeControl.py from
+    # pps:
+    do_time_control = True
+    try:
+        from pps_time_control import PPSTimeControl
+    except ImportError:
+        LOG.warning("Failed to import the PPSTimeControl from pps")
+        do_time_control = False
+
+    pps_control_path = my_env.get('STATISTICS_DIR', PPS_OUTPUT_DIR)
+
+    if do_time_control:
+        LOG.info("Read time control ascii file and generate XML")
+        platform_id = SATELLITE_NAME.get(scene['satid'], scene['satid'])
+        LOG.info("pps platform_id = " + str(platform_id))
+        txt_time_file = (os.path.join(pps_control_path, 'S_NWC_timectrl_') +
+                         str(METOP_NAME_LETTER.get(platform_id, platform_id)) +
+                         '_' + str(scene['orbit_number']) + '*.txt')
+        LOG.info("glob string = " + str(txt_time_file))
+        infiles = glob(txt_time_file)
+        LOG.info("Time control xml file candidates: " + str(infiles))
+        if len(infiles) == 1:
+            infile = infiles[0]
+            LOG.info("Time control xml file: " + str(infile))
+            ppstime_con = PPSTimeControl(infile)
+            ppstime_con.sum_up_processing_times()
+            ppstime_con.write_xml()
+
     # Now check what netCDF/hdf5 output was produced and publish them:
+    pps_path = my_env.get('SM_PRODUCT_DIR', PPS_OUTPUT_DIR)
     result_files = get_outputfiles(
-        PPS_OUTPUT_DIR, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
-    LOG.info("Output files: " + str(result_files))
-    queue.put((publisher, scene, result_files))
+        pps_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
+    LOG.info("PPS Output files: " + str(result_files))
+    xml_files = get_outputfiles(
+        pps_control_path, SATELLITE_NAME[scene['satid']], scene['orbit_number'])
+    LOG.info("PPS summary statistics files: " + str(xml_files))
+    queue.put((publisher, scene, result_files + xml_files))
     semaphore_obj.release()
     return
 
@@ -292,6 +326,7 @@ class FilePublisher(threading.Thread):
                     5 * 60.0, reset_job_registry, args=(self.jobs, keyname))
                 t__.start()
 
+                LOG.info("Publish the files with publish_level2...")
                 publish_level2(publisher, result_files,
                                scene['satid'],
                                scene['orbit_number'],
@@ -309,6 +344,8 @@ def publish_level2(publisher, result_files, sat, orb, instr, start_t, end_t):
     # Now publish:
     for result_file in result_files:
         filename = os.path.split(result_file)[1]
+        LOG.info("file to publish = " + str(filename))
+
         to_send = {}
         to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
         to_send['uid'] = filename
@@ -334,6 +371,7 @@ def publish_level2(publisher, result_files, sat, orb, instr, start_t, end_t):
                       '/norrköping/' + environment + '/polar/direct_readout/',
                       "file", to_send).encode()
         LOG.debug("sending: " + str(msg))
+        LOG.info("Sending: " + str(msg))
         publisher.send(msg)
 
 
@@ -409,17 +447,20 @@ def ready2run(msg, files4pps, job_register, sceneid):
                 'Sensor ' + str(msg.data['sensor']) + ' not required...')
             return False
         if (msg.data['sensor'] in ['amsu-a', 'amsu-b', 'mhs'] and
-                msg.data['data_processing_level'] != '1c'):
-            LOG.info('Level not the required type for PPS for this sensor: ' +
-                     str(msg.data['sensor']) + ' ' +
-                     str(msg.data['data_processing_level']))
-            return False
+                msg.data['data_processing_level'] != '1C'):
+            if msg.data['data_processing_level'] == '1c':
+                LOG.warning("Level should be in upper case!")
+            else:
+                LOG.info('Level not the required type for PPS for this sensor: ' +
+                         str(msg.data['sensor']) + ' ' +
+                         str(msg.data['data_processing_level']))
+                return False
 
     # The orbit number is mandatory!
     orbit_number = int(msg.data['orbit_number'])
     LOG.debug("Orbit number: " + str(orbit_number))
 
-    #sensor = (msg.data['sensor'])
+    # sensor = (msg.data['sensor'])
     platform_name = msg.data['platform_name']
 
     if platform_name not in SATELLITE_NAME:
@@ -519,6 +560,11 @@ def pps_rolling_runner():
 
     LOG.info("*** Start the PPS level-2 runner:")
 
+    LOG.info("First check if NWP data should be downloaded and prepared")
+    now = datetime.utcnow()
+    update_nwp(now - timedelta(days=1),
+               [3, 6, 9, 12, 15, 18, 21, 24])
+
     sema = threading.Semaphore(3)
     import Queue
     q__ = Queue.Queue()
@@ -528,7 +574,7 @@ def pps_rolling_runner():
 
     files4pps = {}
     threads = []
-    with posttroll.subscriber.Subscribe("", ['AAPP-HRPT', 'EOS/1', 'SDR'],
+    with posttroll.subscriber.Subscribe("", ['AAPP-HRPT', 'EOS/1B', 'SDR/1B'],
                                         True) as subscr:
         with Publish('pps_runner', 0, ['PPS', ]) as publisher:
             while True:
