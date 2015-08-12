@@ -575,7 +575,7 @@ class FileListener(threading.Thread):
 
     def run(self):
 
-        with posttroll.subscriber.Subscribe("", ['AAPP-PPS', 'EOS/1B', 'SDR/1B'],
+        with posttroll.subscriber.Subscribe("", ['AAPP-PPS', 'EOS/1B', 'segment/SDR/1B'],
                                             True) as subscr:
 
             for msg in subscr.recv(timeout=90):
