@@ -35,6 +35,10 @@ posttroll_port=0
 # use an alias to convert from platform in the filename to OSCAR naming
 alias_platform_name = noaa18:NOAA-18|noaa19:NOAA-19
 
+# Keep 10 last events in history, and process only if the new event
+# isn't in this history.  If option not given, or set to zero (0), all
+# matching events will be processed
+history=10
 
 [hrit]
 topic=/HRIT/topic/or/something/

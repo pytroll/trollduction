@@ -61,7 +61,10 @@ from trollsched.satpass import Pass
 from trollsched.boundary import Boundary, AreaDefBoundary
 import errno
 import netifaces
-
+try:
+    from mipp import DecodeError
+except ImportError:
+    DecodeError = IOError
 from xml.etree.ElementTree import tostring
 LOGGER = logging.getLogger(__name__)
 
@@ -93,7 +96,10 @@ def check_uri(uri):
         url_ip = socket.gethostbyname(url.netloc)
 
         if url_ip not in get_local_ips() and url.netloc != '':
-            raise IOError("Data file %s unaccessible from this host" % uri)
+            try:
+                os.stat(url.path)
+            except OSError:
+                raise IOError("Data file %s unaccessible from this host" % uri)
 
     except socket.gaierror:
         LOGGER.warning("Couldn't check file location, running anyway")
@@ -258,6 +264,8 @@ def get_polygons_positions(datas, frequency=1):
 
 
 def get_polygons(datas, area, frequency=1):
+    """Get a list of polygons describing the boundary of the area.
+    """
     polygons = get_polygons_positions(datas, frequency)
 
     llpolygons = []
@@ -276,7 +284,8 @@ def get_polygons(datas, area, frequency=1):
 
 
 def coverage(scene, area):
-
+    """Calculate coverages.
+    """
     shapes = set()
     for channel in scene.channels:
         if channel.is_loaded():
@@ -316,6 +325,8 @@ def coverage(scene, area):
 
 
 def generic_covers(scene, area_item):
+    """Check if scene covers area_item with high enough percentage.
+    """
     area_def = get_area_def(area_item.attrib['id'])
     min_coverage = float(area_item.attrib.get('min_coverage', 0))
     if min_coverage == 0:
@@ -338,15 +349,23 @@ class DataProcessor(object):
     """Process the data.
     """
 
-    def __init__(self):
+    def __init__(self, publish_topic=None):
         self.global_data = None
         self.local_data = None
         self.product_config = None
+        self._publish_topic = publish_topic
         self._data_ok = True
-        self.writer = DataWriter()
+        self.writer = DataWriter(publish_topic=self._publish_topic)
         self.writer.start()
 
+    def set_publish_topic(self, publish_topic):
+        '''Set published topic.'''
+        self._publish_topic = publish_topic
+        self.writer.set_publish_topic(publish_topic)
+
     def stop(self):
+        '''Stop data writer.
+        '''
         self.writer.stop()
 
     def create_scene_from_message(self, msg):
@@ -408,6 +427,8 @@ class DataProcessor(object):
         return global_data
 
     def save_to_netcdf(self, data, item, params):
+        """Save data to netCDF4.
+        """
         LOGGER.debug("Save full data to netcdf4")
         try:
             params["time_slot"] = data.time_slot
@@ -431,11 +452,18 @@ class DataProcessor(object):
         """Process the data
         """
 
+        self.product_config = product_config
+
         if msg.type == "file":
             uri = msg.data['uri']
         elif msg.type == "dataset":
             uri = [mda['uri'] for mda in msg.data['dataset']]
         elif msg.type == 'collection':
+            all_areas = self.get_area_def_names()
+            if not msg.data['collection_area_id'] in all_areas:
+                LOGGER.info('Collection does not contain data for '
+                            'current areas. Skipping.')
+                return
             if 'dataset' in msg.data['collection'][0]:
                 uri = []
                 for dataset in msg.data['collection']:
@@ -458,12 +486,8 @@ class DataProcessor(object):
             LOGGER.info("Skipping...")
             return
 
-        self.product_config = product_config
-
         self.global_data = self.create_scene_from_message(msg)
         self._data_ok = True
-
-        area_def_names = self.get_area_def_names()
 
         nprocs = int(self.product_config.attrib.get("nprocs", 1))
         proj_method = self.product_config.attrib.get("proj_method", "nearest")
@@ -474,18 +498,30 @@ class DataProcessor(object):
             ["true", "yes", "1"]
         if precompute:
             LOGGER.debug("Saving projection mapping for re-use")
+        use_extern_calib = \
+            self.product_config.attrib.get("use_extern_calib", "").lower() in \
+            ["true", "yes", "1"]
+        keywords = {"use_extern_calib": use_extern_calib}
 
         for area_item in self.product_config.prodlist:
             if area_item.tag == "dump":
-                self.global_data.load(filename=filename)
-                self.save_to_netcdf(self.global_data,
-                                    area_item,
-                                    self.get_parameters(area_item))
+                try:
+                    self.global_data.load(filename=filename, **keywords)
+                    self.save_to_netcdf(self.global_data,
+                                        area_item,
+                                        self.get_parameters(area_item))
+                except (IndexError, IOError, DecodeError):
+                    LOGGER.exception("Incomplete or corrupted input data.")
 
         for group in self.product_config.groups:
             LOGGER.debug("processing %s", group.info['id'])
             area_def_names = self.get_area_def_names(group.data)
-            LOGGER.debug("areas: %s", str(area_def_names))
+            if msg.type == 'collection' and \
+               not msg.data['collection_area_id'] in area_def_names:
+                LOGGER.info('Collection data does not cover this area group. '
+                            'Skipping.')
+                return
+
             products = []
             skip = []
             skip_group = True
@@ -518,7 +554,8 @@ class DataProcessor(object):
                 req_channels = self.get_req_channels(products)
                 LOGGER.debug("loading channels: %s", str(req_channels))
                 keywords = {"filename": filename,
-                            "area_def_names": area_def_names}
+                            "area_def_names": area_def_names,
+                            "use_extern_calib": use_extern_calib}
                 try:
                     keywords["time_interval"] = (msg.data["start_time"],
                                                  msg.data["end_time"])
@@ -529,7 +566,7 @@ class DataProcessor(object):
 
                 self.global_data.load(req_channels, **keywords)
                 LOGGER.debug("loaded data: %s", str(self.global_data))
-            except IndexError:
+            except (IndexError, IOError, DecodeError):
                 LOGGER.exception("Incomplete or corrupted input data.")
                 self._data_ok = False
                 break
@@ -542,8 +579,8 @@ class DataProcessor(object):
                     continue
 
                 # reproject to local domain
-                LOGGER.debug(
-                    "Projecting data to area " + area_item.attrib['name'])
+                LOGGER.debug("Projecting data to area %s",
+                             area_item.attrib['name'])
                 try:
                     self.local_data = \
                         self.global_data.project(
@@ -559,8 +596,8 @@ class DataProcessor(object):
                                    area_item.attrib['id'])
                     continue
 
-                LOGGER.info(
-                    'Data reprojected for area: %s', area_item.attrib['name'])
+                LOGGER.info('Data reprojected for area: %s',
+                            area_item.attrib['name'])
 
                 # Draw requested images for this area.
                 self.draw_images(area_item)
@@ -576,16 +613,6 @@ class DataProcessor(object):
         if self._data_ok:
             LOGGER.debug("Waiting for the files to be saved")
         self.writer.prod_queue.join()
-        if self._data_ok:
-            LOGGER.debug("All files saved")
-
-            LOGGER.info('File %s processed in %.1f s', uri,
-                        time.time() - t1a)
-
-        if not self._data_ok:
-            LOGGER.warning("File %s not processed due to "
-                           "incomplete/missing/corrupted data.",
-                           uri)
 
         # Release memory
         del self.local_data
@@ -593,8 +620,21 @@ class DataProcessor(object):
         self.local_data = None
         self.global_data = None
 
+        if self._data_ok:
+            LOGGER.debug("All files saved")
+            LOGGER.info("File %s processed in %.1f s", uri,
+                        time.time() - t1a)
+
+        if not self._data_ok:
+            LOGGER.warning("File %s not processed due to "
+                           "incomplete/missing/corrupted data.",
+                           uri)
+            raise IOError
+
+
     def get_req_channels(self, products):
-        # Get a list of required channels
+        """Get a list of required channels
+        """
         reqs = set()
         for product in products:
             if product.tag == "dump":
@@ -613,10 +653,10 @@ class DataProcessor(object):
         config to a list.
         '''
 
-        pl = group or self.product_config.prodlist
+        prodlist = group or self.product_config.prodlist
 
         def_names = [item.attrib["id"]
-                     for item in pl
+                     for item in prodlist
                      if item.tag == "area"]
 
         return def_names
@@ -627,31 +667,27 @@ class DataProcessor(object):
         '''
 
         # Check the list of valid satellites
-        if 'valid_satellite' in config:
-            if self.global_data.info['satname'] +\
-                    self.global_data.info['satnumber'] not in\
-                    config['valid_satellite']:
+        if 'valid_satellite' in config.keys():
+            if self.global_data.info['platform_name'] not in +\
+                    config.attrib['valid_satellite']:
 
                 info = 'Satellite %s not in list of valid ' \
                     'satellites, skipping product %s.' % \
-                    (self.global_data.info['satname'] +
-                     self.global_data.info['satnumber'],
-                     config['name'])
+                    (self.global_data.info['platform_name'],
+                     config.attrib['name'])
                 LOGGER.info(info)
 
                 return False
 
         # Check the list of invalid satellites
-        if 'invalid_satellite' in config:
-            if self.global_data.info['satname'] +\
-                    self.global_data.info['satnumber'] in\
-                    config['invalid_satellite']:
+        if 'invalid_satellite' in config.keys():
+            if self.global_data.info['platform_name'] in \
+                    config.attrib['invalid_satellite']:
 
                 info = 'Satellite %s is in the list of invalid ' \
                     'satellites, skipping product %s.' % \
-                    (self.global_data.info['satname'] +
-                     self.global_data.info['satnumber'],
-                     config['name'])
+                    (self.global_data.info['platform_name'],
+                     config.attrib['name'])
                 LOGGER.info(info)
 
                 return False
@@ -694,9 +730,9 @@ class DataProcessor(object):
                 continue
             # TODO
             # Check if satellite is one that should be processed
-            # if not self.check_satellite(product):
+            if not self.check_satellite(product):
                 # Skip this product, if the return value is True
-                # continue
+                continue
 
             # Check if Sun zenith angle limits match this product
             if 'sunzen_night_minimum' in product.attrib or \
@@ -834,7 +870,9 @@ class DataProcessor(object):
         return True
 
 
-def _create_message(obj, filename, uri, params, uid=None):
+def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
+    """Create posttroll message.
+    """
     to_send = obj.info.copy()
 
     for key in ['collection', 'dataset']:
@@ -892,17 +930,30 @@ def _create_message(obj, filename, uri, params, uid=None):
         to_send["data_processing_level"] = "3"
         to_send["product_name"] = "cloudproduct"
 
-    subject = "/".join(("",
-                        to_send["format"],
-                        to_send["data_processing_level"]))
+    if publish_topic is None:
+        subject = "/".join(("",
+                            to_send["format"],
+                            to_send["data_processing_level"]))
+    else:
+        # TODO: this is ugly, but still the easiest way to get area id
+        # for the compose as dict key "id"
+        compose_dict = {}
+        for key in to_send:
+            if isinstance(to_send[key], dict):
+                for key2 in to_send[key]:
+                    compose_dict[key2] = to_send[key][key2]
+            else:
+                compose_dict[key] = to_send[key]
+        subject = compose(publish_topic, compose_dict)
 
-    msg = Message(subject,
-                  "file",
-                  to_send)
+    msg = Message(subject, "file", to_send)
+
     return msg
 
 
 def link_or_copy(src, dst):
+    """Create a symlink from *src* to *dst*, or if that fails, copy.
+    """
     if src == dst:
         LOGGER.warning("Trying to copy a file over itself: %s", src)
         return
@@ -922,10 +973,12 @@ def link_or_copy(src, dst):
 
 
 def thumbnail(filename, thname, size, fformat):
+    """Create a thumbnail image and save it.
+    """
     from PIL import Image
-    im = Image.open(filename)
-    im.thumbnail(size, Image.ANTIALIAS)
-    im.save(thname, fformat)
+    img = Image.open(filename)
+    img.thumbnail(size, Image.ANTIALIAS)
+    img.save(thname, fformat)
 
 
 def hash_color(colorstring):
@@ -935,9 +988,9 @@ def hash_color(colorstring):
         colorstring = colorstring[1:]
     if len(colorstring) != 6:
         raise ValueError("input #%s is not in #RRGGBB format" % colorstring)
-    r, g, b = colorstring[:2], colorstring[2:4], colorstring[4:]
-    r, g, b = [int(n, 16) for n in (r, g, b)]
-    return (r, g, b)
+    r_col, g_col, b_col = colorstring[:2], colorstring[2:4], colorstring[4:]
+    r_col, g_col, b_col = [int(n, 16) for n in (r_col, g_col, b_col)]
+    return (r_col, g_col, b_col)
 
 
 class DataWriter(Thread):
@@ -948,10 +1001,15 @@ class DataWriter(Thread):
     we don't want to block processing.
     """
 
-    def __init__(self):
+    def __init__(self, publish_topic=None):
         Thread.__init__(self)
         self.prod_queue = Queue.Queue()
+        self._publish_topic = publish_topic
         self._loop = True
+
+    def set_publish_topic(self, publish_topic):
+        '''Set published topic.'''
+        self._publish_topic = publish_topic
 
     def run(self):
         """Run the thread.
@@ -975,8 +1033,7 @@ class DataWriter(Thread):
                                 del attrib[key]
                         if 'format' not in attrib:
                             attrib.setdefault('format',
-                                              os.path.splitext(\
-                                                    item.text)[1][1:])
+                                os.path.splitext(item.text)[1][1:])
 
                         key = tuple(sorted(attrib.items()))
                         sorted_items.setdefault(key, []).append(item)
@@ -1006,7 +1063,8 @@ class DataWriter(Thread):
                             if not saved:
                                 obj.save(fname,
                                          fformat=fformat,
-                                         compression=copy.attrib.get("compression", 6))
+                                         compression=copy.attrib.get(\
+                                                            "compression", 6))
                                 LOGGER.info("Saved %s to %s", str(obj), fname)
                                 saved = fname
                                 uid = os.path.basename(fname)
@@ -1017,27 +1075,35 @@ class DataWriter(Thread):
                             if ("thumbnail_name" in copy.attrib and
                                     "thumbnail_size" in copy.attrib):
                                 thsize = [int(val) for val
-                                          in copy.attrib["thumbnail_size"].split("x")]
+                                          in copy.attrib[\
+                                                "thumbnail_size"].split("x")]
                                 copy.attrib["thumbnail_size"] = thsize
-                                thname = compose(os.path.join(output_dir,
-                                                              copy.attrib["thumbnail_name"]),
-                                                 local_params)
+                                thname = \
+                                    compose(os.path.join(\
+                                                output_dir,
+                                                copy.attrib["thumbnail_name"]),
+                                            local_params)
                                 copy.attrib["thumbnail_name"] = thname
                                 thumbnail(fname, thname, thsize, fformat)
 
                             msg = _create_message(obj, os.path.basename(fname),
-                                                  fname, params, uid=uid)
+                                                  fname, params,
+                                                  publish_topic=\
+                                                  self._publish_topic,
+                                                  uid=uid)
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
-                except:
+                except Exception as e:
                     for item in file_items:
                         if "thumbnail_size" in item.attrib:
                             item.attrib["thumbnail_size"] = str(
                                 item.attrib["thumbnail_size"])
-                    LOGGER.exception("Something wrong happened saving %s to %s",
+                    LOGGER.exception("Something wrong happened saving " \
+                                     "%s to %s: %s",
                                      str(obj),
                                      str([tostring(item)
-                                          for item in file_items]))
+                                          for item in file_items]),
+                                     e.message)
                 finally:
                     self.prod_queue.task_done()
 
@@ -1070,8 +1136,11 @@ class Trollduction(object):
 
         self._loop = True
         self.thr = None
-        self.data_processor = DataProcessor()
+
+        self.data_processor = None
         self.config_watcher = None
+
+        self._previous_file = None
 
         # read everything from the Trollduction config file
         try:
@@ -1087,6 +1156,10 @@ class Trollduction(object):
         except AttributeError:
             self.td_config = config
             self.update_td_config()
+
+        self.data_processor = \
+            DataProcessor(publish_topic=self.td_config.get('publish_topic',
+                                                           None))
 
     def update_td_config_from_file(self, fname, config_item=None):
         '''Read Trollduction config file and use the new parameters.
@@ -1123,11 +1196,8 @@ class Trollduction(object):
         given file.
         '''
         import xml_read
-        self.product_config = xml_read.ProductList(fname)
 
-        # product_config = \
-        #    helper_functions.read_config_file(fname,
-        # config_item=config_item)
+        self.product_config = xml_read.ProductList(fname)
 
         # add checks, or do we just assume the config to be valid at
         # this point?
@@ -1180,13 +1250,41 @@ class Trollduction(object):
                 else:
                     sensors = set((msg.data['sensor'], ))
 
+                prev_file = self._previous_file
                 if (msg.type in ["file", 'collection', 'dataset'] and
                     sensors.intersection(\
-                        self.td_config['instruments'].split(','))):
+                            self.td_config['instruments'].split(','))):
+                    try:
+                        if self._previous_file in msg.data["uri"] and \
+                           self.td_config.get('process_only_once',
+                                              "false").lower() in \
+                           ["true", "yes", "1"]:
+                            LOGGER.info("File was already processed. Skipping.")
+                            continue
+                        else:
+                            self._previous_file = msg.data["uri"]
+                    except TypeError:
+                        self._previous_file = msg.data["uri"]
 
                     self.update_product_config(\
-                        self.td_config['product_config_file'])
-                    self.data_processor.run(self.product_config, msg)
+                            self.td_config['product_config_file'])
 
+                    retried = False
+                    while True:
+                        try:
+                            self.data_processor.run(self.product_config, msg)
+                            break
+                        except IOError:
+                            if retried:
+                                LOGGER.debug("History of processed files not "
+                                             "updated due to "
+                                             "missing/corrupted/incomplete "
+                                             "data.")
+                                self._previous_file = prev_file
+                                break
+                            else:
+                                retried = True
+                                LOGGER.info("Retrying once in 2 seconds.")
+                                time.sleep(2)
         finally:
             self.shutdown()

@@ -13,6 +13,8 @@
     <!-- <check_coverage>False</check_coverage> -->
     <!-- number of processors used for parallel work -->
     <nprocs>1</nprocs>
+    <!-- Use external calibration coefficients for channels 1, 2 and 3a -->
+    <!-- <use_extern_calib>True</use_extern_calib> -->
   </common>
   
 
