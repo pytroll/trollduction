@@ -259,7 +259,7 @@ try:
             self.input_dirs = []
             for pattern in patterns:
                 self.input_dirs.append(os.path.dirname(pattern))
-                LOG.debug("watching %s", os.path.dirname(pattern))
+                LOG.debug("watching " + str(os.path.dirname(pattern)))
             self.patterns = patterns
 
             self.new_file = Event()
@@ -302,9 +302,10 @@ try:
         """
 
         def __init__(self, collectors, terminator, decoder,
-                     patterns, observer_class_name):
+                     patterns, observer_class_name, publish_topic=None):
             self.wdp = AbstractWatchDogProcessor(patterns, observer_class_name)
-            FileTrigger.__init__(self, collectors, terminator, decoder)
+            FileTrigger.__init__(self, collectors, terminator, decoder,
+                                 publish_topic=publish_topic)
             self.wdp.process = self.add_file
 
         def start(self):
@@ -341,11 +342,11 @@ class AbstractMessageProcessor(Thread):
         self.sub = self.nssub.start()
         Thread.start(self)
 
-    def process_message(self, msg):
+    def process(self, msg):
         """Process the message.
         """
         del msg
-        raise NotImplementedError("process_message is not implemented!")
+        raise NotImplementedError("process is not implemented!")
 
     def run(self):
         """Run the trigger.
@@ -374,8 +375,9 @@ class PostTrollTrigger(FileTrigger):
 
     def __init__(self, collectors, terminator, services, topics,
                  publish_topic=None):
-        self.msgproc = MessageProcessor(services, topics)
-        self.msgproc.process_message = self.add_file
+
+        self.msgproc = AbstractMessageProcessor(services, topics)
+        self.msgproc.process = self.add_file
         FileTrigger.__init__(self, collectors, terminator, self.decode_message,
                              publish_topic=publish_topic)
 
