@@ -1140,7 +1140,8 @@ class Trollduction(object):
         self.data_processor = None
         self.config_watcher = None
 
-        self._previous_file = None
+        self._previous_pass = {"platform_name": None,
+                               "start_time": None}
 
         # read everything from the Trollduction config file
         try:
@@ -1250,21 +1251,30 @@ class Trollduction(object):
                 else:
                     sensors = set((msg.data['sensor'], ))
 
-                prev_file = self._previous_file
+                prev_pass = self._previous_pass
                 if (msg.type in ["file", 'collection', 'dataset'] and
                     sensors.intersection(\
                             self.td_config['instruments'].split(','))):
                     try:
-                        if self._previous_file in msg.data["uri"] and \
-                           self.td_config.get('process_only_once',
+                        if self.td_config.get('process_only_once',
                                               "false").lower() in \
-                           ["true", "yes", "1"]:
+                           ["true", "yes", "1"] and \
+                           self._previous_pass["platform_name"] == \
+                           msg.data["platform_name"] and \
+                           self._previous_pass["start_time"] == \
+                           msg.data["start_time"]:
                             LOGGER.info("File was already processed. Skipping.")
                             continue
                         else:
-                            self._previous_file = msg.data["uri"]
+                            self._previous_pass["platform_name"] = \
+                                msg.data["platform_name"]
+                            self._previous_pass["start_time"] = \
+                                msg.data["start_time"]
                     except TypeError:
-                        self._previous_file = msg.data["uri"]
+                            self._previous_pass["platform_name"] = \
+                                msg.data["platform_name"]
+                            self._previous_pass["start_time"] = \
+                                msg.data["start_time"]
 
                     self.update_product_config(\
                             self.td_config['product_config_file'])
@@ -1280,7 +1290,7 @@ class Trollduction(object):
                                              "updated due to "
                                              "missing/corrupted/incomplete "
                                              "data.")
-                                self._previous_file = prev_file
+                                self._previous_pass = prev_pass
                                 break
                             else:
                                 retried = True
