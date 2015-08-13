@@ -249,7 +249,7 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
             out_reader = threading.Thread(
                 target=logreader, args=(pps_proc.stdout, LOG.info))
             err_reader = threading.Thread(
-                target=logreader, args=(pps_proc.stderr, LOG.error))
+                target=logreader, args=(pps_proc.stderr, LOG.info))
             out_reader.start()
             err_reader.start()
             out_reader.join()
