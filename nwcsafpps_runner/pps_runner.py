@@ -135,18 +135,13 @@ class PpsRunError(Exception):
     pass
 
 
-def nonblock_read(output):
-    """An attempt to catch any hangup in reading the output (stderr/stdout)
-    from subprocess"""
-    import fcntl
-    fd = output.fileno()
-
-    fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-    fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
-    try:
-        return output.readline()
-    except:
-        return ''
+def logreader(stream, log_func):
+    while True:
+        s = stream.readline()
+        if not s:
+            break
+        log_func(s.strip())
+    stream.close()
 
 
 def get_outputfiles(path, platform_name, orb):
@@ -245,26 +240,20 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
             try:
                 pps_proc = Popen(myargs, shell=False, stderr=PIPE, stdout=PIPE)
             except PpsRunError:
-                LOG.exception("Failed in PPS")
-                pass
+                LOG.exception("Failed in PPS...")
 
             t__ = threading.Timer(
                 20 * 60.0, terminate_process, args=(pps_proc, scene, ))
             t__.start()
 
-            while True:
-                line = pps_proc.stdout.readline()
-                if not line:
-                    break
-                LOG.info(line)
-
-            while True:
-                errline = pps_proc.stderr.readline()
-                if not errline:
-                    break
-                LOG.info(errline)
-
-            pps_proc.wait()
+            out_reader = threading.Thread(
+                target=logreader, args=(pps_proc.stdout, LOG.info))
+            err_reader = threading.Thread(
+                target=logreader, args=(pps_proc.stderr, LOG.error))
+            out_reader.start()
+            err_reader.start()
+            out_reader.join()
+            err_reader.join()
 
             LOG.info(
                 "Ready with PPS level-2 processing on scene: " + str(scene))
