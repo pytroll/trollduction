@@ -37,6 +37,7 @@ from posttroll.publisher import Publish
 from posttroll.subscriber import Subscribe
 import tempfile
 from bz2 import BZ2File
+from datetime import datetime
 
 LOG = logging.getLogger(__name__)
 
@@ -112,11 +113,30 @@ def popen(cmd):
     err_reader.join()
 
 
+def get_aliases(raw_config_str):
+    items = raw_config_str.split("|")
+    aliases = {}
+    for item in items:
+        key, vals = item.split(":")
+        aliases[key] = dict([alias.split("=") for alias in vals.split(",")])
+    return aliases
+
+
 def process_message(msg, config):
     pattern = config["output_file_pattern"]
     input_files = [item["uri"] for item in msg.data["collection"]]
-    output_file = compose(pattern, msg.data)
-    to_del = []
+
+    data = msg.data.copy()
+    data["proc_time"] = datetime.utcnow()
+    try:
+        aliases = get_aliases(config["aliases"])
+    except KeyError:
+        aliases = {}
+    for key in aliases:
+        if key in data:
+            data[key] = aliases[key].get(data[key], data[key])
+
+    output_file = compose(pattern, data)
 
     with bunzipped(input_files) as files_to_read:
         keyvals = {"input_files": " ".join(sorted(files_to_read)), "output_file": output_file}
@@ -167,10 +187,6 @@ if __name__ == '__main__':
     cfg = RawConfigParser()
     cfg.read(opts.config)
     config = dict(cfg.items(opts.config_item))
-
-    #from posttroll.message import Message
-    ##process_message(Message(rawstr=test_msg), config)
-    # pause
 
     try:
         with Publish("cat") as pub:
