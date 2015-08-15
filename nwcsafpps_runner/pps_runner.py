@@ -311,7 +311,7 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
                 to_send['platform_name'] = scene['platform_name']
                 to_send['orbit_number'] = scene['orbit_number']
                 if result_file.endswith("xml"):
-                    to_send['format'] = 'PPS'
+                    to_send['format'] = 'PPS-XML'
                     to_send['type'] = 'XML'
                 if result_file.endswith("nc"):
                     to_send['format'] = 'CF'
