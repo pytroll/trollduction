@@ -422,7 +422,7 @@ class AappLvl1Processor(object):
             urlobj = urlparse(msg.data['uri'])
             server = urlobj.netloc
             url_ip = socket.gethostbyname(urlobj.netloc)
-            if url_ip not in get_local_ips():
+            if urlobj.netloc and (url_ip not in get_local_ips()):
                 LOG.warning("Server %s not the current one: %s" % (str(urlobj.netloc),
                                                                    socket.gethostname()))
                 return True
