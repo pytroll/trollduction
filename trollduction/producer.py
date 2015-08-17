@@ -66,6 +66,8 @@ try:
 except ImportError:
     DecodeError = IOError
 from xml.etree.ElementTree import tostring
+from struct import error as StructError
+
 LOGGER = logging.getLogger(__name__)
 
 # Config watcher stuff
@@ -510,7 +512,7 @@ class DataProcessor(object):
                     self.save_to_netcdf(self.global_data,
                                         area_item,
                                         self.get_parameters(area_item))
-                except (IndexError, IOError, DecodeError):
+                except (IndexError, IOError, DecodeError, StructError):
                     LOGGER.exception("Incomplete or corrupted input data.")
 
         for group in self.product_config.groups:
@@ -520,7 +522,7 @@ class DataProcessor(object):
                not msg.data['collection_area_id'] in area_def_names:
                 LOGGER.info('Collection data does not cover this area group. '
                             'Skipping.')
-                return
+                continue
 
             products = []
             skip = []
@@ -566,7 +568,7 @@ class DataProcessor(object):
 
                 self.global_data.load(req_channels, **keywords)
                 LOGGER.debug("loaded data: %s", str(self.global_data))
-            except (IndexError, IOError, DecodeError):
+            except (IndexError, IOError, DecodeError, StructError):
                 LOGGER.exception("Incomplete or corrupted input data.")
                 self._data_ok = False
                 break
