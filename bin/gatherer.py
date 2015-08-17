@@ -81,6 +81,9 @@ def get_metadata(fname):
         if "duration" in res:
             del res["duration"]
 
+        if ("sensor" in res) and ("," in res["sensor"]):
+            res["sensor"] = res["sensor"].split(",")
+
         res["uri"] = fname
         res["filename"] = os.path.basename(fname)
 

@@ -515,9 +515,9 @@ class AappLvl1Processor(object):
 
             LOG.debug("scene_id = " + str(scene_id))
             if scene_id in self.level0files:
-                LOG.debug("Level-0files = " + str(self.level0files[scene_id]))
+                LOG.debug("Level-0 files = " + str(self.level0files[scene_id]))
             else:
-                LOG.debug("No level-0files yet...")
+                LOG.debug("No level-0 files yet...")
 
             self.level0_filename = urlobj.path
             dummy, fname = os.path.split(self.level0_filename)
@@ -549,7 +549,7 @@ class AappLvl1Processor(object):
                 return True
 
             if scene_id not in self.level0files:
-                LOG.debug("Reset level0files: scene_id = " + str(scene_id))
+                LOG.debug("Reset level-0 files: scene_id = " + str(scene_id))
                 self.level0files[scene_id] = []
 
             for sensor in sensors:
@@ -560,9 +560,9 @@ class AappLvl1Processor(object):
                 else:
                     LOG.debug("item already in list: " + str(item))
 
-            if len(self.level0files[scene_id]) < 4:
+            if len(self.level0files[scene_id]) < 4 and msg.data.get("variant") != "EARS":
                 LOG.info("Not enough sensor data available yet. " +
-                         "Level-0files = " +
+                         "Level-0 files = " +
                          str(self.level0files[scene_id]))
                 return True
             else:
@@ -643,12 +643,16 @@ class AappLvl1Processor(object):
                         return True
 
                 cmdstr = (self.metop_run_script +
-                          " -d " + metop_in_dir +
-                          " -a " + sensor_filename['avhrr/3'] +
-                          " -u " + sensor_filename['amsu-a'] +
-                          " -m " + sensor_filename['mhs'] +
-                          " -h " + sensor_filename['hirs/4'] +
-                          " -o " + my_env['DYN_WRK_DIR'])
+                          " -d " + metop_in_dir)
+                if "avhrr/3" in sensor_filename:
+                    cmdstr += " -a " + sensor_filename['avhrr/3']
+                if "amsu-a" in sensor_filename:
+                    cmdstr += " -u " + sensor_filename['amsu-a']
+                if "mhs" in sensor_filename:
+                    cmdstr += " -m " + sensor_filename['mhs']
+                if "hirs/4" in sensor_filename:
+                    cmdstr += " -a " + sensor_filename['hirs/4']
+                cmdstr += " -o " + my_env['DYN_WRK_DIR']
 
     #     "-d %s -a %s -u %s -m %s -h %s -o %s") %(METOP_RUN_SCRIPT,
     #                                            metop_in_dir,
