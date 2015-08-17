@@ -32,7 +32,8 @@ import logging
 from logging import handlers
 from aapp_runner.read_aapp_config import read_config_file_options
 from aapp_runner.tle_satpos_prepare import do_tleing
-
+import socket
+import netifaces
 LOG = logging.getLogger(__name__)
 
 
@@ -85,6 +86,17 @@ import shlex
 #import subrocess
 from datetime import timedelta, datetime
 from time import time as _time
+
+
+def get_local_ips():
+    inet_addrs = [netifaces.ifaddresses(iface).get(netifaces.AF_INET)
+                  for iface in netifaces.interfaces()]
+    ips = []
+    for addr in inet_addrs:
+        if addr is not None:
+            for add in addr:
+                ips.append(add['addr'])
+    return ips
 
 
 def nonblock_read(output):
@@ -409,14 +421,14 @@ class AappLvl1Processor(object):
             LOG.debug(str(msg))
             urlobj = urlparse(msg.data['uri'])
             server = urlobj.netloc
-            LOG.debug('Server = <' + str(server) + '>')
-            if len(server) > 0 and server != self.dataserver:
-                LOG.warning("Server " + str(server))
-                LOG.warning("Is not the current dataserver one: " +
-                            str(self.dataserver))
+            url_ip = socket.gethostbyname(urlobj.netloc)
+            if url_ip not in get_local_ips():
+                LOG.warning("Server %s not the current one: %s" % (str(urlobj.netloc),
+                                                                   socket.gethostname()))
                 return True
 
             LOG.info("Ok... " + str(urlobj.netloc))
+            self.servername = urlobj.netloc
             LOG.info("Sat and Sensor: " + str(msg.data['platform_name'])
                      + " " + str(msg.data['sensor']))
 
