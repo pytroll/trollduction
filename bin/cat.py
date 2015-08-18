@@ -35,6 +35,7 @@ import threading
 import os
 from posttroll.publisher import Publish
 from posttroll.subscriber import Subscribe
+from posttroll.message import Message
 import tempfile
 from bz2 import BZ2File
 from datetime import datetime
@@ -156,10 +157,13 @@ def process_message(msg, config):
             popen(cmd)
 
     msg.type = "file"
-    del msg.data["collection"]
-    msg.data["filename"] = os.path.basename(output_file)
-    msg.data["uri"] = output_file
-    return msg
+    new_data = msg.data.copy()
+    del new_data["collection"]
+    new_data["filename"] = os.path.basename(output_file)
+    new_data["uri"] = output_file
+    msg2 = Message(msg.subject, "file", new_data)
+
+    return msg2
 
 if __name__ == '__main__':
 
