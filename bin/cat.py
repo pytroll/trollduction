@@ -78,7 +78,7 @@ class bunzipped(object):
 
     def __enter__(self):
         filenames = []
-        for filename in self._files:
+        for filename in sorted(self._files):
             if filename.endswith(".bz2"):
                 LOG.debug("bunzipping %s...", filename)
                 tmp_fd, tmp_filename = tempfile.mkstemp()
@@ -139,7 +139,7 @@ def process_message(msg, config):
     output_file = compose(pattern, data)
 
     with bunzipped(input_files) as files_to_read:
-        keyvals = {"input_files": " ".join(sorted(files_to_read)), "output_file": output_file}
+        keyvals = {"input_files": " ".join(files_to_read), "output_file": output_file}
         cmd_pattern = config["command"]
         cmd = compose(cmd_pattern, keyvals)
         LOG.info("Running %s", cmd)
