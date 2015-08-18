@@ -664,7 +664,8 @@ class AappLvl1Processor(object):
                     cmdstr += " -m " + sensor_filename['mhs']
                 if "hirs/4" in sensor_filename:
                     cmdstr += " -a " + sensor_filename['hirs/4']
-                cmdstr += " -o " + my_env['DYN_WRK_DIR']
+
+                cmdstr += ' -n ' + str(self.orbit) + " -o " + my_env['DYN_WRK_DIR']
 
     #     "-d %s -a %s -u %s -m %s -h %s -o %s") %(METOP_RUN_SCRIPT,
     #                                            metop_in_dir,
