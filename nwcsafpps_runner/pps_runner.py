@@ -382,9 +382,11 @@ def ready2run(msg, files4pps, job_register, sceneid):
     # LOG.info("Ok... " + str(server))
 
     uris = []
-    if msg.type == 'dataset':
+    if (msg.type == 'dataset' and
+            msg.data['platform_name'] in SUPPORTED_EOS_SATELLITES):
         LOG.info('Dataset: ' + str(msg.data['dataset']))
-        LOG.info('\t...thus we can assume we have everything we need for PPS')
+        LOG.info('Got a dataset on an EOS satellite')
+        LOG.info('\t ...thus we can assume we have everything we need for PPS')
         for obj in msg.data['dataset']:
             uris.append(obj['uri'])
     elif msg.type == 'collection':
@@ -564,7 +566,7 @@ class FileListener(threading.Thread):
 
     def run(self):
 
-        with posttroll.subscriber.Subscribe("", ['AAPP-PPS', 'EOS/1B', 'segment/SDR/1B'],
+        with posttroll.subscriber.Subscribe("", ['AAPP-PPS', 'EOS/1B', 'SDR/1B'],
                                             True) as subscr:
 
             for msg in subscr.recv(timeout=90):
