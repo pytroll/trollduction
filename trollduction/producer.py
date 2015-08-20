@@ -1252,8 +1252,7 @@ class Trollduction(object):
 
                 prev_file = self._previous_file
                 if (msg.type in ["file", 'collection', 'dataset'] and
-                    sensors.intersection(\
-                            self.td_config['instruments'].split(','))):
+                    sensors.intersection(self.td_config['instruments'].split(','))):
                     try:
                         if self._previous_file in msg.data["uri"] and \
                            self.td_config.get('process_only_once',
@@ -1265,7 +1264,8 @@ class Trollduction(object):
                             self._previous_file = msg.data["uri"]
                     except TypeError:
                         self._previous_file = msg.data["uri"]
-
+                    except KeyError:
+                        LOGGER.info("Can't check if file is already processed, so let's do it anyway.")
                     self.update_product_config(\
                             self.td_config['product_config_file'])
 
