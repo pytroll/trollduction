@@ -520,7 +520,7 @@ class DataProcessor(object):
                not msg.data['collection_area_id'] in area_def_names:
                 LOGGER.info('Collection data does not cover this area group. '
                             'Skipping.')
-                return
+                continue
 
             products = []
             skip = []
