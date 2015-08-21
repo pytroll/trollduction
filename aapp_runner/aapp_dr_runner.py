@@ -663,7 +663,7 @@ class AappLvl1Processor(object):
                 if "mhs" in sensor_filename:
                     cmdstr += " -m " + sensor_filename['mhs']
                 if "hirs/4" in sensor_filename:
-                    cmdstr += " -a " + sensor_filename['hirs/4']
+                    cmdstr += " -h " + sensor_filename['hirs/4']
 
                 cmdstr += ' -n ' + str(self.orbit) + " -o " + my_env['DYN_WRK_DIR']
 
