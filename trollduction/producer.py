@@ -65,6 +65,16 @@ try:
     from mipp import DecodeError
 except ImportError:
     DecodeError = IOError
+
+
+try:
+    from mem_top import mem_top
+except ImportError:
+    mem_top = None
+else:
+    import gc
+    import pprint
+
 from xml.etree.ElementTree import tostring
 LOGGER = logging.getLogger(__name__)
 
@@ -614,11 +624,7 @@ class DataProcessor(object):
             LOGGER.debug("Waiting for the files to be saved")
         self.writer.prod_queue.join()
 
-        # Release memory
-        del self.local_data
-        del self.global_data
-        self.local_data = None
-        self.global_data = None
+        self.release_memory()
 
         if self._data_ok:
             LOGGER.debug("All files saved")
@@ -630,6 +636,21 @@ class DataProcessor(object):
                            "incomplete/missing/corrupted data.",
                            uri)
             raise IOError
+
+    def release_memory(self):
+        if mem_top is not None:
+            LOGGER.debug(mem_top())
+        # Release memory
+        del self.local_data
+        del self.global_data
+        self.local_data = None
+        self.global_data = None
+        if mem_top is not None:
+            n = gc.collect()
+            LOGGER.debug("Unreachable objects: %d", n)
+            LOGGER.debug('Remaining Garbage: %s', pprint.pformat(gc.garbage))
+            del gc.garbage[:]
+            LOGGER.debug(mem_top())
 
 
     def get_req_channels(self, products):
