@@ -279,10 +279,10 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
                                  '_' + str(scene['orbit_number']) + '*.txt')
                 LOG.info("glob string = " + str(txt_time_file))
                 infiles = glob(txt_time_file)
-                LOG.info("Time control xml file candidates: " + str(infiles))
+                LOG.info("Time control ascii file candidates: " + str(infiles))
                 if len(infiles) == 1:
                     infile = infiles[0]
-                    LOG.info("Time control xml file: " + str(infile))
+                    LOG.info("Time control ascii file: " + str(infile))
                     ppstime_con = PPSTimeControl(infile)
                     ppstime_con.sum_up_processing_times()
                     ppstime_con.write_xml()
@@ -566,14 +566,15 @@ class FileListener(threading.Thread):
 
     def run(self):
 
-        with posttroll.subscriber.Subscribe("", ['AAPP-PPS', 'EOS/1B', 'SDR/1B'],
+        with posttroll.subscriber.Subscribe("", ['AAPP-HRPT', 'AAPP-PPS',
+                                                 'EOS/1B', 'SDR/1B'],
                                             True) as subscr:
 
             for msg in subscr.recv(timeout=90):
                 if not self.loop:
                     break
 
-                # Check if it a relevant message:
+                # Check if it is a relevant message:
                 if self.check_message(msg):
                     LOG.info("Put the message on the queue...")
                     LOG.debug("Message = " + str(msg))

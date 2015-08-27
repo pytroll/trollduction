@@ -77,9 +77,9 @@ class SstRunError(Exception):
     pass
 
 
-def start_sst_processing(sst_file,
-                         mypublisher, message):
-    """From a posttroll message start the modis lvl1 processing"""
+def start_sst_processing(sst_file, mypublisher, message):
+    """From a posttroll/trallstalker message start the osisaf sst post-processing
+    processing"""
 
     LOG.info("")
     LOG.info("sst-file dict: " + str(sst_file))
