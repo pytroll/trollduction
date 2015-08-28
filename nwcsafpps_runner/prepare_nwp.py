@@ -159,8 +159,13 @@ def update_nwp(starttime, nlengths):
         cmd = ('cat ' + tmp_file + " " +
                os.path.join(nhsf_path, nhsf_prefix + timeinfo) +
                " " + nwp_lsmz_filename + " > " + tmpresult)
+        LOG.debug("Add topography and land-sea mask to data:")
+        LOG.debug("Command = " + str(cmd))
         retv = os.system(cmd)
         LOG.debug("Returncode = " + str(retv))
+        if retv != 0:
+            raise IOError("Failed adding topography and land-sea " +
+                          "mask data to grib file")
         os.remove(tmp_file)
         os.rename(tmpresult, result_file)
 
