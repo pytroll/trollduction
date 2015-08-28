@@ -611,6 +611,8 @@ class DataProcessor(object):
 
                 # Draw requested images for this area.
                 self.draw_images(area_item)
+                del self.local_data
+                self.local_data = None
 
             if group.get("unload", "").lower() in ["yes", "true", "1"]:
                 loaded_channels = [chn.name for chn
