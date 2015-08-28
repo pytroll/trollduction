@@ -65,6 +65,21 @@ nwp_outdir = OPTIONS.get('nwp_outdir', None)
 nwp_lsmz_filename = OPTIONS.get('nwp_static_surface', None)
 nwp_output_prefix = OPTIONS.get('nwp_output_prefix', None)
 
+import threading
+
+
+class NwpPrepareError(Exception):
+    pass
+
+
+def logreader(stream, log_func):
+    while True:
+        s = stream.readline()
+        if not s:
+            break
+        log_func(s.strip())
+    stream.close()
+
 
 def run_command(cmdstr):
     """Run system command"""
@@ -74,20 +89,21 @@ def run_command(cmdstr):
 
     LOG.debug("Command: " + str(cmdstr))
     LOG.debug('Command sequence= ' + str(myargs))
-    proc = Popen(myargs, shell=False, stderr=PIPE, stdout=PIPE)
-    while True:
-        line = proc.stdout.readline()
-        if not line:
-            break
-        LOG.info(line)
+    try:
+        proc = Popen(myargs, shell=False, stderr=PIPE, stdout=PIPE)
+    except NwpPrepareError:
+        LOG.exception("Failed when preparing NWP data for PPS...")
 
-    while True:
-        errline = proc.stderr.readline()
-        if not errline:
-            break
-        LOG.info(errline)
+    out_reader = threading.Thread(
+        target=logreader, args=(proc.stdout, LOG.info))
+    err_reader = threading.Thread(
+        target=logreader, args=(proc.stderr, LOG.info))
+    out_reader.start()
+    err_reader.start()
+    out_reader.join()
+    err_reader.join()
 
-    proc.poll()
+    return proc.returncode
 
 
 def update_nwp(starttime, nlengths):
@@ -131,13 +147,15 @@ def update_nwp(starttime, nlengths):
 
         cmd = ("grib_copy -w gridType=regular_ll " +
                nhsp_file + " " + tmp_file)
-        run_command(cmd)
+        retv = run_command(cmd)
+        LOG.debug("Returncode = " + str(retv))
 
         tmpresult = tempfile.mktemp()
         cmd = ('cat ' + tmp_file + " " +
                os.path.join(nhsf_path, nhsf_prefix + timeinfo) +
                " " + nwp_lsmz_filename + " > " + tmpresult)
-        os.system(cmd)
+        retv = run_command(cmd)
+        LOG.debug("Returncode = " + str(retv))
         os.remove(tmp_file)
         os.rename(tmpresult, result_file)
 
