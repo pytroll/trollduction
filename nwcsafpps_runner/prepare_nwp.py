@@ -150,11 +150,16 @@ def update_nwp(starttime, nlengths):
         retv = run_command(cmd)
         LOG.debug("Returncode = " + str(retv))
 
+        if not os.path.exists(nwp_lsmz_filename):
+            LOG.exception("No static grib file with land-sea mask and " +
+                          "topography available. Can't prepare NWP data")
+            raise
+
         tmpresult = tempfile.mktemp()
         cmd = ('cat ' + tmp_file + " " +
                os.path.join(nhsf_path, nhsf_prefix + timeinfo) +
                " " + nwp_lsmz_filename + " > " + tmpresult)
-        retv = run_command(cmd)
+        retv = os.system(cmd)
         LOG.debug("Returncode = " + str(retv))
         os.remove(tmp_file)
         os.rename(tmpresult, result_file)
