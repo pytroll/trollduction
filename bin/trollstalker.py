@@ -171,9 +171,23 @@ class EventHandler(ProcessEvent):
                     base_time = self.info["start_time"]
             if "start_time" not in self.info:
                 self.info["start_time"] = base_time
+            if "start_date" in self.info:
+                self.info["start_time"] = \
+                    dt.datetime.combine(self.info["start_date"].date(),
+                                        self.info["start_time"].time())
+                if "end_date" not in self.info:
+                    self.info["end_date"] = self.info["start_date"]
+                del self.info["start_date"]
+            if "end_date" in self.info:
+                self.info["end_time"] = \
+                    dt.datetime.combine(self.info["end_date"].date(),
+                                        self.info["end_time"].time())
+                del self.info["end_date"]
             if "end_time" not in self.info:
-                self.info["end_time"] = base_time + dt.timedelta(minutes=15)
+                self.info["end_time"] = base_time + dt.timedelta(minutes=1)
 
+            while self.info["start_time"] > self.info["end_time"]:
+                self.info["end_time"] += dt.timedelta(days=1)
 
 class NewThreadedNotifier(ThreadedNotifier):
 
