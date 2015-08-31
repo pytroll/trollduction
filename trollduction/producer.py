@@ -410,7 +410,8 @@ class DataProcessor(object):
 
         check_coverage = \
             self.product_config.attrib.get("check_coverage",
-                                           "true") in ("true", "yes", "1")
+                                           "true").lower() in ("true", "yes",
+                                                               "1")
 
         if check_coverage and (mda['orbit_number'] is not None or
                                mda.get('orbit_type') == "polar"):
