@@ -120,8 +120,9 @@ class Listener(object):
         '''
         self.running = False
         time.sleep(1)
-        self.subscriber.stop()
-        self.subscriber = None
+        if self.subscriber is not None:
+            self.subscriber.stop()
+            self.subscriber = None
 
     def restart(self):
         '''Restart subscriber
