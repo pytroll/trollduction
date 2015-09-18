@@ -791,10 +791,10 @@ class DataProcessor(object):
                 img.info.update(self.global_data.info)
                 img.info["product_name"] = \
                     product.attrib.get("name", product.attrib["id"])
-            except AttributeError:
+            except AttributeError as err:
                 # Log incorrect product funcion name
-                LOGGER.error('Incorrect product id: %s for area %s',
-                             product.attrib['id'], area.attrib['name'])
+                LOGGER.error('Incorrect product id: %s for area %s (%s)',
+                             product.attrib['id'], area.attrib['name'], str(err))
             except KeyError as err:
                 # log missing channel
                 LOGGER.warning('Missing channel on product %s for area %s: %s',
