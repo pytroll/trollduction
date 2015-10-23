@@ -105,9 +105,9 @@ def check_uri(uri):
         return paths
     url = urlparse(uri)
     try:
-        url_ip = socket.gethostbyname(url.netloc)
+        url_ip = socket.gethostbyname(url.hostname)
 
-        if url_ip not in get_local_ips() and url.netloc != '':
+        if url_ip not in get_local_ips() and url.hostname != '':
             try:
                 os.stat(url.path)
             except OSError:
