@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2012, 2013, 2014 SMHI
+# Copyright (c) 2012, 2013, 2014, 2015 SMHI
 
 # Author(s):
 
@@ -38,6 +38,7 @@ import os
 from datetime import datetime, timedelta
 from time import sleep
 from urlparse import urlsplit, urlunsplit, SplitResult
+from trollduction.producer import check_uri
 from posttroll.publisher import Publish
 from posttroll.message import Message
 import xml.etree.ElementTree as etree
@@ -375,7 +376,14 @@ class MessageReceiver(object):
             self.add_pass(message.body.split(":", 1)[1].strip())
             return None
         elif message.body.startswith(dispatch_prefix):
-            return self.handle_distrib(message.body[len(dispatch_prefix):])
+            # Check hostname in message:
+            url = message.body[len(dispatch_prefix):].split(" ")[1]
+            try:
+                dummy = check_uri(url)
+            except IOError:
+                return None
+            else:
+                return self.handle_distrib(message.body[len(dispatch_prefix):])
 
 
 class GMCSubscriber(object):
