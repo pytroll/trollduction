@@ -658,7 +658,6 @@ class DataProcessor(object):
             del gc.garbage[:]
             LOGGER.debug(mem_top())
 
-
     def get_req_channels(self, products):
         """Get a list of required channels
         """
@@ -1060,7 +1059,7 @@ class DataWriter(Thread):
                                 del attrib[key]
                         if 'format' not in attrib:
                             attrib.setdefault('format',
-                                os.path.splitext(item.text)[1][1:])
+                                              os.path.splitext(item.text)[1][1:])
 
                         key = tuple(sorted(attrib.items()))
                         sorted_items.setdefault(key, []).append(item)
@@ -1090,8 +1089,8 @@ class DataWriter(Thread):
                             if not saved:
                                 obj.save(fname,
                                          fformat=fformat,
-                                         compression=copy.attrib.get(\
-                                                            "compression", 6))
+                                         compression=copy.attrib.get(
+                                             "compression", 6))
                                 LOGGER.info("Saved %s to %s", str(obj), fname)
                                 saved = fname
                                 uid = os.path.basename(fname)
@@ -1102,21 +1101,20 @@ class DataWriter(Thread):
                             if ("thumbnail_name" in copy.attrib and
                                     "thumbnail_size" in copy.attrib):
                                 thsize = [int(val) for val
-                                          in copy.attrib[\
-                                                "thumbnail_size"].split("x")]
+                                          in copy.attrib[
+                                    "thumbnail_size"].split("x")]
                                 copy.attrib["thumbnail_size"] = thsize
                                 thname = \
-                                    compose(os.path.join(\
-                                                output_dir,
-                                                copy.attrib["thumbnail_name"]),
-                                            local_params)
+                                    compose(os.path.join(
+                                        output_dir,
+                                        copy.attrib["thumbnail_name"]),
+                                        local_params)
                                 copy.attrib["thumbnail_name"] = thname
                                 thumbnail(fname, thname, thsize, fformat)
 
                             msg = _create_message(obj, os.path.basename(fname),
                                                   fname, params,
-                                                  publish_topic=\
-                                                  self._publish_topic,
+                                                  publish_topic=self._publish_topic,
                                                   uid=uid)
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
@@ -1125,7 +1123,7 @@ class DataWriter(Thread):
                         if "thumbnail_size" in item.attrib:
                             item.attrib["thumbnail_size"] = str(
                                 item.attrib["thumbnail_size"])
-                    LOGGER.exception("Something wrong happened saving " \
+                    LOGGER.exception("Something wrong happened saving "
                                      "%s to %s: %s",
                                      str(obj),
                                      str([tostring(item)
@@ -1280,7 +1278,7 @@ class Trollduction(object):
 
                 prev_pass = self._previous_pass
                 if (msg.type in ["file", 'collection', 'dataset'] and
-                    sensors.intersection(\
+                    sensors.intersection(
                         self.td_config['instruments'].split(','))):
                     try:
                         if self.td_config.get('process_only_once',
@@ -1290,7 +1288,8 @@ class Trollduction(object):
                            msg.data["platform_name"] and \
                            self._previous_pass["start_time"] == \
                            msg.data["start_time"]:
-                            LOGGER.info("File was already processed. Skipping.")
+                            LOGGER.info(
+                                "File was already processed. Skipping.")
                             continue
                         else:
                             self._previous_pass["platform_name"] = \
@@ -1307,8 +1306,8 @@ class Trollduction(object):
                         LOGGER.info("Can't check if file is already processed, "
                                     "so let's do it anyway.")
 
-                    self.update_product_config(\
-                            self.td_config['product_config_file'])
+                    self.update_product_config(
+                        self.td_config['product_config_file'])
 
                     retried = False
                     while True:

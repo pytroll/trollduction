@@ -494,7 +494,7 @@ class AappLvl1Processor(object):
                 if status:
                     LOG.warning("Processing of scene " + keyname +
                                 " " + str(status[0]) + " " + str(status[1]) +
-                                " with overlapping time have been"
+                                " with overlapping time has been"
                                 " launched previously")
                     LOG.info("Skip it...")
                     return True
@@ -665,7 +665,8 @@ class AappLvl1Processor(object):
                 if "hirs/4" in sensor_filename:
                     cmdstr += " -h " + sensor_filename['hirs/4']
 
-                cmdstr += ' -n ' + str(self.orbit) + " -o " + my_env['DYN_WRK_DIR']
+                cmdstr += ' -n ' + \
+                    str(self.orbit) + " -o " + my_env['DYN_WRK_DIR']
 
     #     "-d %s -a %s -u %s -m %s -h %s -o %s") %(METOP_RUN_SCRIPT,
     #                                            metop_in_dir,
