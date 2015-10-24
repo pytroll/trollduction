@@ -329,59 +329,59 @@ class MessageReceiver(object):
             pname = pass_name(risetime, satellite.upper())
             LOG.debug("pname= % s", str(pname))
             swath = self._received_passes.get(pname, {}).copy()
-            LOG.debug('swath.keys() = %s', str(swath.key())
-                      del swath['satellite']
-            swath["start_time"]=risetime
-            swath["end_time"]=falltime
-            swath["platform_name"]=satellite
-            swath["sensor"]=instruments[filename[:4]]
-            swath["format"]="EPS"
-            swath["type"]="binary"
-            swath["data_processing_level"]="0"
+            LOG.debug('swath.keys() = %s', str(swath.key()))
+            del swath['satellite']
+            swath["start_time"] = risetime
+            swath["end_time"] = falltime
+            swath["platform_name"] = satellite
+            swath["sensor"] = instruments[filename[:4]]
+            swath["format"] = "EPS"
+            swath["type"] = "binary"
+            swath["data_processing_level"] = "0"
         else:
             return None
 
         if pathname2.endswith(filename):
-            uri=pathname2
+            uri = pathname2
         else:
-            uri=os.path.join(pathname2, filename)
+            uri = os.path.join(pathname2, filename)
 
-        url=urlsplit(uri)
+        url = urlsplit(uri)
         if url.scheme in ["", "file"]:
-            scheme="ssh"
-            netloc=self._emitter
-            uri=urlunsplit(SplitResult(scheme,
+            scheme = "ssh"
+            netloc = self._emitter
+            uri = urlunsplit(SplitResult(scheme,
                                          netloc,
                                          url.path,
                                          url.query,
                                          url.fragment))
         elif url.scheme == "ftp":
-            scheme="ssh"
-            netloc=url.hostname
-            uri=urlunsplit(SplitResult(scheme,
+            scheme = "ssh"
+            netloc = url.hostname
+            uri = urlunsplit(SplitResult(scheme,
                                          netloc,
                                          url.path,
                                          url.query,
                                          url.fragment))
-        swath["uid"]=os.path.split(url.path)[1]
-        swath["uri"]=uri
+        swath["uid"] = os.path.split(url.path)[1]
+        swath["uri"] = uri
         return swath
 
     def receive(self, message):
         """Receive the messages and triage them.
         """
-        metadata_stop="STOPRC Stop reception: "
-        metadata_start="STRTRC Start reception: Satellite"
-        dispatch_prefix="FILDIS File Dispatch: "
+        metadata_stop = "STOPRC Stop reception: "
+        metadata_start = "STRTRC Start reception: Satellite"
+        dispatch_prefix = "FILDIS File Dispatch: "
         if (message.body.startswith(metadata_stop) or
                 message.body.startswith(metadata_start)):
             self.add_pass(message.body.split(":", 1)[1].strip())
             return None
         elif message.body.startswith(dispatch_prefix):
             # Check hostname in message:
-            url=message.body[len(dispatch_prefix):].split(" ")[1]
+            url = message.body[len(dispatch_prefix):].split(" ")[1]
             try:
-                dummy=check_uri(url)
+                dummy = check_uri(url)
             except IOError:
                 return None
             else:
@@ -391,18 +391,18 @@ class MessageReceiver(object):
 class GMCSubscriber(object):
 
     def __init__(self, host, port):
-        self._host=host
-        self._port=port
-        self._sock=None
-        self.msg=""
-        self._bufsize=256
-        self.loop=True
+        self._host = host
+        self._port = port
+        self._sock = None
+        self.msg = ""
+        self._bufsize = 256
+        self.loop = True
 
     def recv(self):
         """Receive messages.
         """
         while self.loop:
-            self._sock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 self._sock.connect((self._host, self._port))
             except socket.error:
@@ -414,30 +414,30 @@ class GMCSubscriber(object):
             try:
                 while self.loop:
                     try:
-                        data=self._sock.recv(self._bufsize)
+                        data = self._sock.recv(self._bufsize)
                     except socket.timeout:
                         pass
                     else:
                         if not data:
                             break
                         self.msg += data
-                        messages=self.msg.split("</message>")
+                        messages = self.msg.split("</message>")
                         if len(messages) > 1:
                             for mess in messages[:-1]:
                                 yield mess + "</message>"
                             if messages[-1].endswith("</body>"):
                                 yield messages[-1] + "</message>"
-                                self.msg=""
+                                self.msg = ""
                             else:
-                                self.msg=messages[-1]
+                                self.msg = messages[-1]
                         elif self.msg.endswith("</message>"):
                             yield self.msg
-                            self.msg=""
+                            self.msg = ""
             finally:
                 self._sock.close()
 
     def stop(self):
-        self.loop=False
+        self.loop = False
 
 
 def receive_from_zmq(host, port, station, environment, days=1):
@@ -445,23 +445,23 @@ def receive_from_zmq(host, port, station, environment, days=1):
     """
 
     # socket = Subscriber(["tcp://localhost:9331"], ["2met!"])
-    sock=GMCSubscriber(host, port)
-    msg_rec=MessageReceiver(host)
+    sock = GMCSubscriber(host, port)
+    msg_rec = MessageReceiver(host)
 
     with Publish("receiver", 0, ["HRPT 0", "PDS", "RDR", "EPS 0"]) as pub:
         for rawmsg in sock.recv():
             # TODO:
             # - Watch for idle time in order to detect a hangout
             LOGGER.debug("receive from 2met! %s", str(rawmsg))
-            string=TwoMetMessage(rawmsg)
-            to_send=msg_rec.receive(string)
+            string = TwoMetMessage(rawmsg)
+            to_send = msg_rec.receive(string)
             if to_send is None:
                 continue
-            subject="/".join(("", to_send['format'],
+            subject = "/".join(("", to_send['format'],
                                 to_send['data_processing_level'],
                                 station, environment,
                                 "polar", "direct_readout"))
-            msg=Message(subject,
+            msg = Message(subject,
                           "file",
                           to_send).encode()
             LOGGER.debug("publishing %s", str(msg))
