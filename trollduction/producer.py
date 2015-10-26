@@ -105,13 +105,15 @@ def check_uri(uri):
         return paths
     url = urlparse(uri)
     try:
-        url_ip = socket.gethostbyname(url.hostname)
+        if url.hostname:
+            url_ip = socket.gethostbyname(url.hostname)
 
-        if url_ip not in get_local_ips() and url.hostname != '':
-            try:
-                os.stat(url.path)
-            except OSError:
-                raise IOError("Data file %s unaccessible from this host" % uri)
+            if url_ip not in get_local_ips():
+                try:
+                    os.stat(url.path)
+                except OSError:
+                    raise IOError(
+                        "Data file %s unaccessible from this host" % uri)
 
     except socket.gaierror:
         LOGGER.warning("Couldn't check file location, running anyway")
