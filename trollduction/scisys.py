@@ -326,7 +326,6 @@ class MessageReceiver(object):
             pname = pass_name(risetime, satellite.upper())
             LOGGER.debug("pname= % s", str(pname))
             swath = self._received_passes.get(pname, {}).copy()
-            LOGGER.debug('swath.keys() = %s', str(swath.key()))
             swath.pop('satellite', None)
             swath["start_time"] = risetime
             swath["end_time"] = falltime
