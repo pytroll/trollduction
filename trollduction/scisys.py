@@ -186,7 +186,7 @@ class MessageReceiver(object):
             pname = pass_name(risetime, satellite)
             satellite = satellite.replace("_", "-")
             swath = self._received_passes.get(pname, {}).copy()
-            del swath['satellite']
+            swath.pop('satellite', None)
             swath["platform_name"] = satellite
             swath["start_time"] = risetime
             swath["type"] = "binary"
@@ -218,7 +218,7 @@ class MessageReceiver(object):
                 raise ValueError(
                     "Unrecognized satellite ID: " + pds["apid1"][:3])
             swath = self._received_passes.get(pname, {}).copy()
-            del swath['satellite']
+            swath.pop('satellite', None)
             swath['platform_name'] = satellite
             swath['start_time'] = risetime
             instruments = {"0064": "modis",
@@ -289,10 +289,7 @@ class MessageReceiver(object):
             pname = pass_name(start_time, "NPP")
 
             swath = self._received_passes.get(pname, {}).copy()
-            try:
-                del swath["satellite"]
-            except KeyError:
-                pass
+            swath.pop("satellite", None)
             swath["platform_name"] = satellite
             swath["start_time"] = start_time
             swath['end_time'] = end_time
@@ -330,7 +327,7 @@ class MessageReceiver(object):
             LOGGER.debug("pname= % s", str(pname))
             swath = self._received_passes.get(pname, {}).copy()
             LOGGER.debug('swath.keys() = %s', str(swath.key()))
-            del swath['satellite']
+            swath.pop('satellite', None)
             swath["start_time"] = risetime
             swath["end_time"] = falltime
             swath["platform_name"] = satellite
