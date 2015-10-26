@@ -327,9 +327,9 @@ class MessageReceiver(object):
             falltime = datetime.strptime(filename[32:47], "%Y%m%d%H%M%SZ")
 
             pname = pass_name(risetime, satellite.upper())
-            LOG.debug("pname= % s", str(pname))
+            LOGGER.debug("pname= % s", str(pname))
             swath = self._received_passes.get(pname, {}).copy()
-            LOG.debug('swath.keys() = %s', str(swath.key()))
+            LOGGER.debug('swath.keys() = %s', str(swath.key()))
             del swath['satellite']
             swath["start_time"] = risetime
             swath["end_time"] = falltime
