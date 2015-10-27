@@ -77,13 +77,13 @@ from trollduction.helper_functions import overlapping_timeinterval
 
 import tempfile
 from glob import glob
-#import os
+# import os
 import shutil
-#import aapp_stat
+# import aapp_stat
 import threading
 from subprocess import Popen, PIPE
 import shlex
-#import subrocess
+# import subrocess
 from datetime import timedelta, datetime
 from time import time as _time
 
@@ -394,7 +394,7 @@ class AappLvl1Processor(object):
                 return True
 
             LOG.debug("Received message: " + str(msg))
-            #msg.data['platform_name'] = "NOAA-19"
+            # msg.data['platform_name'] = "NOAA-19"
             LOG.debug(
                 "Supported Metop satellites: " + str(SUPPORTED_METOP_SATELLITES))
             LOG.debug(
@@ -517,7 +517,11 @@ class AappLvl1Processor(object):
                     continue
                 t1_ = datetime.strptime(startt, '%Y%m%d%H%M%S')
                 t2_ = datetime.strptime(endt, '%Y%m%d%H%M%S')
-                if t1_ >= self.starttime and t2_ <= self.endtime:
+                # Get the relative time overlap:
+                sec_inside = (
+                    min(t2_, self.endtime) - max(t1_, self.starttime)).total_seconds()
+                dsec = (t2_ - t1_).total_seconds()
+                if float(sec_inside / dsec) > 0.85:
                     # It is the same scene!
                     LOG.debug(
                         "It is the same scene,"
@@ -525,9 +529,9 @@ class AappLvl1Processor(object):
                     scene_id = key
                     break
 
-                elif (t1_ >= self.starttime - time_thr and
-                      t2_ <= self.endtime + time_thr):
-                    LOG.warning("Seems like the same scene: Time interval = " +
+                elif float(sec_inside / dsec) > 0.01:
+                    LOG.warning("There was an overlap but probably not the " +
+                                "same scene: Time interval = " +
                                 "(%s, %s)",
                                 t1_.strftime('%Y-%m-%d %H:%M:%S'),
                                 t2_.strftime('%Y-%m-%d %H:%M:%S'))
@@ -616,9 +620,10 @@ class AappLvl1Processor(object):
 
             if self.platform_name in SUPPORTED_NOAA_SATELLITES:
                 LOG.info("This is a NOAA scene. Start the NOAA processing!")
-    # FIXME:            LOG.info("Process the scene " +
-    #                     self.platform_name + self.orbit)
-    # TypeError: coercing to Unicode: need string or buffer, int found
+                # FIXME:            LOG.info("Process the scene " +
+                #                     self.platform_name + self.orbit)
+                # TypeError: coercing to Unicode: need string or buffer, int
+                # found
                 LOG.info("Process the file " + str(self.level0_filename))
 
                 if self.platform_name == 'NOAA-15':
@@ -648,9 +653,9 @@ class AappLvl1Processor(object):
                 # as an argument for METOP_RUN_SCRIPT
                 metop_in_dir = os.path.dirname(self.level0_filename)
                 LOG.info("This is a Metop scene. Start the METOP processing!")
-    # FIXME:            LOG.info("Process the scene %s %s" %
-    #                     (self.platform_name, str(self.orbit)))
-    # TypeError: cannot concatenate 'str' and 'tuple' objects
+                # FIXME:            LOG.info("Process the scene %s %s" %
+                #                     (self.platform_name, str(self.orbit)))
+                # TypeError: cannot concatenate 'str' and 'tuple' objects
                 LOG.info("Data is coming from: " + metop_in_dir)
 
                 sensor_filename = {}
@@ -780,8 +785,8 @@ class AappLvl1Processor(object):
             # else:
             #    lines = []
 
-            #lines = lines + [statresult + '\n']
-            #fd = open(_AAPP_STAT_FILE, "w")
+            # lines = lines + [statresult + '\n']
+            # fd = open(_AAPP_STAT_FILE, "w")
             # fd.writelines(lines)
             # fd.close()
 
@@ -831,7 +836,7 @@ def aapp_rolling_runner(runner_config):
                         LOG.info("Create sub-directory for level-1 files: " +
                                  str(subd))
                         level1_files = aapp_proc.smove_lvl1dir()
-                        #level1_files = aapp_proc.spack_aapplvl1_files(subd)
+                        # level1_files = aapp_proc.spack_aapplvl1_files(subd)
                     else:
                         LOG.info("Move sub-directory with NOAA level-1 files")
                         LOG.debug(
@@ -894,8 +899,8 @@ def aapp_rolling_runner(runner_config):
                     #       = no files to publish!
                     if data_out_dir:
                         LOG.info("Copying level-1 files to " + data_out_dir)
-                        level1_files = \
-                            aapp_proc.copy_aapplvl1_files(data_out_dir)
+                        level1_files = aapp_proc.copy_aapplvl1_files(
+                            data_out_dir)
                         if level1_files is not None:
                             LOG.debug("aapp_proc.publish_l1_format:" +
                                       aapp_proc.publish_l1_format)
@@ -1156,7 +1161,7 @@ def pack_aapplvl1_files(aappfiles, base_dir, subdir, satnum):
 #            firstname = instr + ext
 #            level = ext.strip('l')
         level = ext.strip('l')
-        #LOG.debug("Firstname " + firstname)
+        # LOG.debug("Firstname " + firstname)
 #        newfilename = os.path.join(path, "%s_%s.%s" % (firstname,
 #                                                       subdir, ext))
         newfilename = os.path.join(path, filename)
