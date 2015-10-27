@@ -1078,7 +1078,6 @@ class DataWriter(Thread):
                             local_params[key] = aliases.get(params[key],
                                                             params[key])
                     for item, copies in sorted_items.items():
-                        LOGGER.debug("Saving %s to %s", str(item), str(copies))
                         attrib = dict(item)
                         if attrib.get("overlay", "").startswith("#"):
                             obj.add_overlay(hash_color(attrib.get("overlay")))
@@ -1092,8 +1091,11 @@ class DataWriter(Thread):
                         for copy in copies:
                             output_dir = copy.attrib.get("output_dir",
                                                          params["output_dir"])
+                            LOGGER.debug("params %s %s", str(copy.text), str(local_params))
+
                             fname = compose(os.path.join(output_dir, copy.text),
                                             local_params)
+                            LOGGER.debug("Saving %s", fname)
                             if not saved:
                                 obj.save(fname,
                                          fformat=fformat,
@@ -1104,8 +1106,8 @@ class DataWriter(Thread):
                                 uid = os.path.basename(fname)
                             else:
                                 link_or_copy(saved, fname)
+                                LOGGER.info("Copied/Linked %s to %s", saved, fname)
                                 saved = fname
-
                             if ("thumbnail_name" in copy.attrib and
                                     "thumbnail_size" in copy.attrib):
                                 thsize = [int(val) for val
