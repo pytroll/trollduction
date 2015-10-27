@@ -1256,7 +1256,6 @@ class Trollduction(object):
         if self._loop:
             LOGGER.info('Shutting down Trollduction.')
             self._loop = False
-            self.data_processor.stop()
             if self.config_watcher is not None:
                 self.config_watcher.stop()
             if self.listener is not None:
@@ -1335,9 +1334,9 @@ class Trollduction(object):
 
 
 def process_message(msg, product_config, topic=None):
-    import zmq
-    import posttroll
-    posttroll.context = zmq.Context()
+
+    from posttroll import renew_context
+    renew_context()
 
     data_processor = DataProcessor(publish_topic=topic)
 
