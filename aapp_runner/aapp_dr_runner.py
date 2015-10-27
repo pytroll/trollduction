@@ -510,26 +510,34 @@ class AappLvl1Processor(object):
             # Check for keys representing the same scene (slightly different
             # start/end times):
             LOG.debug("Level-0files = " + str(self.level0files))
+            time_thr = timedelta(seconds=30)
             for key in self.level0files:
                 pltrfn, startt, endt = key.split('_')
                 if not self.platform_name == pltrfn:
                     continue
                 t1_ = datetime.strptime(startt, '%Y%m%d%H%M%S')
                 t2_ = datetime.strptime(endt, '%Y%m%d%H%M%S')
-                if (abs(self.starttime - t1_).seconds < 60 and
-                        abs(self.endtime - t2_).seconds < 60):
+                if t1_ >= self.starttime and t2_ <= self.endtime:
                     # It is the same scene!
                     LOG.debug(
                         "It is the same scene,"
-                        " though the file times differ a bit...")
+                        " though the file times may deviate a bit...")
                     scene_id = key
                     break
+
+                elif (t1_ >= self.starttime - time_thr and
+                      t2_ <= self.endtime + time_thr):
+                    LOG.warning("Seems like the same scene: Time interval = " +
+                                "(%s, %s)",
+                                t1_.strftime('%Y-%m-%d %H:%M:%S'),
+                                t2_.strftime('%Y-%m-%d %H:%M:%S'))
 
             LOG.debug("scene_id = " + str(scene_id))
             if scene_id in self.level0files:
                 LOG.debug("Level-0 files = " + str(self.level0files[scene_id]))
             else:
-                LOG.debug("No level-0 files yet...")
+                LOG.debug(
+                    "scene_id = %s: No level-0 files yet...", str(scene_id))
 
             self.level0_filename = urlobj.path
             dummy, fname = os.path.split(self.level0_filename)
