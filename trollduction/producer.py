@@ -979,8 +979,8 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
     return msg
 
 
-def link_or_copy(src, dst):
-    """Create a symlink from *src* to *dst*, or if that fails, copy.
+def link_or_copy(src, dst, retry=1):
+    """Create a hardlink from *src* to *dst*, or if that fails, copy.
     """
     if src == dst:
         LOGGER.warning("Trying to copy a file over itself: %s", src)
@@ -996,8 +996,13 @@ def link_or_copy(src, dst):
         except shutil.Error:
             LOGGER.exception("Something went wrong in copying a file")
         except IOError as err:
-            LOGGER.info(str(err))
-            LOGGER.exception("Could not copy: %s -> %s", src, dst)
+            LOGGER.info("Error copying file: %s", str(err))
+            if retry:
+                LOGGER.info("Retrying...")
+                link_or_copy(src, dst, retry - 1)
+            else:
+                LOGGER.exception("Could not copy: %s -> %s", src, dst)
+
 
 
 def thumbnail(filename, thname, size, fformat):
@@ -1086,20 +1091,32 @@ class DataWriter(Thread):
                         for copy in copies:
                             output_dir = copy.attrib.get("output_dir",
                                                          params["output_dir"])
+                            LOGGER.debug("params %s %s", str(copy.text), str(local_params))
+
                             fname = compose(os.path.join(output_dir, copy.text),
                                             local_params)
+                            LOGGER.debug("Saving %s", fname)
                             if not saved:
-                                obj.save(fname,
-                                         fformat=fformat,
-                                         compression=copy.attrib.get(
-                                             "compression", 6))
+                                try:
+                                    obj.save(fname,
+                                             fformat=fformat,
+                                             compression=copy.attrib.get("compression", 6))
+                                except IOError: # retry once
+                                    try:
+                                        obj.save(fname,
+                                                 fformat=fformat,
+                                                 compression=copy.attrib.get("compression", 6))
+                                    except IOError:
+                                        LOGGER.exception("Can't save file %s", fname)
+                                        continue
+
                                 LOGGER.info("Saved %s to %s", str(obj), fname)
                                 saved = fname
                                 uid = os.path.basename(fname)
                             else:
                                 link_or_copy(saved, fname)
+                                LOGGER.info("Copied/Linked %s to %s", saved, fname)
                                 saved = fname
-
                             if ("thumbnail_name" in copy.attrib and
                                     "thumbnail_size" in copy.attrib):
                                 thsize = [int(val) for val
