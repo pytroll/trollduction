@@ -1097,10 +1097,19 @@ class DataWriter(Thread):
                                             local_params)
                             LOGGER.debug("Saving %s", fname)
                             if not saved:
-                                obj.save(fname,
-                                         fformat=fformat,
-                                         compression=copy.attrib.get(
-                                             "compression", 6))
+                                try:
+                                    obj.save(fname,
+                                             fformat=fformat,
+                                             compression=copy.attrib.get("compression", 6))
+                                except IOError: # retry once
+                                    try:
+                                        obj.save(fname,
+                                                 fformat=fformat,
+                                                 compression=copy.attrib.get("compression", 6))
+                                    except IOError:
+                                        LOGGER.exception("Can't save file %s", fname)
+                                        continue
+
                                 LOGGER.info("Saved %s to %s", str(obj), fname)
                                 saved = fname
                                 uid = os.path.basename(fname)
