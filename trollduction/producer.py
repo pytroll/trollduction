@@ -979,8 +979,8 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
     return msg
 
 
-def link_or_copy(src, dst):
-    """Create a symlink from *src* to *dst*, or if that fails, copy.
+def link_or_copy(src, dst, retry=1):
+    """Create a hardlink from *src* to *dst*, or if that fails, copy.
     """
     if src == dst:
         LOGGER.warning("Trying to copy a file over itself: %s", src)
@@ -996,8 +996,13 @@ def link_or_copy(src, dst):
         except shutil.Error:
             LOGGER.exception("Something went wrong in copying a file")
         except IOError as err:
-            LOGGER.info(str(err))
-            LOGGER.exception("Could not copy: %s -> %s", src, dst)
+            LOGGER.info("Error copying file: %s", str(err)))
+            if retry:
+                LOGGER.info("Retrying...")
+                link_or_copy(src, dst, retry - 1)
+            else:
+                LOGGER.exception("Could not copy: %s -> %s", src, dst)
+
 
 
 def thumbnail(filename, thname, size, fformat):
@@ -1073,6 +1078,7 @@ class DataWriter(Thread):
                             local_params[key] = aliases.get(params[key],
                                                             params[key])
                     for item, copies in sorted_items.items():
+                        LOGGER.debug("Saving %s to %s", str(item), str(copies))
                         attrib = dict(item)
                         if attrib.get("overlay", "").startswith("#"):
                             obj.add_overlay(hash_color(attrib.get("overlay")))
