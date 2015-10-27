@@ -996,7 +996,7 @@ def link_or_copy(src, dst, retry=1):
         except shutil.Error:
             LOGGER.exception("Something went wrong in copying a file")
         except IOError as err:
-            LOGGER.info("Error copying file: %s", str(err)))
+            LOGGER.info("Error copying file: %s", str(err))
             if retry:
                 LOGGER.info("Retrying...")
                 link_or_copy(src, dst, retry - 1)
