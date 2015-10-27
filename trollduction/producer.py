@@ -1336,7 +1336,7 @@ class Trollduction(object):
 
 def process_message(msg, product_config, topic=None):
     import zmq
-    import posttroll.context
+    import posttroll
     posttroll.context = zmq.Context()
 
     data_processor = DataProcessor(publish_topic=topic)
