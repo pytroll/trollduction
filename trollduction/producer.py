@@ -1202,10 +1202,6 @@ class Trollduction(object):
             self.td_config = config
             self.update_td_config()
 
-        self.data_processor = \
-            DataProcessor(publish_topic=self.td_config.get('publish_topic',
-                                                           None))
-
     def update_td_config_from_file(self, fname, config_item=None):
         '''Read Trollduction config file and use the new parameters.
         '''
@@ -1295,7 +1291,6 @@ class Trollduction(object):
                 else:
                     sensors = set((msg.data['sensor'], ))
 
-                prev_pass = self._previous_pass
                 if (msg.type in ["file", 'collection', 'dataset'] and
                     sensors.intersection(
                         self.td_config['instruments'].split(','))):
@@ -1325,25 +1320,43 @@ class Trollduction(object):
                         LOGGER.info("Can't check if file is already processed, "
                                     "so let's do it anyway.")
 
-                    self.update_product_config(
-                        self.td_config['product_config_file'])
+                    self.update_product_config(self.td_config['product_config_file'])
 
-                    retried = False
-                    while True:
-                        try:
-                            self.data_processor.run(self.product_config, msg)
-                            break
-                        except IOError:
-                            if retried:
-                                LOGGER.debug("History of processed files not "
-                                             "updated due to "
-                                             "missing/corrupted/incomplete "
-                                             "data.")
-                                self._previous_pass = prev_pass
-                                break
-                            else:
-                                retried = True
-                                LOGGER.info("Retrying once in 2 seconds.")
-                                time.sleep(2)
+                    from multiprocessing import Process
+                    proc = Process(target=process_message, args=(msg,
+                                                                 self.product_config,
+                                                                 self.td_config.get("publish_topic", None)))
+                    proc.start()
+                    proc.join()
+                    #process_message(msg, self.product_config.copy(), self.td_config.get("publish_topic", None))
+
         finally:
             self.shutdown()
+
+
+def process_message(msg, product_config, topic=None):
+    import zmq
+    import posttroll.context
+    posttroll.context = zmq.Context()
+
+    data_processor = DataProcessor(publish_topic=topic)
+
+    retried = False
+    while True:
+        try:
+            data_processor.run(product_config, msg)
+            break
+        except IOError:
+            if retried:
+                LOGGER.debug("History of processed files not "
+                             "updated due to "
+                             "missing/corrupted/incomplete "
+                             "data.")
+                break
+            else:
+                retried = True
+                LOGGER.info("Retrying once in 2 seconds.")
+                time.sleep(2)
+
+        finally:
+            data_processor.stop()
