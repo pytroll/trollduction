@@ -120,7 +120,7 @@ def update_nwp(starttime, nlengths):
         LOG.info("No input files! dir = " + str(nhsf_path))
         return
 
-    # LOG.debug('Files = ' + str(filelist))
+    LOG.debug('NHSF NWP files found = ' + str(filelist))
     for filename in filelist:
         timeinfo = filename.rsplit("_", 1)[-1]
         timestamp, step = timeinfo.split("+")
