@@ -164,6 +164,8 @@ class AappLvl1Processor(object):
         self.dataserver = runner_config['dataserver']
         self.station = runner_config['station']
         self.environment = runner_config['environment']
+        self.locktime_before_rerun = int(
+            runner_config.get('locktime_before_rerun', 10))
         self.fullswath = True  # Always a full swath (never HRPT granules)
         self.ishmf = False
         self.working_dir = None
@@ -737,13 +739,13 @@ class AappLvl1Processor(object):
             self.job_register[keyname].append((self.starttime, self.endtime))
             LOG.debug("End: job register = " + str(self.job_register))
 
-            # Block any future run on this scene for x (e.g. 10) minutes from
-            # now
-            t__ = threading.Timer(
-                10 * 60.0, reset_job_registry, args=(self.job_register,
-                                                     str(self.platform_name),
-                                                     (self.starttime,
-                                                      self.endtime)))
+            # Block any future run on this scene for time_to_block_before_rerun
+            # (e.g. 10) minutes from now:
+            t__ = threading.Timer(self.locktime_before_rerun * 60.0,
+                                  reset_job_registry, args=(self.job_register,
+                                                            str(self.platform_name),
+                                                            (self.starttime,
+                                                             self.endtime)))
             t__.start()
 
             LOG.debug(

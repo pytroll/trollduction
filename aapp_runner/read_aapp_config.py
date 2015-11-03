@@ -28,7 +28,8 @@ valid_config_variables = [
     'aapp_log_files_dir',
     'aapp_log_files_backup',
     'servername',
-    'dataserver'
+    'dataserver',
+    'locktime_before_rerun',
 ]
 
 #
