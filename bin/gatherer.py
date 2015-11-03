@@ -139,6 +139,9 @@ def arg_parse():
                         default=None)
     parser.add_argument("-v", "--verbose", help="print debug messages too",
                         action="store_true")
+    parser.add_argument("-c", "--config-item",
+                        help="config item to use (all by default). Can be specified multiply times",
+                        action="append")
     parser.add_argument("config", help="config file to be used")
 
     return parser.parse_args()
@@ -229,6 +232,18 @@ def main():
     logging.getLogger('').addHandler(handler)
     logging.getLogger("posttroll").setLevel(logging.INFO)
     LOGGER = logging.getLogger("gatherer")
+
+    if opts.config_item:
+        config_items = opts.config_item + ["default"]
+        for section in config_items:
+            if section not in CONFIG.sections():
+                LOGGER.warning("No config item called %s found in config file.", section)
+        for section in CONFIG.sections():
+            if section not in config_items:
+                CONFIG.remove_section(section)
+        if len(CONFIG.sections()) == 1:
+            LOGGER.error("No valid config item provided")
+            return
 
     decoder = get_metadata
 
