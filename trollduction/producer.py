@@ -96,6 +96,33 @@ def get_local_ips():
     return ips
 
 
+def is_uri_on_server(uri, strict=False):
+    """Checks if the *uri* is designating a place on the server. If *strict* is True, the hostname has to be specified
+    in the *uri* for the path to be considered valid.
+    """
+    url = urlparse(uri)
+    try:
+        url_ip = socket.gethostbyname(url.hostname)
+    except (socket.gaierror, TypeError):
+        if strict:
+            return False
+        try:
+            os.stat(url.path)
+        except OSError:
+            return False
+    else:
+        if url.hostname == '':
+            if strict:
+                return False
+            try:
+                os.stat(url.path)
+            except OSError:
+                return False
+        elif url_ip not in get_local_ips():
+            return False
+    return True
+
+
 def check_uri(uri):
     """Check that the provided *uri* is on the local host and return the
     file path.
@@ -653,6 +680,7 @@ class DataProcessor(object):
         del self.global_data
         self.local_data = None
         self.global_data = None
+
         if mem_top is not None:
             gc_res = gc.collect()
             LOGGER.debug("Unreachable objects: %d", gc_res)

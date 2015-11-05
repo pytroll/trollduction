@@ -38,7 +38,7 @@ import os
 from datetime import datetime, timedelta
 from time import sleep
 from urlparse import urlsplit, urlunsplit, SplitResult
-from trollduction.producer import check_uri
+from trollduction.producer import is_uri_on_server
 from posttroll.publisher import Publish
 from posttroll.message import Message
 import xml.etree.ElementTree as etree
@@ -376,11 +376,7 @@ class MessageReceiver(object):
         elif message.body.startswith(dispatch_prefix):
             # Check hostname in message:
             url = message.body[len(dispatch_prefix):].split(" ")[1]
-            try:
-                dummy = check_uri(url)
-            except IOError:
-                return None
-            else:
+            if is_uri_on_server(url, strict=True):
                 return self.handle_distrib(message.body[len(dispatch_prefix):])
 
 
