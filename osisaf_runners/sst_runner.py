@@ -43,12 +43,6 @@ for option, value in CONF.items(MODE, raw=True):
 
 SST_OUTPUT_DIR = OPTIONS['sst_outdir']
 
-servername = None
-import socket
-servername = socket.gethostname()
-SERVERNAME = OPTIONS.get('servername', servername)
-
-
 #: Default time format
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
@@ -60,7 +54,6 @@ import sys
 from urlparse import urlparse
 import posttroll.subscriber
 from posttroll.publisher import Publish
-from posttroll.message import Message
 
 from mpop.utils import debug_on
 debug_on()
