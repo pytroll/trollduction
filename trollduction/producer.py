@@ -673,20 +673,20 @@ class DataProcessor(object):
 
     def release_memory(self):
         """Run garbage collection for diagnostics"""
-        #if mem_top is not None:
-        #    LOGGER.debug(mem_top())
+        if mem_top is not None:
+            LOGGER.debug(mem_top())
         # Release memory
         del self.local_data
         del self.global_data
         self.local_data = None
         self.global_data = None
-        gc.collect()
-        #if mem_top is not None:
-        #    gc_res = gc.collect()
-        #    LOGGER.debug("Unreachable objects: %d", gc_res)
-        #    LOGGER.debug('Remaining Garbage: %s', pprint.pformat(gc.garbage))
-        #    del gc.garbage[:]
-        #    LOGGER.debug(mem_top())
+
+        if mem_top is not None:
+            gc_res = gc.collect()
+            LOGGER.debug("Unreachable objects: %d", gc_res)
+            LOGGER.debug('Remaining Garbage: %s', pprint.pformat(gc.garbage))
+            del gc.garbage[:]
+            LOGGER.debug(mem_top())
 
     def get_req_channels(self, products):
         """Get a list of required channels
