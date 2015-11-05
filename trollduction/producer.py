@@ -103,7 +103,7 @@ def is_uri_on_server(uri, strict=False):
     url = urlparse(uri)
     try:
         url_ip = socket.gethostbyname(url.hostname)
-    except socket.gaierror:
+    except (socket.gaierror, TypeError):
         if strict:
             return False
         try:
