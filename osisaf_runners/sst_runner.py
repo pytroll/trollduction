@@ -70,8 +70,8 @@ class SstRunError(Exception):
     pass
 
 
-def start_sst_processing(sst_file, mypublisher, message):
-    """From a posttroll/trallstalker message start the osisaf sst post-processing
+def start_sst_processing(sst_file, message, **kwargs):
+    """From a posttroll/trallstalker message start the osisaf sst post-
     processing"""
 
     LOG.info("")
@@ -134,6 +134,12 @@ def start_sst_processing(sst_file, mypublisher, message):
                   str(message.data['instruments']))
         return sst_file
 
+    # Check that the input file really exists:
+    if not os.path.exists(sst_file[scene_id]):
+        LOG.error("File %s does not exist. Don't do anything...",
+                  str(sst_file))
+        return sst_file
+
     LOG.info("Sat and Instrument: " + platform_name + " " + instrument)
 
     prfx = platform_name.lower() + start_time.strftime("_%Y%m%d_%H")
@@ -158,8 +164,7 @@ def start_sst_processing(sst_file, mypublisher, message):
     img = localdata.image.sst_with_overlay()
     img.save(outname)
 
-    LOG.debug("...that was it :-)")
-
+    LOG.debug("SST Tiff file stored!")
     return sst_file
 
 
@@ -171,8 +176,13 @@ def sst_live_runner():
         with Publish('sst_runner', 0) as publisher:
             sstfile = {}
             for msg in subscr.recv():
-                sstfile = start_sst_processing(sstfile,
-                                               publisher, msg)
+                sstfile = start_sst_processing(
+                    sstfile, msg, publisher=publisher)
+                # Cleanup in sstfile registry (keep only the last 5):
+                keys = sstfile.keys()
+                if len(keys) > 5:
+                    keys.sort()
+                    sstfile.pop(keys[0])
 
 
 if __name__ == "__main__":
