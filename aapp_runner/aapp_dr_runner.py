@@ -68,6 +68,9 @@ SENSOR_NAME_CONVERTER = {
 
 METOP_NUMBER = {'b': '01', 'a': '02'}
 
+# FIXME! This variable should be put in the config file:
+SATS_ONLY_AVHRR = []
+
 
 from urlparse import urlparse
 import posttroll.subscriber
@@ -628,7 +631,8 @@ class AappLvl1Processor(object):
                 # found
                 LOG.info("Process the file " + str(self.level0_filename))
 
-                if self.platform_name == 'NOAA-15':
+                # if self.platform_name == 'NOAA-15':
+                if self.platform_name in SATS_ONLY_AVHRR:
                     # AMSU amsubcl fails
                     cmdseq = (self.noaa_run_script +
                               ' -i AVHRR ' +
