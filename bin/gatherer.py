@@ -42,8 +42,8 @@ PUB = None
 
 
 def get_metadata(fname):
-    '''Parse metadata from the file.
-    '''
+    """Parse metadata from the file.
+    """
 
     res = None
     for section in CONFIG.sections():
@@ -129,8 +129,8 @@ def terminator(metadata, publish_topic=None):
 
 
 def arg_parse():
-    '''Handle input arguments.
-    '''
+    """Handle input arguments.
+    """
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -148,8 +148,8 @@ def arg_parse():
 
 
 def setup(regions, decoder):
-    '''Setup the granule triggerer.
-    '''
+    """Setup the granule triggerer.
+    """
 
     granule_triggers = []
 
@@ -201,8 +201,8 @@ def setup(regions, decoder):
 
 
 def main():
-    '''Main() for gatherer.
-    '''
+    """Main() for gatherer.
+    """
 
     global LOGGER
     global PUB

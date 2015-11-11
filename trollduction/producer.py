@@ -1119,7 +1119,6 @@ class DataWriter(Thread):
                         for copy in copies:
                             output_dir = copy.attrib.get("output_dir",
                                                          params["output_dir"])
-                            LOGGER.debug("params %s %s", str(copy.text), str(local_params))
 
                             fname = compose(os.path.join(output_dir, copy.text),
                                             local_params)
