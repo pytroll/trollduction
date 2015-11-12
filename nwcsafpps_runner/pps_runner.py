@@ -48,6 +48,7 @@ for option, value in CONF.items(MODE, raw=True):
 # PPS_OUTPUT_DIR = os.environ.get('SM_PRODUCT_DIR', OPTIONS['pps_outdir'])
 PPS_OUTPUT_DIR = OPTIONS['pps_outdir']
 STATISTICS_DIR = OPTIONS.get('pps_statistics_dir')
+
 LVL1_NPP_PATH = os.environ.get('LVL1_NPP_PATH', None)
 LVL1_EOS_PATH = os.environ.get('LVL1_EOS_PATH', None)
 
@@ -268,8 +269,10 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
                 LOG.warning("Failed to import the PPSTimeControl from pps")
                 do_time_control = False
 
-            #pps_control_path = my_env.get('STATISTICS_DIR', PPS_OUTPUT_DIR)
-            pps_control_path = STATISTICS_DIR
+            if STATISTICS_DIR:
+                pps_control_path = STATISTICS_DIR
+            else:
+                pps_control_path = my_env.get('STATISTICS_DIR')
 
             if do_time_control:
                 LOG.info("Read time control ascii file and generate XML")
