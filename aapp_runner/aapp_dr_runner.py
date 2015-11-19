@@ -526,7 +526,11 @@ class AappLvl1Processor(object):
                 sec_inside = (
                     min(t2_, self.endtime) - max(t1_, self.starttime)).total_seconds()
                 dsec = (t2_ - t1_).total_seconds()
-                if float(sec_inside / dsec) > 0.85:
+                if dsec < 0.01:
+                    LOG.warning(
+                        "Something awkward with this scene: start_time = end_time!")
+                    break
+                elif float(sec_inside / dsec) > 0.85:
                     # It is the same scene!
                     LOG.debug(
                         "It is the same scene,"
