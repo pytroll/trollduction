@@ -32,6 +32,7 @@ from trollduction.collectors import region_collector
 import time
 import logging
 import logging.handlers
+import os
 import os.path
 from posttroll import message, publisher
 from mpop.projector import get_area_def
@@ -109,8 +110,11 @@ def terminator(metadata, publish_topic=None):
     mda['collection_area_id'] = sorted_mda[-1]['collection_area_id']
     mda['collection'] = []
 
+    has_uri = False
     for meta in sorted_mda:
         new_mda = {}
+        if "uri" in meta:
+            has_uri = True
         for key in ['dataset', 'uri', 'uid']:
             if key in meta:
                 new_mda[key] = meta[key]
@@ -122,10 +126,13 @@ def terminator(metadata, publish_topic=None):
         if key in mda:
             del mda[key]
 
-    msg = message.Message(subject, "collection",
-                          mda)
-    LOGGER.info("sending %s", str(msg))
-    PUB.send(str(msg))
+    if has_uri:
+        msg = message.Message(subject, "collection",
+                              mda)
+        LOGGER.info("sending %s", str(msg))
+        PUB.send(str(msg))
+    else:
+        LOGGER.debug("Malformed metadata, no key: %s", "uri")
 
 
 def arg_parse():
@@ -214,22 +221,26 @@ def main():
     os.environ["TZ"] = "UTC"
     time.tzset()
 
+    handlers = []
     if opts.log:
-        handler = logging.handlers.TimedRotatingFileHandler(opts.log,
-                                                            "midnight",
-                                                            backupCount=7)
-    else:
-        handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("[%(levelname)s: %(asctime)s :"
-                                           " %(name)s] %(message)s",
-                                           '%Y-%m-%d %H:%M:%S'))
+        handlers.append(logging.handlers.TimedRotatingFileHandler(opts.log,
+                                                                  "midnight",
+                                                                  backupCount=7))
+
+    handlers.append(logging.StreamHandler())
+
     if opts.verbose:
         loglevel = logging.DEBUG
     else:
         loglevel = logging.INFO
-    handler.setLevel(loglevel)
-    logging.getLogger('').setLevel(loglevel)
-    logging.getLogger('').addHandler(handler)
+    for handler in handlers:
+        handler.setFormatter(logging.Formatter("[%(levelname)s: %(asctime)s :"
+                                               " %(name)s] %(message)s",
+                                               '%Y-%m-%d %H:%M:%S'))
+        handler.setLevel(loglevel)
+        logging.getLogger('').setLevel(loglevel)
+        logging.getLogger('').addHandler(handler)
+
     logging.getLogger("posttroll").setLevel(logging.INFO)
     LOGGER = logging.getLogger("gatherer")
 
