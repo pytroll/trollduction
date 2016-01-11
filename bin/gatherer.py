@@ -110,11 +110,11 @@ def terminator(metadata, publish_topic=None):
     mda['collection_area_id'] = sorted_mda[-1]['collection_area_id']
     mda['collection'] = []
 
-    has_uri = False
+    is_correct = False
     for meta in sorted_mda:
         new_mda = {}
-        if "uri" in meta:
-            has_uri = True
+        if "uri" in meta or 'dataset' in meta:
+            is_correct = True
         for key in ['dataset', 'uri', 'uid']:
             if key in meta:
                 new_mda[key] = meta[key]
@@ -126,13 +126,13 @@ def terminator(metadata, publish_topic=None):
         if key in mda:
             del mda[key]
 
-    if has_uri:
+    if is_correct:
         msg = message.Message(subject, "collection",
                               mda)
         LOGGER.info("sending %s", str(msg))
         PUB.send(str(msg))
     else:
-        LOGGER.debug("Malformed metadata, no key: %s", "uri")
+        LOGGER.warning("Malformed metadata, no key: %s", "uri")
 
 
 def arg_parse():
