@@ -57,7 +57,7 @@ def get_metadata(fname):
         res = parser.parse(fname)
         res.update(dict(CONFIG.items(section)))
 
-        for key in ["watcher", "pattern", "timeliness"]:
+        for key in ["watcher", "pattern", "timeliness", "regions"]:
             res.pop(key, None)
 
         if "duration" in res and "end_time" not in res:
