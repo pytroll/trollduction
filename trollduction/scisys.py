@@ -361,6 +361,7 @@ class MessageReceiver(object):
                                          url.fragment))
         swath["uid"] = os.path.split(url.path)[1]
         swath["uri"] = uri
+        swath['source'] = 'DR'
         return swath
 
     def receive(self, message):
