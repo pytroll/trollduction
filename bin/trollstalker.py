@@ -157,8 +157,10 @@ class EventHandler(ProcessEvent):
 
             # replace values with corresponding aliases, if any are given
             if self.aliases:
-                for key in self.info:
+                info = self.info.copy()
+                for key in info:
                     if key in self.aliases:
+                        self.info['orig_'+key] = self.info[key]
                         self.info[key] = self.aliases[key][str(self.info[key])]
 
             # add start_time and end_time if not present
