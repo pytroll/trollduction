@@ -1081,6 +1081,7 @@ class DataWriter(Thread):
                     obj, file_items, params = self.prod_queue.get(True, 1)
                 except Queue.Empty:
                     continue
+                local_params = params.copy()
                 try:
                     # Sort the file items in categories, to allow copying
                     # similar ones.
@@ -1099,7 +1100,6 @@ class DataWriter(Thread):
                         key = tuple(sorted(attrib.items()))
                         sorted_items.setdefault(key, []).append(item)
 
-                    local_params = params.copy()
                     local_aliases = local_params['aliases']
                     for key, aliases in local_aliases.items():
                         if key in local_params:
@@ -1170,11 +1170,12 @@ class DataWriter(Thread):
                             item.attrib["thumbnail_size"] = str(
                                 item.attrib["thumbnail_size"])
                     LOGGER.exception("Something wrong happened saving "
-                                     "%s to %s: %s",
+                                     "%s to %s: %s (%s)",
                                      str(obj),
                                      str([tostring(item)
                                           for item in file_items]),
-                                     e.message)
+                                     e.message,
+                                     local_params)
                 finally:
                     self.prod_queue.task_done()
 

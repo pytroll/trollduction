@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
 
 # Author(s):
 
@@ -154,7 +154,7 @@ def start_sst_processing(sst_file, message, **kwargs):
     tslot = start_time
     glbd = PolarFactory.create_scene(
         platform_name, "", INSTRUMENT_NAME.get(instrument, instrument),
-        tslot, orbit)
+        tslot, orbit, variant="DR")
 
     LOG.debug("Load sst data...")
     glbd.load(['SST'], time_interval=(start_time, endtime))

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014, 2015 Martin Raspaud
+# Copyright (c) 2013, 2014, 2015, 2016 Martin Raspaud
 
 # Author(s):
 
@@ -49,7 +49,7 @@ setup(name="trollduction",
                'bin/gatherer.py',
                'bin/cat.py',
                'npp_runner/viirs_dr_runner.py',
-               'modis_runner/modis_dr_runner.py',
+               'modis_runner/seadas_modis_runner.py',
                'aapp_runner/aapp_dr_runner.py',
                'osisaf_runners/sst_runner.py',
                'nwcsafpps_runner/pps_runner.py',
