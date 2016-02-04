@@ -307,6 +307,8 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q, input_msg):
                 LOG.info("file to publish = " + str(filename))
 
                 to_send = input_msg.data.copy()
+                to_send.pop('dataset', None)
+                to_send.pop('collection', None)
                 to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
                 to_send['uid'] = filename
                 to_send['sensor'] = scene.get('instrument', None)
