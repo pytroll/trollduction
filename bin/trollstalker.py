@@ -36,6 +36,7 @@ from trollsift import Parser
 from ConfigParser import ConfigParser
 import logging
 import logging.config
+import os
 import os.path
 import datetime as dt
 from collections import deque
@@ -267,6 +268,10 @@ def parse_aliases(config):
 
 def main():
     '''Main(). Commandline parsing and stalker startup.'''
+
+    print "Setting timezone to UTC"
+    os.environ["TZ"] = "UTC"
+    time.tzset()
 
     parser = argparse.ArgumentParser()
 
