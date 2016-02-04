@@ -194,7 +194,7 @@ def terminate_process(popen_obj, scene):
     return
 
 
-def pps_worker(semaphore_obj, scene, job_id, publish_q):
+def pps_worker(semaphore_obj, scene, job_id, publish_q, input_msg):
     """Spawn/Start a PPS run on a new thread if available
 
         scene = {'platform_name': platform_name,
@@ -306,7 +306,7 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q):
                 filename = os.path.split(result_file)[1]
                 LOG.info("file to publish = " + str(filename))
 
-                to_send = {}
+                to_send = input_msg.data.copy()
                 to_send['uri'] = ('ssh://%s/%s' % (SERVERNAME, result_file))
                 to_send['uid'] = filename
                 to_send['sensor'] = scene.get('instrument', None)
@@ -710,7 +710,8 @@ def pps():
             t__ = threading.Thread(target=pps_worker, args=(sema, scene,
                                                             jobs_dict[
                                                                 keyname],
-                                                            publisher_q))
+                                                            publisher_q,
+                                                            msg))
             threads.append(t__)
             t__.start()
 
