@@ -185,6 +185,7 @@ def start_sst_processing(sst_file, message, **kwargs):
         outname = os.path.join(
             SST_OLD_OUTPUT_DIR, 'noaa_osisaf_sstbaltic_%s.png' % prfx)
         LOG.info("Output file name: " + str(outname))
+        img = localdata.image.sst_with_landseamask()
         img.save(outname)
         LOG.debug("SST PNG file stored on area %s", str(areaid))
 
