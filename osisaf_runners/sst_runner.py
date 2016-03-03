@@ -155,7 +155,7 @@ def start_sst_processing(sst_file, message, **kwargs):
     areaid = 'euron1'
     prfx = platform_name.lower() + start_time.strftime("_%Y%m%d_%H") + \
         '_' + str(areaid)
-    outname = os.path.join(SST_OUTPUT_DIR, 'osisaf_sst_%s.tif' % prfx)
+    outname = os.path.join(SST_OUTPUT_DIR, 'osisaf_sst_float_%s.tif' % prfx)
     LOG.info("Output file name: " + str(outname))
     if os.path.exists(outname):
         LOG.warning("File " + str(outname) + " already there. Continue...")
