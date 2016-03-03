@@ -152,7 +152,7 @@ def start_sst_processing(sst_file, message, **kwargs):
 
     LOG.info("Sat and Instrument: " + platform_name + " " + instrument)
 
-    areaid = 'baws'
+    areaid = 'euron1'
     prfx = platform_name.lower() + start_time.strftime("_%Y%m%d_%H") + \
         '_' + str(areaid)
     outname = os.path.join(SST_OUTPUT_DIR, 'osisaf_sst_%s.tif' % prfx)
@@ -173,31 +173,34 @@ def start_sst_processing(sst_file, message, **kwargs):
 
     LOG.debug("Project data...")
     localdata = glbd.project(areaid)
-    img = localdata.image.sst_with_landseamask_with_overlay()
-    img.save(outname)
+    img = localdata.image.sst_float()
+    img.save(outname, floating_point=True)
     LOG.debug("SST Tiff file stored on area %s", str(areaid))
 
     # Store some other products for Diana and other users:
-    # We need to use producer.py and the XML product list!
+    # We should rather use producer.py and the XML product list!
     # FIXME!
-    if SST_OLD_OUTPUT_DIR:
-        prfx = start_time.strftime("%Y%m%d%H%M")
-        outname = os.path.join(
-            SST_OLD_OUTPUT_DIR, 'noaa_osisaf_sstbaltic_%s.png' % prfx)
-        LOG.info("Output file name: " + str(outname))
-        img = localdata.image.sst_with_landseamask()
-        img.save(outname)
-        LOG.debug("SST PNG file stored on area %s", str(areaid))
+    # if SST_OLD_OUTPUT_DIR:
+    #     prfx = start_time.strftime("%Y%m%d%H%M")
+    #     outname = os.path.join(
+    #         SST_OLD_OUTPUT_DIR, 'noaa_osisaf_sstbaltic_%s.png' % prfx)
+    #     LOG.info("Output file name: " + str(outname))
+    #     img = localdata.image.sst_with_landseamask()
+    #     img.save(outname)
+    #     LOG.debug("SST PNG file stored on area %s", str(areaid))
 
     if SST_SIR_LOCALDIR and SST_SIR_DIR:
+        img = localdata.image.sst_with_landseamask()
+        areaid_str = '{s:{c}<{n}}'.format(s=areaid, n=8, c='_')
         local_filename = os.path.join(SST_SIR_LOCALDIR,
-                                      "osafsst_baws____%s.png" % start_time.strftime('%y%m%d%H%M'))
+                                      "osafsst_%s%s.png" % (areaid_str,
+                                                            start_time.strftime('%y%m%d%H%M')))
         img.save(local_filename)
         sir_filename = os.path.join(SST_SIR_DIR,
-                                    "osafsst_baws____%s.png_original" % start_time.strftime('%y%m%d%H%M'))
+                                    "osafsst_%s%s.png_original" % (areaid_str,
+                                                                   start_time.strftime('%y%m%d%H%M')))
         shutil.copy(local_filename, sir_filename)
 
-    areaid = 'euron1'
     prfx = platform_name.lower() + start_time.strftime("_%Y%m%d_%H") + \
         '_' + str(areaid)
     outname = os.path.join(SST_OUTPUT_DIR, 'osisaf_sst_%s.tif' % prfx)
@@ -207,6 +210,20 @@ def start_sst_processing(sst_file, message, **kwargs):
     img = localdata.image.sst()
     img.save(outname)
     LOG.debug("SST Tiff file stored on area %s!", str(areaid))
+
+    if SST_SIR_LOCALDIR and SST_SIR_DIR:
+        areaid = 'baws'
+        localdata = glbd.project(areaid)
+        img = localdata.image.sst_with_landseamask()
+        areaid_str = '{s:{c}<{n}}'.format(s=areaid, n=8, c='_')
+        local_filename = os.path.join(SST_SIR_LOCALDIR,
+                                      "osafsst_%s%s.png" % (areaid_str,
+                                                            start_time.strftime('%y%m%d%H%M')))
+        img.save(local_filename)
+        sir_filename = os.path.join(SST_SIR_DIR,
+                                    "osafsst_%s%s.png_original" % (areaid_str,
+                                                                   start_time.strftime('%y%m%d%H%M')))
+        shutil.copy(local_filename, sir_filename)
 
     return sst_file
 
