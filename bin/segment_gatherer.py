@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2015 Panu Lahtinen
+# Copyright (c) 2015, 2016 Panu Lahtinen
 
 # Author(s): Panu Lahtinen
 
@@ -119,6 +119,16 @@ class SegmentGatherer(object):
 
         # Get copy of metadata
         meta = self.slots[time_slot]['metadata'].copy()
+
+        # Replace variable tags (such as processing time) with a
+        # wildcard, as these can't be forecasted.
+        try:
+            for tag in self._config.get(self._section,
+                                        'variable_tags').split(','):
+                meta[tag] = '*'
+        except NoOptionError:
+            pass
+
         for itm in itm_str.split(','):
             channel_name, segments = itm.split(':')
             segments = segments.split('-')
@@ -266,7 +276,19 @@ class SegmentGatherer(object):
             self._init_data(msg)
 
         slot = self.slots[time_slot]
-        if msg.data['uid'] in slot['received_files']:
+
+        # Replace variable tags (such as processing time) with a
+        # wildcard, as these can't be forecasted.
+        try:
+            for tag in self._config.get(self._section,
+                                       'variable_tags').split(','):
+                mda[tag] = '*'
+        except NoOptionError:
+            pass
+
+        mask = self._parser.compose(mda)
+
+        if mask in slot['received_files']:
             return
 
         # Add uid and uri
@@ -281,7 +303,7 @@ class SegmentGatherer(object):
             slot['delayed_files'][msg.data['uid']] = delay.total_seconds()
 
         # Add to received files
-        slot['received_files'].add(msg.data['uid'])
+        slot['received_files'].add(mask)
 
 
 def arg_parse():
