@@ -170,6 +170,8 @@ def update_nwp(starttime, nlengths):
         os.remove(tmp_file)
 
         if check_nwp_content(tmpresult):
+            LOG.info('A check of the NWP file content has been attempted: %s',
+                     result_file)
             os.rename(tmpresult, result_file)
         else:
             LOG.warning("Missing important fields. No nwp file %s written to disk",
@@ -212,6 +214,7 @@ def check_nwp_content(gribfile):
             LOG.warning("Mandatory field missing in NWP file: %s", str(item))
             file_ok = False
 
+    LOG.info("NWP file has all required fields for PPS: %s", gribfile)
     return file_ok
 
 if __name__ == "__main__":
