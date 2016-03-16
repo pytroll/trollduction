@@ -1,12 +1,13 @@
 #!/home/users/satman/current/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014, 2015 Adam.Dybbroe
+# Copyright (c) 2014, 2015, 2016 Adam.Dybbroe
 
 # Author(s):
 
-#   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+#   Adam.Dybbroe <adam.dybbroe@smhi.se>
 #   Janne Kotro fmi.fi
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -169,6 +170,8 @@ class AappLvl1Processor(object):
         self.environment = runner_config['environment']
         self.locktime_before_rerun = int(
             runner_config.get('locktime_before_rerun', 10))
+        self.passlength_threshold = runner_config['passlength_threshold']
+
         self.fullswath = True  # Always a full swath (never HRPT granules)
         self.ishmf = False
         self.working_dir = None
@@ -425,11 +428,11 @@ class AappLvl1Processor(object):
             LOG.debug("\tMessage:")
             LOG.debug(str(msg))
             urlobj = urlparse(msg.data['uri'])
-            server = urlobj.netloc
             url_ip = socket.gethostbyname(urlobj.netloc)
             if urlobj.netloc and (url_ip not in get_local_ips()):
-                LOG.warning("Server %s not the current one: %s" % (str(urlobj.netloc),
-                                                                   socket.gethostname()))
+                LOG.warning("Server %s not the current one: %s",
+                            str(urlobj.netloc),
+                            socket.gethostname())
                 return True
 
             LOG.info("Ok... " + str(urlobj.netloc))
@@ -445,6 +448,13 @@ class AappLvl1Processor(object):
                     "No end_time in message! Guessing start_time + 14 minutes...")
                 self.endtime = msg.data[
                     'start_time'] + timedelta(seconds=60 * 14)
+
+            # Test if the scene is longer than minimum required:
+            pass_length = self.endtime - self.starttime
+            if pass_length < timedelta(seconds=60 * self.passlength_threshold):
+                LOG.info("Pass is too short: Length in minutes = %6.1f",
+                         pass_length.seconds / 60.0)
+                return True
 
             start_orbnum = None
             try:
