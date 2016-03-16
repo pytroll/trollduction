@@ -170,7 +170,7 @@ class AappLvl1Processor(object):
         self.environment = runner_config['environment']
         self.locktime_before_rerun = int(
             runner_config.get('locktime_before_rerun', 10))
-        self.passlength_threshold = runner_config['passlength_threshold']
+        self.passlength_threshold = int(runner_config['passlength_threshold'])
 
         self.fullswath = True  # Always a full swath (never HRPT granules)
         self.ishmf = False
