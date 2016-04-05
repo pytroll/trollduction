@@ -1,4 +1,4 @@
-#!/home/users/satman/hrpt_20150616/bin/python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2015, 2016 Panu Lahtinen
