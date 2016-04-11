@@ -271,7 +271,11 @@ class SegmentGatherer(object):
 
     def process(self, msg):
         """Process message"""
-        mda = self._parser.parse(msg.data["uid"])
+        try:
+            mda = self._parser.parse(msg.data["uid"])
+        except ValueError:
+            self.logger.debug("Unknown file, skipping.")
+            return
         time_slot = str(mda[self.time_name])
 
         # Init metadata etc if this is the first file
