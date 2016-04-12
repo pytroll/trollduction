@@ -71,7 +71,7 @@ class SegmentGatherer(object):
         if time_slot in self.slots:
             del self.slots[time_slot]
 
-    def _init_data(self, msg):
+    def _init_data(self, msg, mda):
         """Init wanted, all and critical files"""
         # Init metadata struct
         metadata = {}
@@ -79,6 +79,9 @@ class SegmentGatherer(object):
             if key not in ("uid", "uri", "channel_name", "segment"):
                 metadata[key] = msg.data[key]
         metadata['dataset'] = []
+
+        # Use also metadata parsed from the filenames
+        metadata.update(mda)
 
         time_slot = str(metadata[self.time_name])
         self.slots[time_slot] = {}
@@ -268,12 +271,16 @@ class SegmentGatherer(object):
 
     def process(self, msg):
         """Process message"""
-        mda = self._parser.parse(msg.data["uid"])
+        try:
+            mda = self._parser.parse(msg.data["uid"])
+        except ValueError:
+            self.logger.debug("Unknown file, skipping.")
+            return
         time_slot = str(mda[self.time_name])
 
         # Init metadata etc if this is the first file
         if time_slot not in self.slots:
-            self._init_data(msg)
+            self._init_data(msg, mda)
 
         slot = self.slots[time_slot]
 
