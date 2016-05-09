@@ -190,8 +190,9 @@ class EventHandler(ProcessEvent):
             if "end_time" not in self.info and self.granule_length > 0:
                 self.info["end_time"] = base_time + dt.timedelta(seconds=self.granule_length)
 
-            while self.info["start_time"] > self.info["end_time"]:
-                self.info["end_time"] += dt.timedelta(days=1)
+            if "end_time" in self.info:
+                while self.info["start_time"] > self.info["end_time"]:
+                    self.info["end_time"] += dt.timedelta(days=1)
 
 class NewThreadedNotifier(ThreadedNotifier):
 
