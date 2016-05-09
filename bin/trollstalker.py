@@ -404,7 +404,7 @@ def main():
     # Start watching for new files
     notifier = create_notifier(topic, instrument, posttroll_port, filepattern,
                                event_names, monitored_dirs, aliases=aliases,
-                               tbus_orbit=tbus_orbit, history=history, granule=granule_length)
+                               tbus_orbit=tbus_orbit, history=history, granule_length=granule_length)
     notifier.start()
 
     try:
