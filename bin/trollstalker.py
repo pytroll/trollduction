@@ -54,7 +54,7 @@ class EventHandler(ProcessEvent):
     """
 
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
-                 aliases=None, tbus_orbit=False, history=0):
+                 aliases=None, tbus_orbit=False, history=0, granule_length=0):
         super(EventHandler, self).__init__()
 
         self._pub = NoisyPublisher("trollstalker", posttroll_port, topic)
@@ -67,6 +67,7 @@ class EventHandler(ProcessEvent):
         self.instrument = instrument
         self.aliases = aliases
         self.tbus_orbit = tbus_orbit
+        self.granule_length = granule_length
         self._deque = deque([], history)
 
     def stop(self):
@@ -186,8 +187,8 @@ class EventHandler(ProcessEvent):
                     dt.datetime.combine(self.info["end_date"].date(),
                                         self.info["end_time"].time())
                 del self.info["end_date"]
-            if "end_time" not in self.info:
-                self.info["end_time"] = base_time + dt.timedelta(minutes=1)
+            if "end_time" not in self.info and self.granule_length > 0:
+                self.info["end_time"] = base_time + dt.timedelta(seconds=self.granule_length)
 
             while self.info["start_time"] > self.info["end_time"]:
                 self.info["end_time"] += dt.timedelta(days=1)
@@ -204,7 +205,7 @@ class NewThreadedNotifier(ThreadedNotifier):
 
 def create_notifier(topic, instrument, posttroll_port, filepattern,
                     event_names, monitored_dirs, aliases=None,
-                    tbus_orbit=False, history=0):
+                    tbus_orbit=False, history=0, granule_length=0):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
@@ -225,7 +226,8 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
                                  filepattern=filepattern,
                                  aliases=aliases,
                                  tbus_orbit=tbus_orbit,
-                                 history=history)
+                                 history=history,
+                                 granule_length=granule_length)
 
     notifier = NewThreadedNotifier(manager, event_handler)
 
@@ -369,6 +371,8 @@ def main():
         aliases = parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
 
+        granule_length = float(config.get("granule", 0))
+
         try:
             log_config = config["stalker_log_config"]
         except KeyError:
@@ -400,7 +404,7 @@ def main():
     # Start watching for new files
     notifier = create_notifier(topic, instrument, posttroll_port, filepattern,
                                event_names, monitored_dirs, aliases=aliases,
-                               tbus_orbit=tbus_orbit, history=history)
+                               tbus_orbit=tbus_orbit, history=history, granule=granule_length)
     notifier.start()
 
     try:
