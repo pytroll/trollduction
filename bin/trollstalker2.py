@@ -59,8 +59,7 @@ class FilePublisher(AbstractWatchDogProcessor):
 
         self.topic = self.config["topic"]
         self.tbus_orbit = self.config.get("tbus_orbit", False)
-        print [parser.globify()
-               for parser in self.parsers]
+        LOGGER.debug("Looking for: %s", str([parser.globify() for parser in self.parsers]))
         AbstractWatchDogProcessor.__init__(self,
                                            [parser.globify()
                                             for parser in self.parsers],
@@ -181,7 +180,7 @@ def main():
     args_dict = {k: args_dict[k]
                  for k in args_dict if args_dict[k] != None}
 
-    config = args_dict.copy()
+    config = {}
 
     if args.configuration_file is not None:
         config_fname = args.configuration_file
@@ -195,12 +194,13 @@ def main():
         cparser.read(config_fname)
         config = dict(cparser.items(args.config_item, vars=args_dict))
 
+    config.update(args_dict)
+
     config.update({k: config[k].split(",")
                    for k in config if "," in config[k]})
 
     config.setdefault("posttroll_port", "0")
-    from pprint import pprint
-    pprint(config)
+
     try:
         log_config = config["stalker_log_config"]
     except KeyError:
