@@ -61,6 +61,8 @@ from trollsched.satpass import Pass
 from trollsched.boundary import Boundary, AreaDefBoundary
 import errno
 import netifaces
+import tempfile
+
 try:
     from mipp import DecodeError
 except ImportError:
@@ -97,8 +99,9 @@ def get_local_ips():
 
 
 def is_uri_on_server(uri, strict=False):
-    """Checks if the *uri* is designating a place on the server. If *strict* is True, the hostname has to be specified
-    in the *uri* for the path to be considered valid.
+    """Check if the *uri* is designating a place on the server.
+
+    If *strict* is True, the hostname has to be specified in the *uri* for the path to be considered valid.
     """
     url = urlparse(uri)
     try:
@@ -1055,7 +1058,6 @@ def hash_color(colorstring):
 
 
 class DataWriter(Thread):
-
     """Writes data to disk.
 
     This is separate from the DataProcessor since it takes IO time and
@@ -1069,12 +1071,11 @@ class DataWriter(Thread):
         self._loop = True
 
     def set_publish_topic(self, publish_topic):
-        '''Set published topic.'''
+        """Set published topic."""
         self._publish_topic = publish_topic
 
     def run(self):
-        """Run the thread.
-        """
+        """Run the thread."""
         with Publish("l2producer") as pub:
             while self._loop:
                 try:
@@ -1122,26 +1123,29 @@ class DataWriter(Thread):
 
                             fname = compose(os.path.join(output_dir, copy.text),
                                             local_params)
+                            tempfd, tempname = tempfile.mkstemp(dir=os.path.dirname(fname))
                             LOGGER.debug("Saving %s", fname)
                             if not saved:
                                 try:
-                                    obj.save(fname,
+                                    obj.save(tempname,
                                              fformat=fformat,
                                              compression=copy.attrib.get("compression", 6))
-                                except IOError: # retry once
+                                except IOError:  # retry once
                                     try:
-                                        obj.save(fname,
+                                        obj.save(tempname,
                                                  fformat=fformat,
                                                  compression=copy.attrib.get("compression", 6))
                                     except IOError:
                                         LOGGER.exception("Can't save file %s", fname)
                                         continue
+                                os.rename(tempname, fname)
 
                                 LOGGER.info("Saved %s to %s", str(obj), fname)
                                 saved = fname
                                 uid = os.path.basename(fname)
                             else:
-                                link_or_copy(saved, fname)
+                                link_or_copy(saved, tempname)
+                                os.rename(tempname, fname)
                                 LOGGER.info("Copied/Linked %s to %s", saved, fname)
                                 saved = fname
                             if ("thumbnail_name" in copy.attrib and
@@ -1180,13 +1184,11 @@ class DataWriter(Thread):
                     self.prod_queue.task_done()
 
     def write(self, obj, item, params):
-        '''Write to queue.
-        '''
+        """Write to queue."""
         self.prod_queue.put((obj, list(item), params.copy()))
 
     def stop(self):
-        '''Stop the data writer.
-        '''
+        """Stop the data writer."""
         LOGGER.info("stopping data writer")
         self._loop = False
 
