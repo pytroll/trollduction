@@ -1153,6 +1153,7 @@ class DataWriter(Thread):
                                 os.rename(tempname, fname)
                                 LOGGER.info("Copied/Linked %s to %s", saved, fname)
                                 saved = fname
+                            os.close(tempfd)
                             if ("thumbnail_name" in copy.attrib and
                                     "thumbnail_size" in copy.attrib):
                                 thsize = [int(val) for val
