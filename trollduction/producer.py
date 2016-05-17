@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2014, 2015
+# Copyright (c) 2014-2016
 #
 # Author(s):
 #
@@ -1077,6 +1077,10 @@ class DataWriter(Thread):
     def run(self):
         """Run the thread."""
         with Publish("l2producer") as pub:
+            umask = os.umask(0)
+            os.umask(umask)
+            default_mode = int('666', 8) - umask
+
             while self._loop:
                 try:
                     obj, file_items, params = self.prod_queue.get(True, 1)
@@ -1124,6 +1128,7 @@ class DataWriter(Thread):
                             fname = compose(os.path.join(output_dir, copy.text),
                                             local_params)
                             tempfd, tempname = tempfile.mkstemp(dir=os.path.dirname(fname))
+                            os.chmod(tempname, default_mode)
                             LOGGER.debug("Saving %s", fname)
                             if not saved:
                                 try:
