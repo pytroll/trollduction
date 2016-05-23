@@ -1010,7 +1010,7 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
     return msg
 
 
-def link_or_copy(src, dst, retry=1):
+def link_or_copy(src, dst, tmpdst=None, retry=1):
     """Create a hardlink from *src* to *dst*, or if that fails, copy.
     """
     if src == dst:
@@ -1018,22 +1018,27 @@ def link_or_copy(src, dst, retry=1):
         return
     try:
         os.link(src, dst)
+        if tmpdst is not None:
+            os.remove(tmpdst)
     except OSError as err:
         if err.errno not in [errno.EXDEV]:
             LOGGER.exception("Could not link: %s -> %s", src, dst)
             return
         try:
-            shutil.copy(src, dst)
+            if tmpdst is not None:
+                shutil.copy(src, tmpdst)
+                os.rename(tmpdst, dst)
+            else:
+                shutil.copy(src, dst)
         except shutil.Error:
             LOGGER.exception("Something went wrong in copying a file")
         except IOError as err:
             LOGGER.info("Error copying file: %s", str(err))
             if retry:
                 LOGGER.info("Retrying...")
-                link_or_copy(src, dst, retry - 1)
+                link_or_copy(src, dst, tmpdst, retry - 1)
             else:
                 LOGGER.exception("Could not copy: %s -> %s", src, dst)
-
 
 
 def thumbnail(filename, thname, size, fformat):
@@ -1129,6 +1134,7 @@ class DataWriter(Thread):
                                             local_params)
                             tempfd, tempname = tempfile.mkstemp(dir=os.path.dirname(fname))
                             os.chmod(tempname, default_mode)
+                            os.close(tempfd)
                             LOGGER.debug("Saving %s", fname)
                             if not saved:
                                 try:
@@ -1149,11 +1155,9 @@ class DataWriter(Thread):
                                 saved = fname
                                 uid = os.path.basename(fname)
                             else:
-                                link_or_copy(saved, tempname)
-                                os.rename(tempname, fname)
                                 LOGGER.info("Copied/Linked %s to %s", saved, fname)
+                                link_or_copy(saved, fname, tempname)
                                 saved = fname
-                            os.close(tempfd)
                             if ("thumbnail_name" in copy.attrib and
                                     "thumbnail_size" in copy.attrib):
                                 thsize = [int(val) for val
