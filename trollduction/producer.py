@@ -393,13 +393,13 @@ class DataProcessor(object):
     """Process the data.
     """
 
-    def __init__(self, publish_topic=None):
+    def __init__(self, publish_topic=None, port=0):
         self.global_data = None
         self.local_data = None
         self.product_config = None
         self._publish_topic = publish_topic
         self._data_ok = True
-        self.writer = DataWriter(publish_topic=self._publish_topic)
+        self.writer = DataWriter(publish_topic=self._publish_topic, port=port)
         self.writer.start()
 
     def set_publish_topic(self, publish_topic):
@@ -1069,10 +1069,11 @@ class DataWriter(Thread):
     we don't want to block processing.
     """
 
-    def __init__(self, publish_topic=None):
+    def __init__(self, publish_topic=None, port=0):
         Thread.__init__(self)
         self.prod_queue = Queue.Queue()
         self._publish_topic = publish_topic
+        self._port = port
         self._loop = True
 
     def set_publish_topic(self, publish_topic):
@@ -1081,7 +1082,7 @@ class DataWriter(Thread):
 
     def run(self):
         """Run the thread."""
-        with Publish("l2producer") as pub:
+        with Publish("l2producer", port=self._port) as pub:
             umask = os.umask(0)
             os.umask(umask)
             default_mode = int('666', 8) - umask
@@ -1243,8 +1244,8 @@ class Trollduction(object):
             self.update_td_config()
 
         self.data_processor = \
-            DataProcessor(publish_topic=self.td_config.get('publish_topic',
-                                                           None))
+            DataProcessor(publish_topic=self.td_config.get('publish_topic'),
+                          port=int(self.td_config.get('port', 0)))
 
     def update_td_config_from_file(self, fname, config_item=None):
         '''Read Trollduction config file and use the new parameters.
