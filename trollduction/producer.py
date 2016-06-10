@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2014, 2015
+# Copyright (c) 2014-2016
 #
 # Author(s):
 #
@@ -61,6 +61,8 @@ from trollsched.satpass import Pass
 from trollsched.boundary import Boundary, AreaDefBoundary
 import errno
 import netifaces
+import tempfile
+
 try:
     from mipp import DecodeError
 except ImportError:
@@ -97,8 +99,9 @@ def get_local_ips():
 
 
 def is_uri_on_server(uri, strict=False):
-    """Checks if the *uri* is designating a place on the server. If *strict* is True, the hostname has to be specified
-    in the *uri* for the path to be considered valid.
+    """Check if the *uri* is designating a place on the server.
+
+    If *strict* is True, the hostname has to be specified in the *uri* for the path to be considered valid.
     """
     url = urlparse(uri)
     try:
@@ -390,13 +393,13 @@ class DataProcessor(object):
     """Process the data.
     """
 
-    def __init__(self, publish_topic=None):
+    def __init__(self, publish_topic=None, port=0):
         self.global_data = None
         self.local_data = None
         self.product_config = None
         self._publish_topic = publish_topic
         self._data_ok = True
-        self.writer = DataWriter(publish_topic=self._publish_topic)
+        self.writer = DataWriter(publish_topic=self._publish_topic, port=port)
         self.writer.start()
 
     def set_publish_topic(self, publish_topic):
@@ -1007,7 +1010,7 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
     return msg
 
 
-def link_or_copy(src, dst, retry=1):
+def link_or_copy(src, dst, tmpdst=None, retry=1):
     """Create a hardlink from *src* to *dst*, or if that fails, copy.
     """
     if src == dst:
@@ -1015,22 +1018,27 @@ def link_or_copy(src, dst, retry=1):
         return
     try:
         os.link(src, dst)
+        if tmpdst is not None:
+            os.remove(tmpdst)
     except OSError as err:
         if err.errno not in [errno.EXDEV]:
             LOGGER.exception("Could not link: %s -> %s", src, dst)
             return
         try:
-            shutil.copy(src, dst)
+            if tmpdst is not None:
+                shutil.copy(src, tmpdst)
+                os.rename(tmpdst, dst)
+            else:
+                shutil.copy(src, dst)
         except shutil.Error:
             LOGGER.exception("Something went wrong in copying a file")
         except IOError as err:
             LOGGER.info("Error copying file: %s", str(err))
             if retry:
                 LOGGER.info("Retrying...")
-                link_or_copy(src, dst, retry - 1)
+                link_or_copy(src, dst, tmpdst, retry - 1)
             else:
                 LOGGER.exception("Could not copy: %s -> %s", src, dst)
-
 
 
 def thumbnail(filename, thname, size, fformat):
@@ -1055,27 +1063,30 @@ def hash_color(colorstring):
 
 
 class DataWriter(Thread):
-
     """Writes data to disk.
 
     This is separate from the DataProcessor since it takes IO time and
     we don't want to block processing.
     """
 
-    def __init__(self, publish_topic=None):
+    def __init__(self, publish_topic=None, port=0):
         Thread.__init__(self)
         self.prod_queue = Queue.Queue()
         self._publish_topic = publish_topic
+        self._port = port
         self._loop = True
 
     def set_publish_topic(self, publish_topic):
-        '''Set published topic.'''
+        """Set published topic."""
         self._publish_topic = publish_topic
 
     def run(self):
-        """Run the thread.
-        """
-        with Publish("l2producer") as pub:
+        """Run the thread."""
+        with Publish("l2producer", port=self._port) as pub:
+            umask = os.umask(0)
+            os.umask(umask)
+            default_mode = int('666', 8) - umask
+
             while self._loop:
                 try:
                     obj, file_items, params = self.prod_queue.get(True, 1)
@@ -1122,27 +1133,31 @@ class DataWriter(Thread):
 
                             fname = compose(os.path.join(output_dir, copy.text),
                                             local_params)
+                            tempfd, tempname = tempfile.mkstemp(dir=os.path.dirname(fname))
+                            os.chmod(tempname, default_mode)
+                            os.close(tempfd)
                             LOGGER.debug("Saving %s", fname)
                             if not saved:
                                 try:
-                                    obj.save(fname,
+                                    obj.save(tempname,
                                              fformat=fformat,
                                              compression=copy.attrib.get("compression", 6))
-                                except IOError: # retry once
+                                except IOError:  # retry once
                                     try:
-                                        obj.save(fname,
+                                        obj.save(tempname,
                                                  fformat=fformat,
                                                  compression=copy.attrib.get("compression", 6))
                                     except IOError:
                                         LOGGER.exception("Can't save file %s", fname)
                                         continue
+                                os.rename(tempname, fname)
 
                                 LOGGER.info("Saved %s to %s", str(obj), fname)
                                 saved = fname
                                 uid = os.path.basename(fname)
                             else:
-                                link_or_copy(saved, fname)
                                 LOGGER.info("Copied/Linked %s to %s", saved, fname)
+                                link_or_copy(saved, fname, tempname)
                                 saved = fname
                             if ("thumbnail_name" in copy.attrib and
                                     "thumbnail_size" in copy.attrib):
@@ -1180,13 +1195,11 @@ class DataWriter(Thread):
                     self.prod_queue.task_done()
 
     def write(self, obj, item, params):
-        '''Write to queue.
-        '''
+        """Write to queue."""
         self.prod_queue.put((obj, list(item), params.copy()))
 
     def stop(self):
-        '''Stop the data writer.
-        '''
+        """Stop the data writer."""
         LOGGER.info("stopping data writer")
         self._loop = False
 
@@ -1231,8 +1244,8 @@ class Trollduction(object):
             self.update_td_config()
 
         self.data_processor = \
-            DataProcessor(publish_topic=self.td_config.get('publish_topic',
-                                                           None))
+            DataProcessor(publish_topic=self.td_config.get('publish_topic'),
+                          port=int(self.td_config.get('port', 0)))
 
     def update_td_config_from_file(self, fname, config_item=None):
         '''Read Trollduction config file and use the new parameters.
