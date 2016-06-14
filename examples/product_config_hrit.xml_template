@@ -10,6 +10,14 @@
         <!-- <check_coverage>False</check_coverage> -->
         <!-- number of processor used for parallel work -->
         <nprocs>1</nprocs>
+	<!-- Set default maximum search radius for all the areas, in
+	     meters.  Can be overridden for each area, see the "eurol"
+	     area below.  Comment out if default (radius=None) is
+	     sufficient. -->
+	<srch_radius>20000</srch_radius>
+	<!-- Define the interpolation method.  Defaults to "nearest"
+	     if omitted.-->
+	<proj_method>nearest</proj_method>
     </common>
 
     <variables>
@@ -28,7 +36,7 @@
     </groups>
 
     <product_list>
-        <area id="eurol" name="eurol" min_coverage="25">
+        <area id="eurol" name="eurol" min_coverage="25" srch_radius="10000">
             <product id="cloudtop" name="cloudtop">
                 <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
             </product>
