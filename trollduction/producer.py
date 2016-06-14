@@ -538,6 +538,11 @@ class DataProcessor(object):
         proj_method = self.product_config.attrib.get("proj_method", "nearest")
         LOGGER.info("Using %d CPUs for reprojecting with method %s.",
                     nprocs, proj_method)
+        try:
+            srch_radius = int(self.product_config.attrib["srch_radius"])
+        except KeyError:
+            srch_radius = None
+
         precompute = \
             self.product_config.attrib.get("precompute", "").lower() in \
             ["true", "yes", "1"]
@@ -627,12 +632,22 @@ class DataProcessor(object):
                 LOGGER.debug("Projecting data to area %s",
                              area_item.attrib['name'])
                 try:
+                    try:
+                        actual_srch_radius = \
+                                int(area_item.attrib["srch_radius"])
+                        LOGGER.debug("Overriding search radius %s with %s",
+                                     str(srch_radius), str(actual_srch_radius))
+                    except KeyError:
+                        LOGGER.debug("Using search radius %s", str(srch_radius))
+                        actual_srch_radius = srch_radius
+
                     self.local_data = \
                         self.global_data.project(
                             area_item.attrib["id"],
                             channels=self.get_req_channels(area_item),
                             mode=proj_method, nprocs=nprocs,
-                            precompute=precompute)
+                            precompute=precompute,
+                            radius=actual_srch_radius)
                 except ValueError:
                     LOGGER.warning("No data in this area")
                     continue
