@@ -80,6 +80,12 @@ else:
 from xml.etree.ElementTree import tostring
 from struct import error as StructError
 
+try:
+    from dwd_extensions.tools.view_zenith_angle import ViewZenithAngleCacheManager
+    use_dwd_extensions = True
+except ImportError:
+    use_dwd_extensions = False
+
 LOGGER = logging.getLogger(__name__)
 
 # Config watcher stuff
@@ -393,7 +399,8 @@ class DataProcessor(object):
     """Process the data.
     """
 
-    def __init__(self, publish_topic=None, port=0, nameservers=[]):
+    def __init__(self, publish_topic=None, port=0, nameservers=[],
+                 viewZenCacheManager=None):
         self.global_data = None
         self.local_data = None
         self.product_config = None
@@ -402,6 +409,7 @@ class DataProcessor(object):
         self.writer = DataWriter(publish_topic=self._publish_topic, port=port,
                                  nameservers=nameservers)
         self.writer.start()
+        self.viewZenCacheManager = viewZenCacheManager
 
     def set_publish_topic(self, publish_topic):
         '''Set published topic.'''
@@ -629,6 +637,17 @@ class DataProcessor(object):
                       not generic_covers(self.global_data, area_item)):
                     continue
 
+                if self.viewZenCacheManager is not None:
+                    # retrieve the satellite zenith angles for the corresponding area
+                    self.viewZenCacheManager.prepare(msg,
+                                                     area_item.attrib['id'],
+                                                     self.global_data.info['time'])
+
+                    # update viewZenCacheManager with loaded channels to notify about
+                    # satellite position infos
+                    self.viewZenCacheManager.notify_channels_loaded(
+                        self.global_data.loaded_channels())
+
                 # reproject to local domain
                 LOGGER.debug("Projecting data to area %s",
                              area_item.attrib['name'])
@@ -659,6 +678,20 @@ class DataProcessor(object):
 
                 LOGGER.info('Data reprojected for area: %s',
                             area_item.attrib['name'])
+
+                # create a shallow copy of the info dictionary in local_data
+                # to provide information which should be local only
+                # independent from the global_data object
+                self.local_data.info = self.local_data.info.copy()
+                # do the same for each channel in local_data
+                for chn in self.local_data.channels:
+                    chn.info = chn.info.copy()
+
+                if self.viewZenCacheManager is not None:
+                    # wait for the satellite zenith angle calculation process
+                    vza_chn = \
+                        self.viewZenCacheManager.waitForViewZenithChannel()
+                    self.local_data.channels.append(vza_chn)
 
                 # Draw requested images for this area.
                 self.draw_images(area_item)
@@ -1191,10 +1224,20 @@ class DataWriter(Thread):
                                 copy.attrib["thumbnail_name"] = thname
                                 thumbnail(fname, thname, thsize, fformat)
 
+                            if 'uri' in params:
+                                source_uri = [params['uri']]
+                            elif 'dataset' in params:
+                                source_uri = \
+                                    [e['uri'] for e in params['dataset']
+                                     if 'uri' in e]
+                            else:
+                                source_uri = None
+
                             msg = _create_message(obj, os.path.basename(fname),
                                                   fname, params,
                                                   publish_topic=self._publish_topic,
-                                                  uid=uid)
+                                                  uid=uid,
+                                                  source_uri=source_uri)
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
                 except Exception as e:
@@ -1242,6 +1285,7 @@ class Trollduction(object):
 
         self.data_processor = None
         self.config_watcher = None
+        self.viewZenCacheManager = None
 
         self._previous_pass = {"platform_name": None,
                                "start_time": None}
@@ -1267,10 +1311,16 @@ class Trollduction(object):
         else:
             nameservers = []
 
+        if use_dwd_extensions:
+            aliases = helper_functions.parse_aliases(self.td_config)
+            self.viewZenCacheManager = ViewZenithAngleCacheManager(
+                self.td_config.get('tle_path', ''), aliases)
+
         self.data_processor = \
             DataProcessor(publish_topic=self.td_config.get('publish_topic'),
                           port=int(self.td_config.get('port', 0)),
-                          nameservers=nameservers)
+                          nameservers=nameservers,
+                          viewZenCacheManager=self.viewZenCacheManager)
 
     def update_td_config_from_file(self, fname, config_item=None):
         '''Read Trollduction config file and use the new parameters.
@@ -1331,6 +1381,10 @@ class Trollduction(object):
                 self.config_watcher.stop()
             if self.listener is not None:
                 self.listener.stop()
+                
+            if self.viewZenCacheManager is not None:
+                self.viewZenCacheManager.shutdown()
+                self.viewZenCacheManager = None
 
     def stop(self):
         """Stop running.

@@ -403,3 +403,33 @@ def align_time(input_val, steps=dt.timedelta(minutes=5),
     result = val - dt.timedelta(seconds=(vals - (vals // stepss) * stepss))
     result = result + (intervals_to_add * steps)
     return result
+
+
+def parse_aliases(config):
+    '''Parse aliases from the config.
+
+    Aliases are given in the config as:
+
+    {'alias_<name>': 'value:alias'}, or
+    {'alias_<name>': 'value1:alias1|value2:alias2'},
+
+    where <name> is the name of the key which value will be
+    replaced. The later form is there to support several possible
+    substitutions (eg. '2' -> '9' and '3' -> '10' in the case of MSG).
+
+    '''
+    aliases = {}
+
+    for key in config:
+        if 'alias' in key:
+            alias = config[key]
+            new_key = key.replace('alias_', '')
+            if '|' in alias or ':' in alias:
+                parts = alias.split('|')
+                aliases2 = {}
+                for part in parts:
+                    key2, val2 = part.split(':')
+                    aliases2[key2] = val2
+                alias = aliases2
+            aliases[new_key] = alias
+    return aliases
