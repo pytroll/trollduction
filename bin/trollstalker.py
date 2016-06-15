@@ -416,7 +416,10 @@ def main():
         except KeyError:
             history = 0
 
-        nameservers = nameservers or config['nameservers']
+        try:
+            nameservers = nameservers or config['nameservers']
+        except KeyError:
+            nameservers = []
 
         aliases = parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))

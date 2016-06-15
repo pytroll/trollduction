@@ -1261,7 +1261,11 @@ class Trollduction(object):
             self.td_config = config
             self.update_td_config()
 
-        nameservers = self.td_config.get('nameservers','').split(',')
+        nameservers = self.td_config.get('nameservers', None)
+        if nameservers:
+            nameservers = nameservers.split(',')
+        else:
+            nameservers = []
 
         self.data_processor = \
             DataProcessor(publish_topic=self.td_config.get('publish_topic'),
