@@ -1,6 +1,921 @@
 Changelog
 =========
 
+v1.0.0 (2016-06-15)
+-------------------
+
+Fix
+~~~
+
+- Bugfix: log-error message text. [Adam.Dybbroe]
+
+- Bugfix: copy incoming message data. [Adam.Dybbroe]
+
+- Bugfix: typo. [Martin Raspaud]
+
+- Bugfix: check_uri now checks ip or hostname, not netloc.
+  [Adam.Dybbroe]
+
+- Bugfix: granule metadata is now copied and not shared amoung
+  collectors. [Martin Raspaud]
+
+- Bugfix: don't return from the group loop, just continue if the area is
+  irrelevant. [Martin Raspaud]
+
+- Bugfix: process instead of process_message. [Adam.Dybbroe]
+
+- Bugfix: More robust in case where input file is not present.
+  [Adam.Dybbroe@smhi.se]
+
+- Bugfix: Fix correct call syntax to AAPP script. [Adam.Dybbroe]
+
+- Bugfix: rename pps_runner package to nwcsafpps_runner.
+  [Adam.Dybbroe@smhi.se]
+
+  Conflicts:
+  	bin/pps_runner.py
+  	nwcsafpps_runner/__init__.py
+  	nwcsafpps_runner/prepare_nwp.py
+  	setup.py
+
+
+- Bugfix: get_area_def_names is now returning the correct amount of
+  areas. [Martin Raspaud]
+
+Other
+~~~~~
+
+- Update changelog. [Martin Raspaud]
+
+- Bump version: 0.2.0 → 1.0.0. [Martin Raspaud]
+
+- Use globify instead of compose for more genericity with variable-timed
+  files. [Panu Lahtinen]
+
+- Add support to configuring search radius for nearest neighbour
+  interpolation. [Panu Lahtinen]
+
+- Add config examples for projection method selection and search radius
+  definition for nearest neighbour interpolation. [Panu Lahtinen]
+
+- Remove empty subscripe topics. [Adam.Dybbroe]
+
+- Handle non-satellite scene messages. [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Add the (publish) 'port' as a possible option for trollduction.cfg.
+  [Martin Raspaud]
+
+- Merge pull request #7 from
+  khunger/gatherer_without_hardcoded_segment_digits. [Panu Lahtinen]
+
+  Removed hardcoded 6-digits segment substrings
+
+- Removed hardcoded 6-digits segment substrings. [Christian Kliche]
+
+  Some filenames differ from formerly implemented 6-digit scheme.
+
+  i.e . Himawari8 files are named like IMG_DK01IR1_201604291009_010 (segment "010")
+
+  The configured pattern must be adjusted to handle both cases. For example {segment:0>6s} for 6 digits
+  and {segment:0>3s} for 3 digits.
+
+
+- Avoid using tempfiles when linking. [Martin Raspaud]
+
+  os.link can't work on an existing file.
+
+- Merge pull request #6 from khunger/feature-seggath-premature-publish.
+  [Panu Lahtinen]
+
+  Support for "pre-mature" publishing
+
+- Fixed typo. [Christian Kliche]
+
+  Replaced constant name SLOT_OBSOLUTE_TIMEOUT by SLOT_OBSOLETE_TIMEOUT
+
+
+- Support for pre-mature publishing. [Christian Kliche]
+
+  New configuration parameter num_files_premature_publish to define
+  a number of received files after that an event will be published
+  although there are still some missing files. After publishing such
+  event, the segment gatherer still waits for further file messages
+  for this timeslot.
+
+
+- Close files after saving. [Martin Raspaud]
+
+- Fix the temporary file permissions. [Martin Raspaud]
+
+- Save files through a temporary name first. [Martin Raspaud]
+
+- Bugfix segment_gatherer in case of delayed files. [Martin Raspaud]
+
+- Cleanup trollstalker2. [Martin Raspaud]
+
+- Make trollstalker more robust when end_time is missing. [Martin
+  Raspaud]
+
+- Bugfix. [Martin Raspaud]
+
+- Add granule length capability to trollstalker. [Martin Raspaud]
+
+  This way we can specify an end time that was implicit, and remove hardcoded
+  ugliness
+
+- Make gatherer crash when the trigger crashes. [Martin Raspaud]
+
+  It happens that the trigger crashes now and then. Unfortunately, the main
+  gatherer process won't die in this case, and would just do nothing. This
+  patch should address this issue through checking that the triggers are
+  alive.
+
+- Avoid crash in xml product-list reading when an env is missing.
+  [Martin Raspaud]
+
+- Move publish/subscribe topics and station to config file.
+  [Adam.Dybbroe]
+
+- Take care of smaller passes using min_length in cat. [Martin Raspaud]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Add the min_length config option for catter. [Martin Raspaud]
+
+- Handle files that don't match the used pattern. [Panu Lahtinen]
+
+- Fix incorrect python path. [Panu Lahtinen]
+
+- Use metadata parsed from the filename (UID) as basis. [SatMan]
+
+- Fix consistency in orbit number. [Adam.Dybbroe]
+
+  The orbit number in the outgoing message now match the orbit
+  number in the RDR (and later SDR) files
+
+- Bugfix, pass on incoming message. [Adam.Dybbroe]
+
+- Fixing bug - transfering message data from listener to publisher.
+  [Adam.Dybbroe]
+
+- Fix bug, missing variant field in msg. Carry on message from incoming
+  msg. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Bugfix; now reading the passlength_threshold param. [Adam.Dybbroe]
+
+- Don't process very short passes, determined by config param.
+  [Adam.Dybbroe]
+
+- A bit more log info on NWP file consistency. [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Fix FakeMessage data from str to dict. [Panu Lahtinen]
+
+- Add missing colon. [Panu Lahtinen]
+
+- Prevent "ValueError: max() arg is an empty sequence" for equal sets,
+  add more information on logging these occurences. [Panu Lahtinen]
+
+- Merge branch 'develop' of https://github.com/pytroll/trollduction into
+  develop. [Panu Lahtinen]
+
+- Take into account filenames with variable fields (eg. production
+  time), update example config. [Panu Lahtinen]
+
+- Add a check of the NWP file content. [Adam.Dybbroe]
+
+- Bugfix - filename. [Adam.Dybbroe]
+
+- New sst tif output added. [Adam.Dybbroe]
+
+- Bugfix for sst tiff file on euron1. [Adam.Dybbroe]
+
+- Fix png image. [Adam.Dybbroe]
+
+- Add some more output formats and variants. [Adam.Dybbroe]
+
+- Remove old file info from pps runner messages. [Martin Raspaud]
+
+  When passing over the metadata to new pps runner meesages, old file info
+  wasn't removed. This is now fixed through removing collections and datasets
+  from the input metadata.
+
+- Make pps runner pass around input metadata. [Martin Raspaud]
+
+  pps_runner would create a message from scratch, thereby leaving out the
+  input metadata for later messages. We now copy the metadata over.
+
+- Set time to UTC. [Panu Lahtinen]
+
+- Add segment_collector to installed scripts. [Panu Lahtinen]
+
+- Merge branch 'develop' of https://github.com/pytroll/trollduction into
+  develop. [Panu Lahtinen]
+
+- Revert back to 6 pool processes. [Adam.Dybbroe]
+
+- Make it possible to turn on/off destriping via config. [Adam.Dybbroe]
+
+- Lower the amount of pool processes to 4. [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Add more deubg info... [Adam.Dybbroe]
+
+- Add example config for segment_gatherer.py. [Panu Lahtinen]
+
+- Add more general gatherer for GEO segments and multifile polar
+  granules (VIIRS, EARS-PPS, etc) [Panu Lahtinen]
+
+- Add geo_gatherer to the list of installed scripts. [Panu Lahtinen]
+
+- Fix bug. [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Add example how to collect EARS-PPS products together. [Panu Lahtinen]
+
+- Merge branch 'develop' of https://github.com/pytroll/trollduction into
+  develop. [Panu Lahtinen]
+
+- If aliases are used, rename original metadata to 'orig_'+key. [Panu
+  Lahtinen]
+
+- Chmod +x. [Panu Lahtinen]
+
+- Add destriping step. [Adam.Dybbroe]
+
+- Allow None as a valid return code in geolocation processing.
+  [Adam.Dybbroe]
+
+- Use variant=DR. [Adam.Dybbroe]
+
+- Fix to use correct path to default GBAD config file. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Add support for Aqua processing. [Adam.Dybbroe]
+
+- Use startnudge/endnudge from config and accepts returncode = 1 for
+  geolocation. [Adam.Dybbroe]
+
+- Fix bug. [Adam.Dybbroe]
+
+  Only the three lvl1b files were send via posttroll,
+  now the geo-file is included
+
+
+- Add more debug info. [Adam.Dybbroe]
+
+- Fix level: 1B instead of L1B. [Adam.Dybbroe]
+
+- Add check if output files exists in working dir before moving them.
+  [Adam.Dybbroe]
+
+- Reset eos-files dict after completion/timeout of scene. [Adam.Dybbroe]
+
+- Publish result messages. [Adam.Dybbroe]
+
+- Fix bug in modis-lvl1b call. [Adam.Dybbroe]
+
+- Removes the first and last 15 seconds of the data instead of just 5.
+  [Adam.Dybbroe]
+
+- Fix filenames and paths for geolocation and l1b generation.
+  [Adam.Dybbroe]
+
+- Fix bug. [Adam.Dybbroe]
+
+- Fix bug. [Adam.Dybbroe]
+
+- Exclude file path of the level-1 result file when calling modis_L1A.
+  [Adam.Dybbroe]
+
+  The Seadas modis_L1A doesn't work if you provide the full path
+
+- Fix bug in scene dict and add more processing steps. [Adam.Dybbroe]
+
+- Fix bug in scene dict. [Adam.Dybbroe]
+
+- Add try-except clause around thread. [Adam.Dybbroe]
+
+- Add more debug info. [Adam.Dybbroe]
+
+- Add more debug info to terra processing and add level-1a command.
+  [Adam.Dybbroe]
+
+- Fix proper cleaning of job register and add ancillary data
+  downloading. [Adam.Dybbroe]
+
+- Fix installation of new seadas-modis runner. [Adam.Dybbroe]
+
+- Add new modis runner using SeaDAS. [Adam.Dybbroe]
+
+- Transfer message metadata thru aapp_runner. [Martin Raspaud]
+
+  AAPP runner was recreating new messages for publishing, thereby dropping
+  the incomming messages's metadata. Instead we now initialize the outgoing
+  message with the incomming mda, so that the whole mda is available at later
+  stages.
+
+- Add params info on save error. [Martin Raspaud]
+
+  when saving crashes, we now print out the params info
+
+- Rename source to variant. [Martin Raspaud]
+
+- Pop 'regions' from metadata. [Martin Raspaud]
+
+  Since last update, 'regions' would be included in the message. This was not
+  desireable, so it has now been removed.
+
+- Add source info in scisys receiver. [Martin Raspaud]
+
+  The scisys-receiver is now providing a source info in it's messages.
+
+- Allow gatherer regions for each config item. [Martin Raspaud]
+
+  The regions to gather on were until now defined globally only, in a
+  'default' section. By upcasing this to 'DEFAULT', this allows us to use the
+  global value as a default, and to have locally defined 'regions'
+  parameters.
+
+- Fix the message check in gatherer. [Martin Raspaud]
+
+  Gatherer is checking the resulting message before sending. Until now, the
+  uri had to be there. However this is not valid for dataset messages, so
+  we check this case now also.
+
+- Fix intendation error. [Panu Lahtinen]
+
+- Add a function that checks swath completeness, clearer log messages.
+  [Panu Lahtinen]
+
+- Check metadata for URI, use stdout logging even when logging to file.
+  [Panu Lahtinen]
+
+- Prevent ZeroDivisionError, when scenes have start_time = end_time.
+  [Adam.Dybbroe]
+
+- Fall back to environment variable if config doesn't have
+  pps_statistics_dir. [Adam.Dybbroe]
+
+- Using pps_statistics_dir from pps_config. [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Cleanup. [Martin Raspaud]
+
+- Hardfix: Attempt running AAPP with all instruments, no exceptions for
+  NOAA-15. [Adam.Dybbroe]
+
+- Cleanup registry. [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Bugfix gc. [Martin Raspaud]
+
+- Fix is_uri_on_server. [Martin Raspaud]
+
+- Fix uri checking for scisys receiver. [Martin Raspaud]
+
+- Remove install section in setup.cfg, and add netcdf4-python as a
+  dependency. [Martin Raspaud]
+
+- Cleaning up in sst-runner. [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Merge branch 'develop' of https://github.com/pytroll/trollduction into
+  develop. [Panu Lahtinen]
+
+- Add watchdog as a dependency to trollduction. [Martin Raspaud]
+
+- Gatherer can now be parametrized as to which streams to watch. [Martin
+  Raspaud]
+
+- Example config for GEO satellite segment gatherer. [Panu Lahtinen]
+
+- Gatherer for GEO satellite segments. [Panu Lahtinen]
+
+- More debug info on NWP files found. [Adam.Dybbroe]
+
+- Introduce new config param locktime_before_rerun. [Adam.Dybbroe]
+
+- Fix the checking of same scene_id using time overlap determination.
+  [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Retry saving file once in case of an IOError. [Martin Raspaud]
+
+- Add some debug info. [Martin Raspaud]
+
+- Retry when copying fails with IOError. [Martin Raspaud]
+
+- Allow for Metop lvl0 instrument files with slightly (more than a
+  minute) different start and end times. [Adam.Dybbroe]
+
+- Removed buggy log-message. [Adam.Dybbroe]
+
+- Allow for no hostname in message: url.hostname may be None.
+  [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+  Conflicts:
+  	trollduction/scisys.py
+
+- Avoid key errors in scisys.py. [Martin Raspaud]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- More debug info. [Adam.Dybbroe]
+
+- Clean up and pep8. [Adam.Dybbroe]
+
+- 2met receiver checks that that message is for the current host only.
+  [Adam.Dybbroe]
+
+- Bug in region collector printout. [Martin Raspaud]
+
+- Be more explicit in debug when the product can't be created. [Martin
+  Raspaud]
+
+- Change timeout in gatherer when last granule is not arriving last.
+  [Martin Raspaud]
+
+- Remove use of servername from config. [Adam.Dybbroe]
+
+- Dynamic checking of hostname. [Adam.Dybbroe]
+
+- Merge branch 'develop' of https://github.com/mraspaud/trollduction
+  into develop. [Panu Lahtinen]
+
+  Conflicts:
+  	trollduction/collectors/trigger.py
+  	trollduction/producer.py
+
+
+- More debug info and check return code after cat command.
+  [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Cleanup local_data before going on to the next area. [Martin Raspaud]
+
+- Bugfix, use os.system for cat-command. [Adam.Dybbroe]
+
+- Change the way system commands are called and logged, using Popen.
+  [Adam.Dybbroe]
+
+- Listens to AAPP-HRPT. [Adam.Dybbroe]
+
+- Add some optional memory-leak detection. [Martin Raspaud]
+
+- Bugfix flag for hirs in aapp runner. [Martin Raspaud]
+
+- Listen to SDR/1B and not segment/SDR/1B. [Adam.Dybbroe]
+
+- Don't crash if message doesn't have a uri. [Martin Raspaud]
+
+- Adding the orbit number to the aapp call for metop. [Martin Raspaud]
+
+- Create a new message in cat instead of recycling the old one. [Martin
+  Raspaud]
+
+  Otherwise sender and time don't get updated.
+
+- Sort files before decompression for the cat. [Martin Raspaud]
+
+- Fix the last fix to work when the netloc is empty. [Martin Raspaud]
+
+- Fix hostname checking to dynamic instead of config-based. [Martin
+  Raspaud]
+
+- Allow only one sensor for ears metop. [Martin Raspaud]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Add alias capability to cat. [Martin Raspaud]
+
+- Make cat.py available as a script. [Martin Raspaud]
+
+- Add cat script. [Martin Raspaud]
+
+- Change the format for the xml output to PPS-XML, so that the
+  l2processors will ignore these files/messages. [Adam.Dybbroe]
+
+- Merge branch 'my-new-aapp-runner' into develop. [Adam.Dybbroe]
+
+- Log stderr as info. [Adam.Dybbroe]
+
+- Fix log reading. [Adam.Dybbroe]
+
+- Merge branch 'my-new-aapp-runner' into develop. [Adam.Dybbroe]
+
+- Subscribe to Segmen/SDR... [Adam.Dybbroe]
+
+- Bugfix. publish_topic added as a keyword argument to WatchDogTrigger.
+  [Adam.Dybbroe]
+
+- Merge branch 'develop' into my-new-aapp-runner. [Adam.Dybbroe]
+
+  Conflicts:
+  	trollduction/collectors/trigger.py
+
+- Debugging... [Adam.Dybbroe]
+
+- Avhrr/3 name in call to mpop instead of avhrr. [Adam.Dybbroe]
+
+- Avhrr instead of avhrr/3 in mpop call. [Adam.Dybbroe]
+
+- Support for avhrr. [Adam.Dybbroe]
+
+- Date/time bugfix. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Developing sst_runner. [Adam.Dybbroe]
+
+- Typo/bugfix. [Adam.Dybbroe]
+
+- Adding osisaf sst runner. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Install trollstalker2.py. [Adam.Dybbroe]
+
+- Merge branch 'feature-trollstalker2' into my-new-aapp-runner.
+  [Adam.Dybbroe]
+
+  Conflicts:
+  	trollduction/collectors/trigger.py
+
+
+- New code checking if host matches message is commented out.
+  [Adam.Dybbroe]
+
+- Handle PpsRunError from pps. [Adam.Dybbroe]
+
+- Only run if message is from the same server! [Adam.Dybbroe]
+
+- Put back the update_nwp call at start up. [Adam.Dybbroe]
+
+- Making a try, except clause around run function, and remove p.wait()
+  call. [Adam.Dybbroe]
+
+- Bugfix - orbit. [Adam.Dybbroe]
+
+- Using platform_name consistently. [Adam.Dybbroe]
+
+- Check for pps-script. [Adam.Dybbroe]
+
+- Debugging and catching exceptions in pps_worker. [Adam.Dybbroe]
+
+- More debug info in case of prepare_nwp crach. [Adam.Dybbroe]
+
+- AAPP-PPS is the avhrr lvl1 publish format. [Adam.Dybbroe]
+
+- Bugfix - data level. [Adam.Dybbroe]
+
+- Install under /usr instead of /usr/local. [Adam.Dybbroe]
+
+- Debug info added. [Adam.Dybbroe]
+
+- Handle situation where no log file is given in env. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Adding pps_runner.py to package and add the shell script.
+  [Adam.Dybbroe]
+
+- Merge branch 'new-pps-runner' into my-new-aapp-runner. [Adam.Dybbroe]
+
+- Editorial. [Adam.Dybbroe@smhi.se]
+
+- More debug info. [Adam.Dybbroe@smhi.se]
+
+- Syncing with smhi-develop branch. [Adam.Dybbroe@smhi.se]
+
+- Complete restructure of pps_runner. [Adam.Dybbroe@smhi.se]
+
+- Rewrite pps-runner. [Adam.Dybbroe@smhi.se]
+
+- Use smove function also for metop. [Adam.Dybbroe]
+
+- Temporarily take away the cleaning of workdir. [Adam.Dybbroe]
+
+- Print environment variables... [Adam.Dybbroe]
+
+- Perform tleing also after each aapp run. [Adam.Dybbroe]
+
+- Fixes for tleing. [Adam.Dybbroe]
+
+- Adding support for new config variables. [Adam.Dybbroe]
+
+- Add support for running tle-ingest etc from the runner. [Adam.Dybbroe]
+
+- Put back the cleaning of the working dir after run. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Fix satellite name for output-dir. [Adam.Dybbroe]
+
+- More debug info. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Call AAPP-script with orbit number + debugging (do not clean up after
+  AAPP) [Adam.Dybbroe]
+
+- Bugfix in printout. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Remove pdb entries. [Adam.Dybbroe]
+
+- Fix subscribe topics. [Adam.Dybbroe]
+
+- Fixing the logging. [Adam.Dybbroe]
+
+- Cleaning setup.py and adding setup.cfg. [Adam.Dybbroe]
+
+- Bypassing host server checking. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Making it merge with smhi branch. [Adam.Dybbroe]
+
+- Cosmetics. [Adam.Dybbroe]
+
+- Rename aapp_runner to aapp_dr_runner. [Adam.Dybbroe]
+
+- Bugfix in import. [Adam.Dybbroe]
+
+- Adding support for smhi station. [Adam.Dybbroe]
+
+- Bug fixes. [jkotro]
+
+- Fixing. [jkotro]
+
+- Making a packge out of aapp_runner. [Adam.Dybbroe]
+
+- Restructure of aapp_runner.py. [jkotro]
+
+- Make sure that l2processor doesn't hang on crash. [Panu Lahtinen]
+
+- Fixed incorrect function names in PostTrollTrigger. [Panu Lahtinen]
+
+- Add handling for separate start_date + start_time, end_date and
+  end_time (Suomi-NPP files) [Panu Lahtinen]
+
+- Use UTC, not local time. [Panu Lahtinen]
+
+- Fixed parsing of check_coverage from product config. [Panu Lahtinen]
+
+- "continue" to next area item in collection instead of return, add
+  handling for struct.error (raised in mipp) [Panu Lahtinen]
+
+- Better handling of "run only once" history. [Panu Lahtinen]
+
+- Merge branch 'feature-trollstalker2' into develop. [Adam.Dybbroe]
+
+  Conflicts:
+  	trollduction/collectors/trigger.py
+
+- Merge branch 'develop' into feature-trollstalker2. [Adam.Dybbroe]
+
+  Conflicts:
+  	trollduction/collectors/trigger.py
+
+- First iteration of the trollstalker rewrite. [Martin Raspaud]
+
+- Retry failed processing once, workaround for mipp import error. [Panu
+  Lahtinen]
+
+- Some error handling for broken input data. [Panu Lahtinen]
+
+- Add "history" to trollstalker, update config templates. [Panu
+  Lahtinen]
+
+- Possibility to stop reprocessing of the previous file with
+  configuration option process_only_once=True. [Panu Lahtinen]
+
+- For published message, collect also sub-dictionary keys/values for
+  trollsift.compose. [Panu Lahtinen]
+
+- Missing self added. [Panu Lahtinen]
+
+- Added possibility to set publish_topic in l2processor_config.ini, with
+  trollsift formating. [Panu Lahtinen]
+
+- Check if file is local (workaround for file:// "protocol") [Panu
+  Lahtinen]
+
+- Removed forgotten obsolete argument. [Panu Lahtinen]
+
+- Removed obsolete variable. [Panu Lahtinen]
+
+- Merge branch 'feature_area_msg' into develop. [Panu Lahtinen]
+
+  Conflicts:
+  	trollduction/collectors/region_collector.py
+  	trollduction/producer.py
+  	trollduction/xml_read.py
+
+
+- Fixes for logging (PEP8) [Panu Lahtinen]
+
+- Style changes to logging. [Panu Lahtinen]
+
+- Fixed a test after renaming a class member. [Panu Lahtinen]
+
+- For inbound messages where type is collection, check if the area
+  matches to the configured area. Also some cleanup for PEP8. [Panu
+  Lahtinen]
+
+- Added config option for using external calibration coefficients for
+  channels 1, 2 and 3a. [Panu Lahtinen]
+
+- Fix and re-enable checking valid and invalid satellites. [Panu
+  Lahtinen]
+
+- Merge documentation updates from branch 'zero_coverage' into develop.
+  [Panu Lahtinen]
+
+  Conflicts:
+  	doc/source/index.rst
+  	doc/source/usage.rst
+
+
+- Updated documentation. [Panu Lahtinen]
+
+- Fixed instrument -> sensor, clarified product config templates. [Panu
+  Lahtinen]
+
+- Making landscape happier. [Panu Lahtinen]
+
+- Fix for having <dump> in the product config. [Panu Lahtinen]
+
+- Removed as obsolete. [Panu Lahtinen]
+
+- Update to gatherer usage. [Panu Lahtinen]
+
+- Changed instrument -> sensor. [Panu Lahtinen]
+
+- Fixed links. [Panu Lahtinen]
+
+- Removed redundat documentation, added a link to readthedocs to README.
+  [Panu Lahtinen]
+
+- Updated configuration. [Panu Lahtinen]
+
+- Merge branch 'develop' of https://github.com/mraspaud/trollduction
+  into develop. [Panu Lahtinen]
+
+- Merge pull request #4 from mraspaud/gatherer_publish_topic. [Panu
+  Lahtinen]
+
+  Gatherer publish topic
+
+- Fixed test for PostTrollTrigger. [Panu Lahtinen]
+
+- Changed logging to info from warning in case no topic has been given.
+  [Panu Lahtinen]
+
+- Config option "publish_topic" for setting custom topic for published
+  messages by gatherer. [Panu Lahtinen]
+
+- Small updates. [Panu Lahtinen]
+
+- Removed obsolete config file. [Panu Lahtinen]
+
+- Consistent template filenames and updates to examples. [Panu Lahtinen]
+
+- Sync prepare_nwp from smhi-develop. [Adam.Dybbroe@smhi.se]
+
+- Activate nwp update for testing. [Adam.Dybbroe@smhi.se]
+
+- Adding nwp-stuff in pps-config template. [Adam.Dybbroe@smhi.se]
+
+- More verbose. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Bugfix. [Adam.Dybbroe]
+
+- Add support for pps time statistics. [Adam.Dybbroe]
+
+- Needs level in upper case. Warns if level is right but in lower case.
+  [Adam.Dybbroe]
+
+- Use upper case for level (1C instead of 1c) [Adam.Dybbroe]
+
+- Listen to all levels of AAPP-HRPT (needs 1B and 1C) [Adam.Dybbroe]
+
+- Use Upper case for processing level: "1B" instead of "1b"
+  [Adam.Dybbroe]
+
+- Change data proc level from 1b to 1B. [Adam.Dybbroe]
+
+- Subscribing to 1B data only. [Adam.Dybbroe]
+
+- Allow for different paths for hdf5/netcdf and xml output.
+  [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:mraspaud/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Don't listen to the SDR_compact (EARS-VIIRS) data. PPS is not
+  compatible with this format. [Adam.Dybbroe]
+
+- Uses socket.gethostname to get the server name, in case it is not
+  provided in config. [Adam.Dybbroe]
+
+- Also publish netCDF and XML output. [Adam.Dybbroe]
+
+- Do not take aliases from the product list to replace metadata in
+  incomming msg. [Martin Raspaud]
+
+- Viirs-runner: get hostname from system, not from config file. [Martin
+  Raspaud]
+
+- Gatherer doesn't crash anymore when "pattern" is missing, it uses
+  posttroll. [Martin Raspaud]
+
+- Merge branch 'develop' of github.com:mraspaud/trollduction into
+  develop. [Martin Raspaud]
+
+- Typo. [Panu Lahtinen]
+
+- Added new configuration options (nprocs, proj_method, precompute).
+  [Panu Lahtinen]
+
+- Added excecute file access bits. [Panu Lahtinen]
+
+- Added new config options (nprocs, proj_method, precompute). [Panu
+  Lahtinen]
+
+- Restructuring. [Panu Lahtinen]
+
+- Merge branch 'zero_coverage' into develop. [Panu Lahtinen]
+
+- Use aliases also to replace the data in incoming messages (eg. MSG3 ->
+  Meteosat-10) [Panu Lahtinen]
+
+- Removed satnumber to reflect the coming changes in satellite naming.
+  [Panu Lahtinen]
+
+- Possibility to skip all area coverage calculations, skip area coverage
+  calculation if min_coverage is zero, satnumber parameter returned to
+  create_scene() call, cleaned log message formating, some syntactic
+  cleanup (row lengths) [Panu Lahtinen]
+
+- Added configuration option for skipping area coverage checks. [Panu
+  Lahtinen]
+
+- Merge pull request #1 from mraspaud/stalker_times. [Panu Lahtinen]
+
+  Add "start_time" and "end_time" to messages if they are not present.
+
+- Add "start_time" and "end_time" to messages if they are not present.
+  The value "end_time" will be nominal_time (or "time", or
+  "nominal_time") plus 15 minutes. [Panu Lahtinen]
+
+- Make the uid unique for the different copies. [Martin Raspaud]
+
+- Fix data processing level for cloud products. [Martin Raspaud]
+
+- Fixing type/formats for output products. [Martin Raspaud]
+
+- Fix format and type fields of output messages. [Martin Raspaud]
+
+- Mock h5py and netcdf for documentation. [Martin Raspaud]
+
+- Mock mpop for building documentation. [Martin Raspaud]
+
 v0.2.0 (2015-02-19)
 -------------------
 
