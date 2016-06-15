@@ -50,3 +50,28 @@ loglevel=DEBUG
 event_names=IN_CLOSE_WRITE,IN_MOVED_TO
 posttroll_port=0
 alias_platform_name = MSG2:Meteosat-9|MSG3:Meteosat-10
+
+
+[himawari8]
+topic=/H8/topic/or/something/
+directory=/path/to/satellite/data/
+filepattern = {path}IMG_{platform_name:4s}{channel:3s}_{time:%Y%m%d%H%M}_{segment}
+
+# define new variable "platform_name" because it is not included in the filepattern
+var_platform_name = himawari8
+
+# define new datetime variable aligned/ceiled to 15 minutes intervals 
+# (Himawari filename timestampes are not constant for a timeslot)
+var_h8_gather_time={time:%Y%m%d%H%M|align(15)}
+
+# override start_time and end_time because default values are derived from {time} in 
+# filepattern and that is not constant for all files of a timeslot
+# "end_time" should be 1 interval after start_time (3rd parameter of align function)
+var_start_time = {time:%Y%m%d%H%M%S|align(15)}
+var_end_time = {time:%Y%m%d%H%M%S|align(15,0,1)}
+
+instruments = ahi
+stalker_log_config=/usr/local/etc/pytroll/trollstalker_logging.ini
+loglevel=DEBUG
+event_names=IN_CLOSE_WRITE,IN_MOVED_TO
+posttroll_port=0
