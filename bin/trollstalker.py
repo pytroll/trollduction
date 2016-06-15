@@ -260,36 +260,6 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
     return notifier
 
 
-def parse_aliases(config):
-    '''Parse aliases from the config.
-
-    Aliases are given in the config as:
-
-    {'alias_<name>': 'value:alias'}, or
-    {'alias_<name>': 'value1:alias1|value2:alias2'},
-
-    where <name> is the name of the key which value will be
-    replaced. The later form is there to support several possible
-    substitutions (eg. '2' -> '9' and '3' -> '10' in the case of MSG).
-
-    '''
-    aliases = {}
-
-    for key in config:
-        if 'alias' in key:
-            alias = config[key]
-            new_key = key.replace('alias_', '')
-            if '|' in alias or ':' in alias:
-                parts = alias.split('|')
-                aliases2 = {}
-                for part in parts:
-                    key2, val2 = part.split(':')
-                    aliases2[key2] = val2
-                alias = aliases2
-            aliases[new_key] = alias
-    return aliases
-
-
 def parse_vars(config):
     '''Parse custom variables from the config.
 
@@ -421,7 +391,7 @@ def main():
         except KeyError:
             nameservers = []
 
-        aliases = parse_aliases(config)
+        aliases = helper_functions.parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
 
         granule_length = float(config.get("granule", 0))
