@@ -42,6 +42,7 @@ SLOT_READY = 1
 SLOT_READY_BUT_WAIT_FOR_MORE = 2
 SLOT_OBSOLETE_TIMEOUT = 3
 
+DO_NOT_COPY_KEYS = ("uid", "uri", "channel_name", "segment")
 
 class SegmentGatherer(object):
 
@@ -87,7 +88,7 @@ class SegmentGatherer(object):
         # Init metadata struct
         metadata = {}
         for key in msg.data:
-            if key not in ("uid", "uri", "channel_name", "segment"):
+            if key not in DO_NOT_COPY_KEYS:
                 metadata[key] = msg.data[key]
         metadata['dataset'] = []
 
@@ -308,7 +309,14 @@ class SegmentGatherer(object):
         except ValueError:
             self.logger.debug("Unknown file, skipping.")
             return
-        time_slot = str(mda[self.time_name])
+
+        metadata = {}
+        for key in msg.data:
+            if key not in DO_NOT_COPY_KEYS:
+                metadata[key] = msg.data[key]
+        metadata.update(mda)
+
+        time_slot = str(metadata[self.time_name])
 
         # Init metadata etc if this is the first file
         if time_slot not in self.slots:
