@@ -53,7 +53,13 @@ class SegmentGatherer(object):
         self._config = config
         self._section = section
         topics = config.get(section, 'topics').split()
-        nameservers = config.get(section, 'nameservers').split()
+        
+        try:
+            nameservers = config.get(section, 'nameservers')
+            nameservers = nameservers.split(',')
+        except (NoOptionError, ValueError):
+            nameservers = []
+        
         self._listener = ListenerContainer(topics=topics)
         self._publisher = publisher.NoisyPublisher("segment_gatherer",
                                                    nameservers=nameservers)
