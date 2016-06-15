@@ -57,10 +57,11 @@ class EventHandler(ProcessEvent):
 
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
                  aliases=None, tbus_orbit=False, history=0, granule_length=0,
-                 custom_vars=None):
+                 custom_vars=None, nameservers=[]):
         super(EventHandler, self).__init__()
 
-        self._pub = NoisyPublisher("trollstalker", posttroll_port, topic)
+        self._pub = NoisyPublisher("trollstalker", posttroll_port, topic,
+                                   nameservers=nameservers)
         self.pub = self._pub.start()
         self.topic = topic
         self.info = OrderedDict()
@@ -224,7 +225,7 @@ class NewThreadedNotifier(ThreadedNotifier):
 def create_notifier(topic, instrument, posttroll_port, filepattern,
                     event_names, monitored_dirs, aliases=None,
                     tbus_orbit=False, history=0, granule_length=0,
-                    custom_vars=None):
+                    custom_vars=None, nameservers=[]):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
@@ -247,7 +248,8 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
                                  tbus_orbit=tbus_orbit,
                                  history=history,
                                  granule_length=granule_length,
-                                 custom_vars=custom_vars)
+                                 custom_vars=custom_vars,
+                                 nameservers=nameservers)
 
     notifier = NewThreadedNotifier(manager, event_handler)
 
@@ -347,6 +349,10 @@ def main():
     parser.add_argument("-i", "--instrument",
                         type=str, default=None,
                         help="Instrument name in the satellite")
+    parser.add_argument("-n", "--nameservers",
+                        type=str, default=None,
+                        help="Posttroll nameservers to register own address,"
+                        " otherwise multicasting is used")
 
     if len(sys.argv) <= 1:
         parser.print_help()
@@ -366,6 +372,7 @@ def main():
     topic = args.topic
     event_names = args.event_names
     instrument = args.instrument
+    nameservers = args.nameservers
 
     filepattern = args.filepattern
     if args.filepattern == '':
@@ -409,6 +416,8 @@ def main():
         except KeyError:
             history = 0
 
+        nameservers = nameservers or config['nameservers']
+
         aliases = parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
 
@@ -444,12 +453,18 @@ def main():
     if type(monitored_dirs) is not list:
         monitored_dirs = [monitored_dirs]
 
+    if nameservers:
+        nameservers = nameservers.split(',')
+    else:
+        nameservers = []
+
     # Start watching for new files
     notifier = create_notifier(topic, instrument, posttroll_port, filepattern,
                                event_names, monitored_dirs, aliases=aliases,
                                tbus_orbit=tbus_orbit, history=history,
                                granule_length=granule_length,
-                               custom_vars=custom_vars)
+                               custom_vars=custom_vars,
+                               nameservers=nameservers)
     notifier.start()
 
     try:

@@ -32,6 +32,12 @@ event_names=IN_CLOSE_WRITE,IN_MOVED_TO
 # free port.
 posttroll_port=0
 
+# nameserver hosts to register publisher
+# WARNING: 
+# if nameservers option is set, address broadcasting via multicasting is not used any longer.
+# The corresponding nameserver has to be started with command line option "--no-multicast".
+#nameservers=localhost
+
 # use an alias to convert from platform in the filename to OSCAR naming
 alias_platform_name = noaa18:NOAA-18|noaa19:NOAA-19
 
