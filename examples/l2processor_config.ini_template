@@ -15,9 +15,3 @@ td_log_config=/usr/local/etc/pytroll/trollduction_logging.ini
 # option below, so that only first of identical consecutive messages
 #  will be processed
 # process_only_once=True
-
-# nameserver hosts to register publisher
-# WARNING: 
-# if nameservers option is set, address broadcasting via multicasting is not used any longer.
-# The corresponding nameserver has to be started with command line option "--no-multicast".
-#nameservers=localhost
