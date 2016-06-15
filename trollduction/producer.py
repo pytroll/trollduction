@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2014, 2015
+# Copyright (c) 2014-2016
 #
 # Author(s):
 #
@@ -61,8 +61,25 @@ from trollsched.satpass import Pass
 from trollsched.boundary import Boundary, AreaDefBoundary
 import errno
 import netifaces
+import tempfile
+
+try:
+    from mipp import DecodeError
+except ImportError:
+    DecodeError = IOError
+
+
+try:
+    from mem_top import mem_top
+except ImportError:
+    mem_top = None
+else:
+    import gc
+    import pprint
 
 from xml.etree.ElementTree import tostring
+from struct import error as StructError
+
 LOGGER = logging.getLogger(__name__)
 
 # Config watcher stuff
@@ -81,6 +98,34 @@ def get_local_ips():
     return ips
 
 
+def is_uri_on_server(uri, strict=False):
+    """Check if the *uri* is designating a place on the server.
+
+    If *strict* is True, the hostname has to be specified in the *uri* for the path to be considered valid.
+    """
+    url = urlparse(uri)
+    try:
+        url_ip = socket.gethostbyname(url.hostname)
+    except (socket.gaierror, TypeError):
+        if strict:
+            return False
+        try:
+            os.stat(url.path)
+        except OSError:
+            return False
+    else:
+        if url.hostname == '':
+            if strict:
+                return False
+            try:
+                os.stat(url.path)
+            except OSError:
+                return False
+        elif url_ip not in get_local_ips():
+            return False
+    return True
+
+
 def check_uri(uri):
     """Check that the provided *uri* is on the local host and return the
     file path.
@@ -90,10 +135,15 @@ def check_uri(uri):
         return paths
     url = urlparse(uri)
     try:
-        url_ip = socket.gethostbyname(url.netloc)
+        if url.hostname:
+            url_ip = socket.gethostbyname(url.hostname)
 
-        if url_ip not in get_local_ips() and url.netloc != '':
-            raise IOError("Data file %s unaccessible from this host" % uri)
+            if url_ip not in get_local_ips():
+                try:
+                    os.stat(url.path)
+                except OSError:
+                    raise IOError(
+                        "Data file %s unaccessible from this host" % uri)
 
     except socket.gaierror:
         LOGGER.warning("Couldn't check file location, running anyway")
@@ -257,6 +307,8 @@ def get_polygons_positions(datas, frequency=1):
 
 
 def get_polygons(datas, area, frequency=1):
+    """Get a list of polygons describing the boundary of the area.
+    """
     polygons = get_polygons_positions(datas, frequency)
 
     llpolygons = []
@@ -275,7 +327,8 @@ def get_polygons(datas, area, frequency=1):
 
 
 def coverage(scene, area):
-
+    """Calculate coverages.
+    """
     shapes = set()
     for channel in scene.channels:
         if channel.is_loaded():
@@ -283,7 +336,7 @@ def coverage(scene, area):
 
     coverages = []
 
-    from trollsched.satpass import Mapper
+    # from trollsched.satpass import Mapper
 
     for shape in shapes:
 
@@ -315,6 +368,8 @@ def coverage(scene, area):
 
 
 def generic_covers(scene, area_item):
+    """Check if scene covers area_item with high enough percentage.
+    """
     area_def = get_area_def(area_item.attrib['id'])
     min_coverage = float(
         area_item.attrib.get('min_coverage', 0))
@@ -336,15 +391,23 @@ class DataProcessor(object):
     """Process the data.
     """
 
-    def __init__(self):
+    def __init__(self, publish_topic=None, port=0):
         self.global_data = None
         self.local_data = None
         self.product_config = None
+        self._publish_topic = publish_topic
         self._data_ok = True
-        self.writer = DataWriter()
+        self.writer = DataWriter(publish_topic=self._publish_topic, port=port)
         self.writer.start()
 
+    def set_publish_topic(self, publish_topic):
+        '''Set published topic.'''
+        self._publish_topic = publish_topic
+        self.writer.set_publish_topic(publish_topic)
+
     def stop(self):
+        '''Stop data writer.
+        '''
         self.writer.stop()
 
     def create_scene_from_message(self, msg):
@@ -384,7 +447,14 @@ class DataProcessor(object):
                                       variant=mda.get('variant', ''))
         LOGGER.debug("Creating scene for satellite %s and time %s",
                      str(platform), str(time_slot))
-        if mda['orbit_number'] is not None or mda.get('orbit_type') == "polar":
+
+        check_coverage = \
+            self.product_config.attrib.get("check_coverage",
+                                           "true").lower() in ("true", "yes",
+                                                               "1")
+
+        if check_coverage and (mda['orbit_number'] is not None or
+                               mda.get('orbit_type') == "polar"):
             global_data.overpass = Pass(platform,
                                         mda['start_time'],
                                         mda['end_time'],
@@ -398,6 +468,8 @@ class DataProcessor(object):
         return global_data
 
     def save_to_netcdf(self, data, item, params):
+        """Save data to netCDF4.
+        """
         LOGGER.debug("Save full data to netcdf4")
         try:
             params["time_slot"] = data.time_slot
@@ -421,11 +493,18 @@ class DataProcessor(object):
         """Process the data
         """
 
+        self.product_config = product_config
+
         if msg.type == "file":
             uri = msg.data['uri']
         elif msg.type == "dataset":
             uri = [mda['uri'] for mda in msg.data['dataset']]
         elif msg.type == 'collection':
+            all_areas = self.get_area_def_names()
+            if not msg.data['collection_area_id'] in all_areas:
+                LOGGER.info('Collection does not contain data for '
+                            'current areas. Skipping.')
+                return
             if 'dataset' in msg.data['collection'][0]:
                 uri = []
                 for dataset in msg.data['collection']:
@@ -453,18 +532,44 @@ class DataProcessor(object):
         self._data_ok = True
         self.product_config = product_config
 
-        area_def_names = self.get_area_def_names()
+        nprocs = int(self.product_config.attrib.get("nprocs", 1))
+        proj_method = self.product_config.attrib.get("proj_method", "nearest")
+        LOGGER.info("Using %d CPUs for reprojecting with method %s.",
+                    nprocs, proj_method)
+        try:
+            srch_radius = int(self.product_config.attrib["srch_radius"])
+        except KeyError:
+            srch_radius = None
 
-        for area_item in self.product_config.pl:
+        precompute = \
+            self.product_config.attrib.get("precompute", "").lower() in \
+            ["true", "yes", "1"]
+        if precompute:
+            LOGGER.debug("Saving projection mapping for re-use")
+        use_extern_calib = \
+            self.product_config.attrib.get("use_extern_calib", "").lower() in \
+            ["true", "yes", "1"]
+        keywords = {"use_extern_calib": use_extern_calib}
+
+        for area_item in self.product_config.prodlist:
             if area_item.tag == "dump":
-                self.global_data.load(filename=filename)
-                self.save_to_netcdf(self.global_data,
-                                    area_item,
-                                    self.get_parameters(area_item))
+                try:
+                    self.global_data.load(filename=filename, **keywords)
+                    self.save_to_netcdf(self.global_data,
+                                        area_item,
+                                        self.get_parameters(area_item))
+                except (IndexError, IOError, DecodeError, StructError):
+                    LOGGER.exception("Incomplete or corrupted input data.")
 
         for group in self.product_config.groups:
             LOGGER.debug("processing %s", str(group))
             area_def_names = self.get_area_def_names(group.data)
+            if msg.type == 'collection' and \
+               not msg.data['collection_area_id'] in area_def_names:
+                LOGGER.info('Collection data does not cover this area group. '
+                            'Skipping.')
+                continue
+
             products = []
             skip = []
             skip_group = True
@@ -478,8 +583,8 @@ class DataProcessor(object):
                     else:
                         skip_group = False
                 except AttributeError:
-                    LOGGER.exception(
-                        "Can't compute coverage from unloaded data, continuing")
+                    LOGGER.exception("Can't compute coverage from "
+                                     "unloaded data, continuing")
                     do_generic_coverage = True
                     skip_group = False
                 for product in area_item:
@@ -497,7 +602,8 @@ class DataProcessor(object):
                 LOGGER.debug("loading channels : %s",
                              str(self.get_req_channels(products)))
                 keywords = {"filename": filename,
-                            "area_def_names": area_def_names}
+                            "area_def_names": area_def_names,
+                            "use_extern_calib": use_extern_calib}
                 try:
                     keywords["time_interval"] = (msg.data["start_time"],
                                                  msg.data["end_time"])
@@ -505,10 +611,10 @@ class DataProcessor(object):
                     pass
                 if "resolution" in group.info:
                     keywords["resolution"] = int(group.resolution)
-                self.global_data.load(self.get_req_channels(products),
-                                      **keywords)
-                LOGGER.debug("loaded data : %s", str(self.global_data))
-            except IndexError:
+
+                self.global_data.load(req_channels, **keywords)
+                LOGGER.debug("loaded data: %s", str(self.global_data))
+            except (IndexError, IOError, DecodeError, StructError):
                 LOGGER.exception("Incomplete or corrupted input data.")
                 self._data_ok = False
                 break
@@ -521,14 +627,25 @@ class DataProcessor(object):
                     continue
 
                 # reproject to local domain
-                LOGGER.debug(
-                    "Projecting data to area " + area_item.attrib['name'])
+                LOGGER.debug("Projecting data to area %s",
+                             area_item.attrib['name'])
                 try:
+                    try:
+                        actual_srch_radius = \
+                                int(area_item.attrib["srch_radius"])
+                        LOGGER.debug("Overriding search radius %s with %s",
+                                     str(srch_radius), str(actual_srch_radius))
+                    except KeyError:
+                        LOGGER.debug("Using search radius %s", str(srch_radius))
+                        actual_srch_radius = srch_radius
+
                     self.local_data = \
                         self.global_data.project(
                             area_item.attrib["id"],
                             channels=self.get_req_channels(area_item),
-                            mode='nearest')
+                            mode=proj_method, nprocs=nprocs,
+                            precompute=precompute,
+                            radius=actual_srch_radius)
                 except ValueError:
                     LOGGER.warning("No data in this area")
                     continue
@@ -537,11 +654,13 @@ class DataProcessor(object):
                                    area_item.attrib['id'])
                     continue
 
-                LOGGER.info(
-                    'Data reprojected for area: %s', area_item.attrib['name'])
+                LOGGER.info('Data reprojected for area: %s',
+                            area_item.attrib['name'])
 
                 # Draw requested images for this area.
                 self.draw_images(area_item)
+                del self.local_data
+                self.local_data = None
 
             if group.get("unload", "").lower() in ["yes", "true", "1"]:
                 loaded_channels = [chn.name for chn
@@ -554,32 +673,47 @@ class DataProcessor(object):
         if self._data_ok:
             LOGGER.debug("Waiting for the files to be saved")
         self.writer.prod_queue.join()
+
+        self.release_memory()
+
         if self._data_ok:
             LOGGER.debug("All files saved")
-
-            LOGGER.info('File %s processed in %.1f s', uri,
+            LOGGER.info("File %s processed in %.1f s", uri,
                         time.time() - t1a)
 
         if not self._data_ok:
             LOGGER.warning("File %s not processed due to "
-                           "incomplete/missing/corrupted data." %
+                           "incomplete/missing/corrupted data.",
                            uri)
+            raise IOError
 
+    def release_memory(self):
+        """Run garbage collection for diagnostics"""
+        if mem_top is not None:
+            LOGGER.debug(mem_top())
         # Release memory
         del self.local_data
         del self.global_data
         self.local_data = None
         self.global_data = None
 
+        if mem_top is not None:
+            gc_res = gc.collect()
+            LOGGER.debug("Unreachable objects: %d", gc_res)
+            LOGGER.debug('Remaining Garbage: %s', pprint.pformat(gc.garbage))
+            del gc.garbage[:]
+            LOGGER.debug(mem_top())
+
     def get_req_channels(self, products):
-        # Get a list of required channels
+        """Get a list of required channels
+        """
         reqs = set()
         for product in products:
             if product.tag == "dump":
                 return None
             try:
-                composite = getattr(
-                    self.global_data.image, product.attrib['id'])
+                composite = getattr(self.global_data.image,
+                                    product.attrib['id'])
                 reqs |= composite.prerequisites
             except AttributeError:
                 LOGGER.info("Composite %s not available",
@@ -591,10 +725,10 @@ class DataProcessor(object):
         config to a list.
         '''
 
-        pl = group or self.product_config.pl
+        prodlist = group or self.product_config.prodlist
 
         def_names = [item.attrib["id"]
-                     for item in self.product_config.pl
+                     for item in prodlist
                      if item.tag == "area"]
 
         return def_names
@@ -605,31 +739,27 @@ class DataProcessor(object):
         '''
 
         # Check the list of valid satellites
-        if 'valid_satellite' in config:
-            if self.global_data.info['satname'] +\
-                    self.global_data.info['satnumber'] not in\
-                    config['valid_satellite']:
+        if 'valid_satellite' in config.keys():
+            if self.global_data.info['platform_name'] not in +\
+                    config.attrib['valid_satellite']:
 
                 info = 'Satellite %s not in list of valid ' \
                     'satellites, skipping product %s.' % \
-                    (self.global_data.info['satname'] +
-                     self.global_data.info['satnumber'],
-                     config['name'])
+                    (self.global_data.info['platform_name'],
+                     config.attrib['name'])
                 LOGGER.info(info)
 
                 return False
 
         # Check the list of invalid satellites
-        if 'invalid_satellite' in config:
-            if self.global_data.info['satname'] +\
-                    self.global_data.info['satnumber'] in\
-                    config['invalid_satellite']:
+        if 'invalid_satellite' in config.keys():
+            if self.global_data.info['platform_name'] in \
+                    config.attrib['invalid_satellite']:
 
                 info = 'Satellite %s is in the list of invalid ' \
                     'satellites, skipping product %s.' % \
-                    (self.global_data.info['satname'] +
-                     self.global_data.info['satnumber'],
-                     config['name'])
+                    (self.global_data.info['platform_name'],
+                     config.attrib['name'])
                 LOGGER.info(info)
 
                 return False
@@ -672,9 +802,9 @@ class DataProcessor(object):
                 continue
             # TODO
             # Check if satellite is one that should be processed
-            # if not self.check_satellite(product):
+            if not self.check_satellite(product):
                 # Skip this product, if the return value is True
-                # continue
+                continue
 
             # Check if Sun zenith angle limits match this product
             if 'sunzen_night_minimum' in product.attrib or \
@@ -690,7 +820,9 @@ class DataProcessor(object):
                                   product.attrib['sunzen_lonlat'].split(',')]
                     else:
                         lonlat = None
-                if not self.check_sunzen(product.attrib, area_def=get_area_def(area.attrib['id']),
+                if not self.check_sunzen(product.attrib,
+                                         area_def=get_area_def(
+                                             area.attrib['id']),
                                          xy_loc=xy_loc, lonlat=lonlat):
                     # If the return value is False, skip this product
                     continue
@@ -701,12 +833,12 @@ class DataProcessor(object):
                 LOGGER.debug("Generating %s", product.attrib['id'])
                 img = func()
                 img.info.update(self.global_data.info)
-                img.info["product_name"] = product.attrib.get("name",
-                                                              product.attrib["id"])
-            except AttributeError:
+                img.info["product_name"] = \
+                    product.attrib.get("name", product.attrib["id"])
+            except AttributeError as err:
                 # Log incorrect product funcion name
-                LOGGER.error('Incorrect product id: %s for area %s',
-                             product.attrib['id'], area.attrib['name'])
+                LOGGER.error('Incorrect product id: %s for area %s (%s)',
+                             product.attrib['id'], area.attrib['name'], str(err))
             except KeyError as err:
                 # log missing channel
                 LOGGER.warning('Missing channel on product %s for area %s: %s',
@@ -808,7 +940,9 @@ class DataProcessor(object):
         return True
 
 
-def _create_message(obj, filename, uri, params):
+def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
+    """Create posttroll message.
+    """
     to_send = obj.info.copy()
 
     for key in ['collection', 'dataset']:
@@ -835,61 +969,96 @@ def _create_message(obj, filename, uri, params):
 
     # FIXME: fishy: what if the uri already has a scheme ?
     to_send["uri"] = urlunsplit(("file", "", uri, "", ""))
-    to_send["uid"] = os.path.basename(filename)
+    to_send["uid"] = uid or os.path.basename(filename)
     # we should have more info on format...
     fformat = os.path.splitext(filename)[1][1:]
     if fformat.startswith("tif"):
-        fformat = "GeoTIFF"
+        fformat = "TIFF"
     elif fformat.startswith("png"):
         fformat = "PNG"
     elif fformat.startswith("jp"):
         fformat = "JPEG"
     elif fformat.startswith("nc"):
-        fformat = "NetCDF"
+        fformat = "NetCDF4"
+    elif fformat in ["hdf", "h5"]:
+        fformat = "HDF5"
     to_send["type"] = fformat
-    if fformat != "NetCDF":
+    if fformat not in ["NetCDF4", "HDF5", "TIFF"]:
         to_send["format"] = "raster"
         to_send["data_processing_level"] = "2"
         to_send["product_name"] = obj.info["product_name"]
-    else:
+    elif fformat == "TIFF":
+        to_send["format"] = "GeoTIFF"
+        to_send["data_processing_level"] = "2"
+        to_send["product_name"] = obj.info["product_name"]
+    elif fformat == "NetCDF4":
         to_send["format"] = "CF"
         to_send["data_processing_level"] = "1b"
         to_send["product_name"] = "dump"
+    elif fformat == "HDF5":
+        to_send["format"] = "PPS"
+        to_send["data_processing_level"] = "3"
+        to_send["product_name"] = "cloudproduct"
 
-    subject = "/".join(("",
-                        to_send["format"],
-                        to_send["data_processing_level"]))
+    if publish_topic is None:
+        subject = "/".join(("",
+                            to_send["format"],
+                            to_send["data_processing_level"]))
+    else:
+        # TODO: this is ugly, but still the easiest way to get area id
+        # for the compose as dict key "id"
+        compose_dict = {}
+        for key in to_send:
+            if isinstance(to_send[key], dict):
+                for key2 in to_send[key]:
+                    compose_dict[key2] = to_send[key][key2]
+            else:
+                compose_dict[key] = to_send[key]
+        subject = compose(publish_topic, compose_dict)
 
-    msg = Message(subject,
-                  "file",
-                  to_send)
+    msg = Message(subject, "file", to_send)
+
     return msg
 
 
-def link_or_copy(src, dst):
+def link_or_copy(src, dst, tmpdst=None, retry=1):
+    """Create a hardlink from *src* to *dst*, or if that fails, copy.
+    """
     if src == dst:
         LOGGER.warning("Trying to copy a file over itself: %s", src)
         return
     try:
         os.link(src, dst)
+        if tmpdst is not None:
+            os.remove(tmpdst)
     except OSError as err:
         if err.errno not in [errno.EXDEV]:
             LOGGER.exception("Could not link: %s -> %s", src, dst)
             return
         try:
-            shutil.copy(src, dst)
+            if tmpdst is not None:
+                shutil.copy(src, tmpdst)
+                os.rename(tmpdst, dst)
+            else:
+                shutil.copy(src, dst)
         except shutil.Error:
             LOGGER.exception("Something went wrong in copying a file")
         except IOError as err:
-            LOGGER.info(str(err))
-            LOGGER.exception("Could not copy: %s -> %s", src, dst)
+            LOGGER.info("Error copying file: %s", str(err))
+            if retry:
+                LOGGER.info("Retrying...")
+                link_or_copy(src, dst, tmpdst, retry - 1)
+            else:
+                LOGGER.exception("Could not copy: %s -> %s", src, dst)
 
 
 def thumbnail(filename, thname, size, fformat):
+    """Create a thumbnail image and save it.
+    """
     from PIL import Image
-    im = Image.open(filename)
-    im.thumbnail(size, Image.ANTIALIAS)
-    im.save(thname, fformat)
+    img = Image.open(filename)
+    img.thumbnail(size, Image.ANTIALIAS)
+    img.save(thname, fformat)
 
 
 def hash_color(colorstring):
@@ -899,33 +1068,42 @@ def hash_color(colorstring):
         colorstring = colorstring[1:]
     if len(colorstring) != 6:
         raise ValueError("input #%s is not in #RRGGBB format" % colorstring)
-    r, g, b = colorstring[:2], colorstring[2:4], colorstring[4:]
-    r, g, b = [int(n, 16) for n in (r, g, b)]
-    return (r, g, b)
+    r_col, g_col, b_col = colorstring[:2], colorstring[2:4], colorstring[4:]
+    r_col, g_col, b_col = [int(n, 16) for n in (r_col, g_col, b_col)]
+    return (r_col, g_col, b_col)
 
 
 class DataWriter(Thread):
-
     """Writes data to disk.
 
-    This is separate from the DataProcessor since it takes IO time and we don't
-    want to block processing.
+    This is separate from the DataProcessor since it takes IO time and
+    we don't want to block processing.
     """
 
-    def __init__(self):
+    def __init__(self, publish_topic=None, port=0):
         Thread.__init__(self)
         self.prod_queue = Queue.Queue()
+        self._publish_topic = publish_topic
+        self._port = port
         self._loop = True
 
+    def set_publish_topic(self, publish_topic):
+        """Set published topic."""
+        self._publish_topic = publish_topic
+
     def run(self):
-        """Run the thread.
-        """
-        with Publish("l2producer") as pub:
+        """Run the thread."""
+        with Publish("l2producer", port=self._port) as pub:
+            umask = os.umask(0)
+            os.umask(umask)
+            default_mode = int('666', 8) - umask
+
             while self._loop:
                 try:
                     obj, file_items, params = self.prod_queue.get(True, 1)
                 except Queue.Empty:
                     continue
+                local_params = params.copy()
                 try:
                     # Sort the file items in categories, to allow copying
                     # similar ones.
@@ -944,7 +1122,6 @@ class DataWriter(Thread):
                         key = tuple(sorted(attrib.items()))
                         sorted_items.setdefault(key, []).append(item)
 
-                    local_params = params.copy()
                     local_aliases = local_params['aliases']
                     for key, aliases in local_aliases.items():
                         if key in local_params:
@@ -964,53 +1141,76 @@ class DataWriter(Thread):
                         for copy in copies:
                             output_dir = copy.attrib.get("output_dir",
                                                          params["output_dir"])
+
                             fname = compose(os.path.join(output_dir, copy.text),
                                             local_params)
+                            tempfd, tempname = tempfile.mkstemp(dir=os.path.dirname(fname))
+                            os.chmod(tempname, default_mode)
+                            os.close(tempfd)
+                            LOGGER.debug("Saving %s", fname)
                             if not saved:
-                                obj.save(fname,
-                                         fformat=fformat,
-                                         compression=copy.attrib.get("compression", 6))
+                                try:
+                                    obj.save(tempname,
+                                             fformat=fformat,
+                                             compression=copy.attrib.get("compression", 6))
+                                except IOError:  # retry once
+                                    try:
+                                        obj.save(tempname,
+                                                 fformat=fformat,
+                                                 compression=copy.attrib.get("compression", 6))
+                                    except IOError:
+                                        LOGGER.exception("Can't save file %s", fname)
+                                        continue
+                                os.rename(tempname, fname)
+
                                 LOGGER.info("Saved %s to %s", str(obj), fname)
                                 saved = fname
+                                uid = os.path.basename(fname)
                             else:
-                                link_or_copy(saved, fname)
+                                LOGGER.info("Copied/Linked %s to %s", saved, fname)
+                                link_or_copy(saved, fname, tempname)
                                 saved = fname
-
                             if ("thumbnail_name" in copy.attrib and
                                     "thumbnail_size" in copy.attrib):
                                 thsize = [int(val) for val
-                                          in copy.attrib["thumbnail_size"].split("x")]
+                                          in copy.attrib[
+                                    "thumbnail_size"].split("x")]
                                 copy.attrib["thumbnail_size"] = thsize
-                                thname = compose(os.path.join(output_dir,
-                                                              copy.attrib["thumbnail_name"]),
-                                                 local_params)
+                                thname = \
+                                    compose(os.path.join(
+                                        output_dir,
+                                        copy.attrib["thumbnail_name"]),
+                                        local_params)
                                 copy.attrib["thumbnail_name"] = thname
                                 thumbnail(fname, thname, thsize, fformat)
 
                             msg = _create_message(obj, os.path.basename(fname),
-                                                  fname, params)
+                                                  fname, params,
+                                                  publish_topic=self._publish_topic,
+                                                  uid=uid)
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
-                except:
+                except Exception as e:
                     for item in file_items:
                         if "thumbnail_size" in item.attrib:
                             item.attrib["thumbnail_size"] = str(
                                 item.attrib["thumbnail_size"])
-                    LOGGER.exception("Something wrong happened saving %s to %s",
+                    LOGGER.exception("Something wrong happened saving "
+                                     "%s to %s: %s (%s)",
                                      str(obj),
                                      str([tostring(item)
-                                          for item in file_items]))
+                                          for item in file_items]),
+                                     e.message,
+                                     local_params)
                 finally:
                     self.prod_queue.task_done()
 
     def write(self, obj, item, params):
-        '''Write to queue.
-        '''
+        """Write to queue."""
         self.prod_queue.put((obj, list(item), params.copy()))
 
     def stop(self):
-        '''Stop the data writer.
-        '''
+        """Stop the data writer."""
         LOGGER.info("stopping data writer")
         self._loop = False
 
@@ -1032,8 +1232,12 @@ class Trollduction(object):
 
         self._loop = True
         self.thr = None
-        self.data_processor = DataProcessor()
+
+        self.data_processor = None
         self.config_watcher = None
+
+        self._previous_pass = {"platform_name": None,
+                               "start_time": None}
 
         # read everything from the Trollduction config file
         try:
@@ -1042,12 +1246,17 @@ class Trollduction(object):
             if not managed:
                 self.config_watcher = \
                     ConfigWatcher(config['config_file'],
+                                  config['config_item'],
                                   self.update_td_config_from_file)
                 self.config_watcher.start()
 
         except AttributeError:
             self.td_config = config
             self.update_td_config()
+
+        self.data_processor = \
+            DataProcessor(publish_topic=self.td_config.get('publish_topic'),
+                          port=int(self.td_config.get('port', 0)))
 
     def update_td_config_from_file(self, fname, config_item=None):
         '''Read Trollduction config file and use the new parameters.
@@ -1073,23 +1282,19 @@ class Trollduction(object):
             LOGGER.info("Listener restarted")
 
         try:
-            self.update_product_config(self.td_config['product_config_file'],
-                                       self.td_config['config_item'])
+            self.update_product_config(self.td_config['product_config_file'])
         except KeyError:
-            LOGGER.exception("Key 'product_config_file' or 'config_item' is "
+            LOGGER.exception("Key 'product_config_file' is "
                              "missing from Trollduction config")
 
-    def update_product_config(self, fname, config_item):
+    def update_product_config(self, fname):
         '''Update area definitions, associated product names, output
         filename prototypes and other relevant information from the
         given file.
         '''
         import xml_read
-        self.product_config = xml_read.ProductList(fname)
 
-        # product_config = \
-        #    helper_functions.read_config_file(fname,
-        # config_item=config_item)
+        self.product_config = xml_read.ProductList(fname)
 
         # add checks, or do we just assume the config to be valid at
         # this point?
@@ -1141,11 +1346,56 @@ class Trollduction(object):
                     sensors = set(msg.data['sensor'])
                 else:
                     sensors = set((msg.data['sensor'], ))
-                if (msg.type in ["file", 'collection', 'dataset'] and
-                        sensors.intersection(self.td_config['instruments'].split(','))):
-                    self.update_product_config(self.td_config['product_config_file'],
-                                               self.td_config['config_item'])
-                    self.data_processor.run(self.product_config, msg)
 
+                prev_pass = self._previous_pass
+                if (msg.type in ["file", 'collection', 'dataset'] and
+                    sensors.intersection(
+                        self.td_config['instruments'].split(','))):
+                    try:
+                        if self.td_config.get('process_only_once',
+                                              "false").lower() in \
+                           ["true", "yes", "1"] and \
+                           self._previous_pass["platform_name"] == \
+                           msg.data["platform_name"] and \
+                           self._previous_pass["start_time"] == \
+                           msg.data["start_time"]:
+                            LOGGER.info(
+                                "File was already processed. Skipping.")
+                            continue
+                        else:
+                            self._previous_pass["platform_name"] = \
+                                msg.data["platform_name"]
+                            self._previous_pass["start_time"] = \
+                                msg.data["start_time"]
+                    except TypeError:
+                        self._previous_pass["platform_name"] = \
+                            msg.data["platform_name"]
+                        self._previous_pass["start_time"] = \
+                            msg.data["start_time"]
+
+                    except KeyError:
+                        LOGGER.info("Can't check if file is already processed, "
+                                    "so let's do it anyway.")
+
+                    self.update_product_config(
+                        self.td_config['product_config_file'])
+
+                    retried = False
+                    while True:
+                        try:
+                            self.data_processor.run(self.product_config, msg)
+                            break
+                        except IOError:
+                            if retried:
+                                LOGGER.debug("History of processed files not "
+                                             "updated due to "
+                                             "missing/corrupted/incomplete "
+                                             "data.")
+                                self._previous_pass = prev_pass
+                                break
+                            else:
+                                retried = True
+                                LOGGER.info("Retrying once in 2 seconds.")
+                                time.sleep(2)
         finally:
             self.shutdown()

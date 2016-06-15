@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014
+# Copyright (c) 2013, 2014, 2015, 2016
 
 # Author(s):
 
@@ -27,10 +27,11 @@ pytroll messages from the Nimbus server (PDS file dispatch) and triggers
 processing on direct readout data
 """
 
-
 import os
 import glob
 import logging
+import socket
+from trollduction import get_local_ips
 
 #: Default time format
 _DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -163,7 +164,7 @@ def update_utcpole_and_leapsec_files():
         LOG.info("Data retrieved from url...")
 
         # I store the files with a timestamp attached, in order not to remove
-        # the existing files.  In case something gets wrong in the download, we
+        # the existing files. In case something gets wrong in the download, we
         # can handle this by not changing the sym-links below:
         newname = filename + '_' + timestamp
         outfile = os.path.join(ETC_DIR, newname)
@@ -597,10 +598,16 @@ def start_modis_lvl1_processing(eos_files,
     LOG.info("EOS files: " + str(eos_files))
     LOG.info("\tMessage:")
     LOG.info(message)
+
     urlobj = urlparse(message.data['uri'])
     LOG.info("Server = " + str(urlobj.netloc))
-    if urlobj.netloc != SERVERNAME:
+    server = urlobj.netloc
+    url_ip = socket.gethostbyname(server)
+    if urlobj.netloc and (url_ip not in get_local_ips()):
+        LOG.warning("Server %s not the current one: %s",
+                    str(server), socket.gethostname())
         return eos_files
+
     LOG.info("Ok... " + str(urlobj.netloc))
     LOG.info("Sat and Instrument: " + str(message.data['platform_name']) + " "
              + str(message.data['sensor']))
@@ -672,13 +679,13 @@ def start_modis_lvl1_processing(eos_files,
             LOG.debug("Message data: " + str(message.data))
             send_message(mypublisher, create_message(message.data,
                                                      l1b_files,
-                                                     "1b"))
+                                                     "1B"))
 
             l1a_file = result_files['level1a_file']
 
             send_message(mypublisher, create_message(message.data,
                                                      l1a_file,
-                                                     "1a"))
+                                                     "1A"))
 
     elif (message.data['platform_name'] == "EOS-Aqua" and
           (message.data['sensor'] == 'modis' or
@@ -772,12 +779,12 @@ def start_modis_lvl1_processing(eos_files,
                                                        'mod02qkm_file']]
             send_message(mypublisher, create_message(message.data,
                                                      l1b_files,
-                                                     "1b"))
+                                                     "1B"))
 
             l1a_file = result_files['level1a_file']
             send_message(mypublisher, create_message(message.data,
                                                      l1a_file,
-                                                     "1a"))
+                                                     "1B"))
 
     return eos_files
 
@@ -836,7 +843,6 @@ if __name__ == "__main__":
     DAYS_BETWEEN_URL_DOWNLOAD = OPTIONS.get('days_between_url_download', 14)
     DAYS_KEEP_OLD_ETC_FILES = OPTIONS.get('days_keep_old_etc_files', 60)
     URL = OPTIONS['url_modis_navigation']
-    SERVERNAME = OPTIONS['servername']
 
     if args.log is not None:
         ndays = int(OPTIONS.get("log_rotation_days", 1))

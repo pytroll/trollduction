@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2014 Martin Raspaud
+# Copyright (c) 2014, 2015 Martin Raspaud
 
 # Author(s):
 
@@ -25,6 +25,7 @@
 
 
 from trollduction.producer import coverage, get_polygons_positions
+from trollduction.producer import check_uri
 import numpy as np
 import unittest
 from mock import MagicMock
@@ -129,11 +130,26 @@ class TestPolygonCoverage(unittest.TestCase):
         self.assertEquals(0.44009280754700542, coverage(scene, mali))
 
 
+class TestCheckUri(unittest.TestCase):
+
+    def test_check_uri(self):
+
+        URI1 = "ssh:///san1/pps/import/PPS_data/source/noaa19_20151016_0830_34458/amsual1b_noaa19_20151016_0830_34458.l1b"
+        retv = check_uri(URI1)
+        self.assertEqual(
+            retv, "/san1/pps/import/PPS_data/source/noaa19_20151016_0830_34458/amsual1b_noaa19_20151016_0830_34458.l1b")
+        URI2 = "ssh://mytestserver.myhost.xx/san1/pps/import/PPS_data/source/metop01_20151016_1007_15964/hrpt_metop01_20151016_1007_15964.l1b"
+        retv = check_uri(URI2)
+        self.assertEqual(
+            retv, "/san1/pps/import/PPS_data/source/metop01_20151016_1007_15964/hrpt_metop01_20151016_1007_15964.l1b")
+
+
 def suite():
     """The suite for test_xml_read
     """
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()
     mysuite.addTest(loader.loadTestsFromTestCase(TestPolygonCoverage))
+    mysuite.addTest(loader.loadTestsFromTestCase(TestCheckUri))
 
     return mysuite

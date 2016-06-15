@@ -7,7 +7,11 @@ topics=/AAPP-HRPT/1b
 # the instruments we want to process
 instruments=avhrr/3
 # the list of products we want to generate for this type of data
-product_config_file=/usr/local/etc/pytroll/polar_product_list.xml
+product_config_file=/usr/local/etc/pytroll/product_config_hrpt.xml
 # the log config file
-td_log_config=/usr/local/etc/pytroll/trollduction_logging.cfg
-
+td_log_config=/usr/local/etc/pytroll/trollduction_logging.ini
+# It is sometimes possible, that the same message is received again.
+# If it's not necessary to run the processing again, uncomment the
+# option below, so that only first of identical consecutive messages
+#  will be processed
+# process_only_once=True

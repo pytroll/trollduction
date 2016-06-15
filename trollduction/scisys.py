@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2012, 2013, 2014 SMHI
+# Copyright (c) 2012, 2013, 2014, 2015 SMHI
 
 # Author(s):
 
@@ -23,20 +23,29 @@
 """Receiver for 2met messages, through zeromq.
 
 Outputs messages with the following metadata:
-satellite, format, start_time, end_time, filename, uri, type, orbit_number, [instrument, number]
+- satellite
+- format
+- start_time
+- end_time
+- filename
+- uri
+- type
+- orbit_number
+- [instrument, number]
 
 """
 import os
 from datetime import datetime, timedelta
 from time import sleep
 from urlparse import urlsplit, urlunsplit, SplitResult
+from trollduction.producer import is_uri_on_server
 from posttroll.publisher import Publish
 from posttroll.message import Message
 import xml.etree.ElementTree as etree
 import logging
 import socket
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class TwoMetMessage(object):
@@ -92,9 +101,10 @@ class TwoMetMessage(object):
             try:
                 self._xml_decode(mstring)
             except:
-                logger.exception("Spurious message! " + str(mstring))
+                LOGGER.exception("Spurious message! %s", str(mstring))
         else:
-            logger.warning("Don't know how to decode message: " + str(mstring))
+            LOGGER.warning("Don't know how to decode message: %s",
+                           str(mstring))
 
 
 def pass_name(utctime, satellite):
@@ -130,7 +140,7 @@ class MessageReceiver(object):
         """Formats pass info and adds it to the object.
         """
         info = dict((item.split(": ", 1) for item in message.split(", ", 3)))
-        logger.info("Adding pass: " + str(info))
+        LOGGER.info("Adding pass: %s", str(info))
         pass_info = {}
         for key, val in info.items():
             pass_info[key.lower()] = val
@@ -145,7 +155,7 @@ class MessageReceiver(object):
             pass_info['orbit_number'] = int(pass_info['orbit number'])
             del pass_info['orbit number']
         else:
-            logger.warning("No 'orbit number' in message!")
+            LOGGER.warning("No 'orbit number' in message!")
 
         pname = pass_name(pass_info["start_time"], pass_info["satellite"])
         self._received_passes[pname] = pass_info
@@ -176,7 +186,7 @@ class MessageReceiver(object):
             pname = pass_name(risetime, satellite)
             satellite = satellite.replace("_", "-")
             swath = self._received_passes.get(pname, {}).copy()
-            del swath['satellite']
+            swath.pop('satellite', None)
             swath["platform_name"] = satellite
             swath["start_time"] = risetime
             swath["type"] = "binary"
@@ -208,7 +218,7 @@ class MessageReceiver(object):
                 raise ValueError(
                     "Unrecognized satellite ID: " + pds["apid1"][:3])
             swath = self._received_passes.get(pname, {}).copy()
-            del swath['satellite']
+            swath.pop('satellite', None)
             swath['platform_name'] = satellite
             swath['start_time'] = risetime
             instruments = {"0064": "modis",
@@ -254,19 +264,21 @@ class MessageReceiver(object):
                 elif filename.startswith("RCRIS_npp"):
                     mda["sensor"] = "cris"
                 else:
-                    logger.warning("Seems to be a NPP/JPSS RDR " +
+                    LOGGER.warning("Seems to be a NPP/JPSS RDR "
                                    "file but name is not standard!")
-                    logger.warning("filename = " + filename)
+                    LOGGER.warning("filename = %s", filename)
                     return None
                 idx_start = -6
 
-            mda["start_time"] = datetime.strptime(filename[idx_start + 16:idx_start + 33],
-                                                  "d%Y%m%d_t%H%M%S")
-            end_time = datetime.strptime(filename[idx_start + 16:idx_start + 25] +
-                                         " " +
-                                         filename[
-                                             idx_start + 35:idx_start + 42],
-                                         "d%Y%m%d e%H%M%S")
+            mda["start_time"] = \
+                datetime.strptime(filename[idx_start + 16:idx_start + 33],
+                                  "d%Y%m%d_t%H%M%S")
+            end_time = \
+                datetime.strptime(filename[idx_start + 16:idx_start + 25] +
+                                  " " +
+                                  filename[
+                                      idx_start + 35:idx_start + 42],
+                                  "d%Y%m%d e%H%M%S")
             if mda["start_time"] > end_time:
                 end_time += timedelta(days=1)
             mda["orbit"] = filename[idx_start + 45:idx_start + 50]
@@ -277,10 +289,7 @@ class MessageReceiver(object):
             pname = pass_name(start_time, "NPP")
 
             swath = self._received_passes.get(pname, {}).copy()
-            try:
-                del swath["satellite"]
-            except KeyError:
-                pass
+            swath.pop("satellite", None)
             swath["platform_name"] = satellite
             swath["start_time"] = start_time
             swath['end_time'] = end_time
@@ -291,10 +300,9 @@ class MessageReceiver(object):
 
         # metop
         elif filename[4:12] == "_HRP_00_":
-            instruments = {"AVHR": "avhrr",
-                           "ASCA": "ascat",
+            # "AVHR": "avhrr",
+            instruments = {"ASCA": "ascat",
                            "AMSA": "amsu-a",
-                           "ASCA": "ascat",
                            "ATOV": "atovs",
                            "AVHR": "avhrr/3",
                            "GOME": "gome",
@@ -308,15 +316,17 @@ class MessageReceiver(object):
                            "HKTM": "vcdu34"}
 
             satellites = {"M02": "Metop-A",
-                          "M01": "Metop-B"}
+                          "M01": "Metop-B",
+                          "M03": "Metop-C"}
 
             satellite = satellites[filename[12:15]]
             risetime = datetime.strptime(filename[16:31], "%Y%m%d%H%M%SZ")
             falltime = datetime.strptime(filename[32:47], "%Y%m%d%H%M%SZ")
 
             pname = pass_name(risetime, satellite.upper())
+            LOGGER.debug("pname= % s", str(pname))
             swath = self._received_passes.get(pname, {}).copy()
-            del swath['satellite']
+            swath.pop('satellite', None)
             swath["start_time"] = risetime
             swath["end_time"] = falltime
             swath["platform_name"] = satellite
@@ -351,6 +361,7 @@ class MessageReceiver(object):
                                          url.fragment))
         swath["uid"] = os.path.split(url.path)[1]
         swath["uri"] = uri
+        swath['variant'] = 'DR'
         return swath
 
     def receive(self, message):
@@ -364,7 +375,10 @@ class MessageReceiver(object):
             self.add_pass(message.body.split(":", 1)[1].strip())
             return None
         elif message.body.startswith(dispatch_prefix):
-            return self.handle_distrib(message.body[len(dispatch_prefix):])
+            # Check hostname in message:
+            url = message.body[len(dispatch_prefix):].split(" ")[1]
+            if is_uri_on_server(url, strict=True):
+                return self.handle_distrib(message.body[len(dispatch_prefix):])
 
 
 class GMCSubscriber(object):
@@ -385,8 +399,8 @@ class GMCSubscriber(object):
             try:
                 self._sock.connect((self._host, self._port))
             except socket.error:
-                logger.error("Cannot connect to " + str((self._host, self._port))
-                             + ", retrying in 60 seconds.")
+                LOGGER.error("Cannot connect to %s, retrying in 60 seconds.",
+                             str((self._host, self._port)))
                 sleep(60)
                 continue
             self._sock.settimeout(1.0)
@@ -423,7 +437,7 @@ def receive_from_zmq(host, port, station, environment, days=1):
     """Receive 2met! messages from zeromq.
     """
 
-    #socket = Subscriber(["tcp://localhost:9331"], ["2met!"])
+    # socket = Subscriber(["tcp://localhost:9331"], ["2met!"])
     sock = GMCSubscriber(host, port)
     msg_rec = MessageReceiver(host)
 
@@ -431,18 +445,19 @@ def receive_from_zmq(host, port, station, environment, days=1):
         for rawmsg in sock.recv():
             # TODO:
             # - Watch for idle time in order to detect a hangout
-            logger.debug("receive from 2met! " + str(rawmsg))
+            LOGGER.debug("receive from 2met! %s", str(rawmsg))
             string = TwoMetMessage(rawmsg)
             to_send = msg_rec.receive(string)
             if to_send is None:
                 continue
-            subject = "/".join(("", to_send['format'], to_send['data_processing_level'],
+            subject = "/".join(("", to_send['format'],
+                                to_send['data_processing_level'],
                                 station, environment,
                                 "polar", "direct_readout"))
             msg = Message(subject,
                           "file",
                           to_send).encode()
-            logger.debug("publishing " + str(msg))
+            LOGGER.debug("publishing %s", str(msg))
             pub.send(msg)
             if days:
                 msg_rec.clean_passes(days)

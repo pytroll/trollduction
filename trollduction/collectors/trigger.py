@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2012, 2014 Martin Raspaud
+# Copyright (c) 2012, 2014, 2015 Martin Raspaud
 
 # Author(s):
 
 #   Kristian Rune Larsen <krl@dmi.dk>
 #   Martin Raspaud <martin.raspaud@smhi.se>
+#   Panu Lahtinen <panu.lahtinen@fmi.fi>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -36,29 +37,33 @@ from posttroll.subscriber import NSSubscriber
 LOG = logging.getLogger(__name__)
 
 
-def total_seconds(td):
-    return ((td.microseconds +
-             (td.seconds + td.days * 24 * 3600) * 10 ** 6) / 10.0 ** 6)
+def total_seconds(tdef):
+    """Calculate total time in seconds.
+    """
+    return ((tdef.microseconds +
+             (tdef.seconds + tdef.days * 24 * 3600) * 10 ** 6) / 10.0 ** 6)
 
 
-class Trigger:
+class Trigger(object):
 
     """Abstract trigger class.
     """
 
-    def __init__(self, collectors, terminator):
+    def __init__(self, collectors, terminator, publish_topic=None):
         self.collectors = collectors
         self.terminator = terminator
+        self.publish_topic = publish_topic
 
     def _do(self, metadata):
         """Execute the collectors and terminator.
         """
         if not metadata:
+            LOG.warning("No metadata")
             return
         for collector in self.collectors:
-            res = collector(metadata)
+            res = collector(metadata.copy())
             if res:
-                return self.terminator(res)
+                return self.terminator(res, publish_topic=self.publish_topic)
 
 
 from threading import Thread, Event
@@ -69,9 +74,10 @@ class FileTrigger(Trigger, Thread):
     """File trigger, acting upon inotify events.
     """
 
-    def __init__(self, collectors, terminator, decoder):
+    def __init__(self, collectors, terminator, decoder, publish_topic=None):
         Thread.__init__(self)
-        Trigger.__init__(self, collectors, terminator)
+        Trigger.__init__(self, collectors, terminator,
+                         publish_topic=publish_topic)
         self.decoder = decoder
         self._running = True
         self.new_file = Event()
@@ -105,7 +111,11 @@ class FileTrigger(Trigger, Thread):
                 next_timeout = min(timeouts, key=(lambda(x): x[1]))
                 if next_timeout[1] and (next_timeout[1] < datetime.utcnow()):
                     LOG.warning("Timeout detected, terminating collector")
-                    self.terminator(next_timeout[0].finish())
+                    LOG.debug("Area: %s, timeout: %s",
+                              next_timeout[0].region,
+                              str(next_timeout[1]))
+                    self.terminator(next_timeout[0].finish(),
+                                    publish_topic=self.publish_topic)
                 else:
                     LOG.debug("Waiting %s seconds until timeout",
                               str(total_seconds(next_timeout[1] -
@@ -129,9 +139,11 @@ class InotifyTrigger(ProcessEvent, FileTrigger):
     """File trigger, acting upon inotify events.
     """
 
-    def __init__(self, collectors, terminator, decoder, patterns):
+    def __init__(self, collectors, terminator, decoder, patterns,
+                 publish_topic=None):
         ProcessEvent.__init__(self)
-        FileTrigger.__init__(self, collectors, terminator, decoder)
+        FileTrigger.__init__(self, collectors, terminator, decoder,
+                             publish_topic=publish_topic)
         self.input_dirs = []
         for pattern in patterns:
             self.input_dirs.append(os.path.dirname(pattern))
@@ -143,7 +155,8 @@ class InotifyTrigger(ProcessEvent, FileTrigger):
         """
         for pattern in self.patterns:
             if fnmatch(event.src_path, pattern):
-                LOG.debug("New file detected (close write): " + event.pathname)
+                LOG.debug("New file detected (close write): %s",
+                          event.pathname)
                 self.add_file(event.pathname)
 
     def process_IN_MOVED_TO(self, event):
@@ -151,7 +164,8 @@ class InotifyTrigger(ProcessEvent, FileTrigger):
         """
         for pattern in self.patterns:
             if fnmatch(event.src_path, pattern):
-                LOG.debug("New file detected (moved to): " + event.pathname)
+                LOG.debug("New file detected (moved to): %s",
+                          event.pathname)
                 self.add_file(event.pathname)
 
     def loop(self):
@@ -181,7 +195,7 @@ try:
     from watchdog.observers.polling import PollingObserver
     from watchdog.observers import Observer
 
-    class WatchDogTrigger(FileSystemEventHandler, FileTrigger):
+    class WatchDogTriggerOld(FileSystemEventHandler, FileTrigger):
 
         """File trigger, acting upon inotify events.
         """
@@ -189,9 +203,11 @@ try:
         cases = {"PollingObserver": PollingObserver,
                  "Observer": Observer}
 
-        def __init__(self, collectors, terminator, decoder, patterns, observer_class_name):
+        def __init__(self, collectors, terminator, decoder, patterns,
+                     observer_class_name, publish_topic=None):
             FileSystemEventHandler.__init__(self)
-            FileTrigger.__init__(self, collectors, terminator, decoder)
+            FileTrigger.__init__(self, collectors, terminator, decoder,
+                                 publish_topic=publish_topic)
             self.input_dirs = []
             for pattern in patterns:
                 self.input_dirs.append(os.path.dirname(pattern))
@@ -206,17 +222,19 @@ try:
             try:
                 for pattern in self.patterns:
                     if fnmatch(event.src_path, pattern):
-                        LOG.debug(
-                            "New file detected (created): " + event.src_path)
+                        LOG.debug("New file detected (created): %s",
+                                  event.src_path)
                         self.add_file(event.src_path)
                         LOG.debug("Done adding")
                         return
-            except:
+            except Exception as e:
                 LOG.exception(
-                    "Something wrong happened in the event processing!")
+                    "Something wrong happened in the event processing: %s",
+                    e.message)
 
         def start(self):
-
+            """Start trigger.
+            """
             # add watches
             for idir in self.input_dirs:
                 self.observer.schedule(self, idir)
@@ -231,11 +249,89 @@ try:
             self.observer.join()
             self.join()
 
+    class AbstractWatchDogProcessor(FileSystemEventHandler):
+
+        """File trigger, acting upon file system events.
+        """
+
+        cases = {"PollingObserver": PollingObserver,
+                 "Observer": Observer}
+
+        def __init__(self, patterns, observer_class_name="Observer"):
+            FileSystemEventHandler.__init__(self)
+            self.input_dirs = []
+            for pattern in patterns:
+                self.input_dirs.append(os.path.dirname(pattern))
+                LOG.debug("watching " + str(os.path.dirname(pattern)))
+            self.patterns = patterns
+
+            self.new_file = Event()
+            self.observer = self.cases.get(observer_class_name, Observer)()
+
+        def on_created(self, event):
+            """On creating a file.
+            """
+            try:
+                for pattern in self.patterns:
+                    if fnmatch(event.src_path, pattern):
+                        LOG.debug(
+                            "New file detected (created): " + event.src_path)
+                        self.process(event.src_path)
+                        LOG.debug("Done processing file")
+                        return
+            except:
+                LOG.exception(
+                    "Something wrong happened in the event processing!")
+
+        def process(self, pathname):
+            raise NotImplementedError
+
+        def start(self):
+            """Start processor"""
+            # add watches
+            for idir in self.input_dirs:
+                self.observer.schedule(self, idir)
+            self.observer.start()
+
+            LOG.debug("Started watching filesystem")
+
+        def stop(self):
+            """Stop processor"""
+            self.observer.stop()
+            self.observer.join()
+
+    class WatchDogTrigger(FileTrigger):
+
+        """File trigger, acting upon filesystem events.
+        """
+
+        def __init__(self, collectors, terminator, decoder,
+                     patterns, observer_class_name, publish_topic=None):
+            self.wdp = AbstractWatchDogProcessor(patterns, observer_class_name)
+            FileTrigger.__init__(self, collectors, terminator, decoder,
+                                 publish_topic=publish_topic)
+            self.wdp.process = self.add_file
+
+        def start(self):
+
+            # add watches
+            self.wdp.start()
+
+            FileTrigger.start(self)
+            LOG.debug("Started polling")
+
+        def stop(self):
+            FileTrigger.stop(self)
+            self.wdp.stop()
+            self.join()
+
+
 except ImportError:
+    LOG.error("Watchdog import failed!")
     WatchDogTrigger = None
 
 
-class MessageProcessor(Thread):
+class AbstractMessageProcessor(Thread):
 
     """Process Messages
     """
@@ -250,22 +346,28 @@ class MessageProcessor(Thread):
         self.sub = self.nssub.start()
         Thread.start(self)
 
-    def process_message(self, msg):
+    def process(self, msg):
+        """Process the message.
+        """
         del msg
-        raise NotImplementedError("process_message is not implemented!")
+        raise NotImplementedError("process is not implemented!")
 
     def run(self):
+        """Run the trigger.
+        """
         try:
             for msg in self.sub.recv(2):
                 if not self.loop:
                     break
                 if msg is None:
                     continue
-                self.process_message(msg)
+                self.process(msg)
         finally:
             self.stop()
 
     def stop(self):
+        """Stop the trigger.
+        """
         self.nssub.stop()
         self.loop = False
 
@@ -275,19 +377,27 @@ class PostTrollTrigger(FileTrigger):
     """Get posttroll messages.
     """
 
-    def __init__(self, collectors, terminator, services, topics):
-        self.mp = MessageProcessor(services, topics)
-        self.mp.process_message = self.add_file
-        FileTrigger.__init__(self, collectors, terminator, self.decode_message)
+    def __init__(self, collectors, terminator, services, topics,
+                 publish_topic=None):
+        self.msgproc = AbstractMessageProcessor(services, topics)
+        self.msgproc.process = self.add_file
+        FileTrigger.__init__(self, collectors, terminator, self.decode_message,
+                             publish_topic=publish_topic)
 
     def start(self):
+        """Start the posttroll trigger.
+        """
         FileTrigger.start(self)
-        self.mp.start()
+        self.msgproc.start()
 
     @staticmethod
     def decode_message(message):
+        """Return the message data.
+        """
         return message.data
 
     def stop(self):
-        self.mp.stop()
+        """Stop the posttroll trigger.
+        """
+        self.msgproc.stop()
         FileTrigger.stop(self)

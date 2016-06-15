@@ -103,7 +103,7 @@ class TestProductList(unittest.TestCase):
     #                                       'rgb': '/local_disk/data/out/rgb',
     #                                       'sir': '/local_disk/data/out/sir',
     #                                       'tmp': '/tmp'}})
-    #     dump_item = pconfig.pl.findall('./dump/file')[0]
+    #     dump_item = pconfig.prodlist.findall('./dump/file')[0]
     #     self.assertEquals(dump_item.attrib["output_dir"],
     #                      '/local_disk/data/out/sir')
     pass

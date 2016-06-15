@@ -47,14 +47,15 @@ class TestPostTrollTrigger(unittest.TestCase):
         collector.timeout = datetime.utcnow() + timedelta(seconds=.2)
         collector.return_value = None
 
-        def terminator(obj):
+        def terminator(obj, publish_topic=None):
             collector.timeout = None
-        ptt = PostTrollTrigger([collector], terminator, None, None)
+        ptt = PostTrollTrigger([collector], terminator, None, None,
+                               publish_topic=None)
 
-        sub = ptt.mp.nssub.start.return_value
-        sub.recv.return_value = iter([FakeMessage("a"),
-                                      FakeMessage("b"),
-                                      FakeMessage("c")])
+        sub = ptt.msgproc.nssub.start.return_value
+        sub.recv.return_value = iter([FakeMessage({"a": "a"}),
+                                      FakeMessage({"b": "b"}),
+                                      FakeMessage({"c": "c"})])
 
         ptt.start()
         time.sleep(.4)

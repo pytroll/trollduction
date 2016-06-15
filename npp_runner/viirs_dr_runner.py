@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014 Adam.Dybbroe
+# Copyright (c) 2013, 2014, 2015, 2016
 
 # Author(s):
 
 #   Adam.Dybbroe <a000680@c14526.ad.smhi.se>
+#   Martin.Raspaud <martin.raspaud@smhi.se>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,6 +32,8 @@ import os
 from glob import glob
 from datetime import datetime, timedelta
 from urlparse import urlunsplit
+import socket
+import netifaces
 
 import npp_runner
 import npp_runner.orbitno
@@ -252,8 +255,6 @@ def update_ancillary_files():
 
     return
 
-# ---------------------------------------------------------------------------
-
 
 def run_cspp(*viirs_rdr_files):
     """Run CSPP on VIIRS RDR files"""
@@ -316,32 +317,37 @@ def get_sdr_times(filename):
     return start_time, end_time
 
 
-def publish_sdr(publisher, result_files, orbit):
+def publish_sdr(publisher, result_files, mda, **kwargs):
     """Publish the messages that SDR files are ready
     """
     if not result_files:
         return
+
     # Now publish:
-    to_send = {}
+    to_send = mda.copy()
+    if 'orbit' in kwargs:
+        to_send["orig_orbit_number"] = to_send["orbit_number"]
+        to_send["orbit_number"] = kwargs['orbit']
+
     to_send["dataset"] = []
     for result_file in result_files:
         filename = os.path.basename(result_file)
-        to_send['dataset'].append({'uri': urlunsplit(('ssh', SERVERNAME,
+        to_send['dataset'].append({'uri': urlunsplit(('ssh', socket.gethostname(),
                                                       result_file, '', '')),
                                    'uid': filename})
-    to_send['sensor'] = 'viirs'
-    to_send['orbit_number'] = orbit
-    to_send['platform_name'] = 'Suomi-NPP'
     to_send['format'] = 'SDR'
     to_send['type'] = 'HDF5'
-    to_send['data_processing_level'] = '1b'
+    to_send['data_processing_level'] = '1B'
     to_send['start_time'], to_send['end_time'] = get_sdr_times(filename)
+    site = SITE
 
+    LOG.debug('Site = %s', SITE)
+    LOG.debug('Publish topic = %s', PUBLISH_TOPIC)
     msg = Message('/'.join(('',
-                            'segment',
+                            PUBLISH_TOPIC,
                             to_send['format'],
                             to_send['data_processing_level'],
-                            'norrköping',
+                            site,
                             MODE,
                             'polar',
                             'direct_readout')),
@@ -382,6 +388,17 @@ def spawn_cspp(current_granule, *glist):
     return working_dir, result_files
 
 
+def get_local_ips():
+    inet_addrs = [netifaces.ifaddresses(iface).get(netifaces.AF_INET)
+                  for iface in netifaces.interfaces()]
+    ips = []
+    for addr in inet_addrs:
+        if addr is not None:
+            for add in addr:
+                ips.append(add['addr'])
+    return ips
+
+
 class ViirsSdrProcessor(object):
 
     """
@@ -402,6 +419,7 @@ class ViirsSdrProcessor(object):
         self.pass_start_time = None
         self.result_files = []
         self.sdr_home = OPTIONS['level1_home']
+        self.message_data = None
 
     def initialise(self):
         """Initialise the processor"""
@@ -433,6 +451,9 @@ class ViirsSdrProcessor(object):
                                                            [keeper] + self.glist))
             LOG.debug("Inside run: Return with a False...")
             return False
+        elif msg and ('platform_name' not in msg.data or 'sensor' not in msg.data):
+            LOG.debug("No platform_name or sensor in message. Continue...")
+            return True
         elif msg and not (msg.data['platform_name'] in VIIRS_SATELLITES and
                           msg.data['sensor'] == 'viirs'):
             LOG.info("Not a VIIRS scene. Continue...")
@@ -445,14 +466,16 @@ class ViirsSdrProcessor(object):
         LOG.debug(str(msg))
         urlobj = urlparse(msg.data['uri'])
         LOG.debug("Server = " + str(urlobj.netloc))
-        if urlobj.netloc != SERVERNAME:
+        url_ip = socket.gethostbyname(urlobj.netloc)
+        if url_ip not in get_local_ips():
             LOG.warning("Server %s not the current one: %s" % (str(urlobj.netloc),
-                                                               SERVERNAME))
+                                                               socket.gethostname()))
             return True
         LOG.info("Ok... " + str(urlobj.netloc))
         LOG.info("Sat and Instrument: " + str(msg.data['platform_name'])
                  + " " + str(msg.data['sensor']))
 
+        self.message_data = msg.data
         start_time = msg.data['start_time']
         try:
             end_time = msg.data['end_time']
@@ -548,8 +571,6 @@ class ViirsSdrProcessor(object):
 
         return True
 
-# ---------------------------------------------------------------------------
-
 
 def npp_rolling_runner():
     """The NPP/VIIRS runner. Listens and triggers processing on RDR granules."""
@@ -578,8 +599,10 @@ def npp_rolling_runner():
     LOG.info("Will use %d CPUs when running CSPP instances" % ncpus)
     viirs_proc = ViirsSdrProcessor(ncpus)
 
+    LOG.debug("Subscribe topics = %s", str(SUBSCRIBE_TOPICS))
     with posttroll.subscriber.Subscribe('',
-                                        ['RDR', ], True) as subscr:
+                                        SUBSCRIBE_TOPICS, True) as subscr:
+                                        #['RDR', ], True) as subscr:
         with Publish('viirs_dr_runner', 0) as publisher:
             while True:
                 viirs_proc.initialise()
@@ -588,6 +611,8 @@ def npp_rolling_runner():
                     if not status:
                         break  # end the loop and reinitialize !
 
+                LOG.debug(
+                    "Received message data = %s", str(viirs_proc.message_data))
                 tobj = viirs_proc.pass_start_time
                 LOG.info("Time used in sub-dir name: " +
                          str(tobj.strftime("%Y-%m-%d %H:%M")))
@@ -604,7 +629,8 @@ def npp_rolling_runner():
                     LOG.info("Cleaning up directory %s" % working_dir)
                     cleanup_cspp_workdir(working_dir)
                     publish_sdr(publisher, sdr_files,
-                                viirs_proc.orbit_number)
+                                viirs_proc.message_data,
+                                orbit=viirs_proc.orbit_number)
 
                 make_okay_files(viirs_proc.sdr_home, subd)
 
@@ -658,7 +684,13 @@ if __name__ == "__main__":
     for option, value in CONF.items(MODE, raw=True):
         OPTIONS[option] = value
 
-    SERVERNAME = OPTIONS['servername']
+    PUBLISH_TOPIC = OPTIONS.get('publish_topic')
+    SUBSCRIBE_TOPICS = OPTIONS.get('subscribe_topics').split(',')
+    for item in SUBSCRIBE_TOPICS:
+        if len(item) == 0:
+            SUBSCRIBE_TOPICS.remove(item)
+
+    SITE = OPTIONS.get('site')
 
     THR_LUT_FILES_AGE_DAYS = OPTIONS.get('threshold_lut_files_age_days', 14)
     URL_JPSS_REMOTE_LUT_DIR = OPTIONS['url_jpss_remote_lut_dir']

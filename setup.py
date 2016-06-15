@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2013, 2014, 2015 Martin Raspaud
+# Copyright (c) 2013, 2014, 2015, 2016 Martin Raspaud
 
 # Author(s):
 
@@ -41,15 +41,24 @@ setup(name="trollduction",
                    "Topic :: Scientific/Engineering"],
       url="https://github.com/mraspaud/trollduction",
       packages=['trollduction', 'npp_runner',
+                'nwcsafpps_runner', 'aapp_runner',
+                'osisaf_runners',
                 'modis_runner', 'trollduction.collectors'],
       scripts=['bin/trollstalker.py',
+               'bin/trollstalker2.py',
                'bin/gatherer.py',
+               'bin/geo_gatherer.py',
+               'bin/segment_gatherer.py',
+               'bin/cat.py',
                'npp_runner/viirs_dr_runner.py',
-               'modis_runner/modis_dr_runner.py',
-               'bin/aapp_runner.py',
-               'bin/pps_runner.py',
+               'modis_runner/seadas_modis_runner.py',
+               'aapp_runner/aapp_dr_runner.py',
+               'osisaf_runners/sst_runner.py',
+               'nwcsafpps_runner/pps_runner.py',
+               'nwcsafpps_runner/pps_run.sh',
                'bin/l2processor.py',
-               'bin/scisys_receiver.py'],
+               'bin/scisys_receiver.py',
+               ],
       data_files=[],
       zip_safe=False,
       install_requires=['pyinotify', 'mpop', 'posttroll',

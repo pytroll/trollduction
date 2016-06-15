@@ -111,6 +111,8 @@ if __name__ == '__main__':
         logging.shutdown()
     except:
         logger.exception("Trollduction died!")
+        trd.shutdown()
+        os._exit(os.EX_SOFTWARE)
 
     print "Thank you for using pytroll/l2processor!" \
         "See you soon on pytroll.org."

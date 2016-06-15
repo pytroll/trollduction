@@ -3,7 +3,8 @@
 
 # Copyright (c) 2014, 2015 Martin Raspaud
 
-# Author(s):
+# Author(s): Martin Raspaud
+#            Panu Lahtinen
 
 #   Martin Raspaud <martin.raspaud@smhi.se>
 
@@ -24,37 +25,39 @@
 """
 
 from ConfigParser import RawConfigParser, NoOptionError
-from trollsift import Parser
+from trollsift import Parser, compose
 from datetime import timedelta, datetime
 from trollduction.collectors import trigger
 from trollduction.collectors import region_collector
 import time
 import logging
+import logging.handlers
+import os
 import os.path
 from posttroll import message, publisher
 from mpop.projector import get_area_def
 
-logger = logging.getLogger(__name__)
-
-config = RawConfigParser()
-pub = None
+LOGGER = logging.getLogger(__name__)
+CONFIG = RawConfigParser()
+PUB = None
 
 
 def get_metadata(fname):
+    """Parse metadata from the file.
+    """
+
     res = None
-    for section in config.sections():
-        if section == "default":
-            continue
+    for section in CONFIG.sections():
         try:
-            parser = Parser(config.get(section, "pattern"))
+            parser = Parser(CONFIG.get(section, "pattern"))
         except NoOptionError:
             continue
         if not parser.validate(fname):
             continue
         res = parser.parse(fname)
-        res.update(dict(config.items(section)))
+        res.update(dict(CONFIG.items(section)))
 
-        for key in ["watcher", "pattern", "timeliness"]:
+        for key in ["watcher", "pattern", "timeliness", "regions"]:
             res.pop(key, None)
 
         if "duration" in res and "end_time" not in res:
@@ -77,29 +80,39 @@ def get_metadata(fname):
         if "duration" in res:
             del res["duration"]
 
+        if ("sensor" in res) and ("," in res["sensor"]):
+            res["sensor"] = res["sensor"].split(",")
+
         res["uri"] = fname
         res["filename"] = os.path.basename(fname)
+
     return res
 
 
-def terminator(metadata):
+def terminator(metadata, publish_topic=None):
     """Dummy terminator function.
     """
     sorted_mda = sorted(metadata, key=lambda x: x["start_time"])
 
     mda = metadata[0].copy()
 
-    subject = "/".join(("",
-                        mda["format"],
-                        mda["data_processing_level"],
-                        ''))
+    if publish_topic is not None:
+        LOGGER.info("Composing topic.")
+        subject = compose(publish_topic, mda)
+    else:
+        LOGGER.info("Using default topic.")
+        subject = "/".join(("", mda["format"], mda["data_processing_level"],
+                            ''))
 
     mda['end_time'] = sorted_mda[-1]['end_time']
-
+    mda['collection_area_id'] = sorted_mda[-1]['collection_area_id']
     mda['collection'] = []
 
+    is_correct = False
     for meta in sorted_mda:
         new_mda = {}
+        if "uri" in meta or 'dataset' in meta:
+            is_correct = True
         for key in ['dataset', 'uri', 'uid']:
             if key in meta:
                 new_mda[key] = meta[key]
@@ -111,98 +124,160 @@ def terminator(metadata):
         if key in mda:
             del mda[key]
 
-    msg = message.Message(subject, "collection",
-                          mda)
-    logger.info("sending %s", str(msg))
-    pub.send(str(msg))
+    if is_correct:
+        msg = message.Message(subject, "collection",
+                              mda)
+        LOGGER.info("sending %s", str(msg))
+        PUB.send(str(msg))
+    else:
+        LOGGER.warning("Malformed metadata, no key: %s", "uri")
 
 
-if __name__ == '__main__':
-
+def arg_parse():
+    """Handle input arguments.
+    """
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-l", "--log", help="File to log to (defaults to stdout)",
+    parser.add_argument("-l", "--log",
+                        help="File to log to (defaults to stdout)",
                         default=None)
     parser.add_argument("-v", "--verbose", help="print debug messages too",
                         action="store_true")
+    parser.add_argument("-c", "--config-item",
+                        help="config item to use (all by default). Can be specified multiply times",
+                        action="append")
     parser.add_argument("config", help="config file to be used")
-    opts = parser.parse_args()
 
-    config.read(opts.config)
+    return parser.parse_args()
 
+
+def setup(decoder):
+    """Setup the granule triggerer.
+    """
+
+    granule_triggers = []
+
+    for section in CONFIG.sections():
+        regions = [get_area_def(region)
+                   for region in CONFIG.get(section, "regions").split()]
+
+        timeliness = timedelta(minutes=CONFIG.getint(section, "timeliness"))
+        try:
+            duration = timedelta(seconds=CONFIG.getfloat(section, "duration"))
+        except NoOptionError:
+            duration = None
+        collectors = [region_collector.RegionCollector(region, timeliness, duration)
+                      for region in regions]
+
+        try:
+            observer_class = CONFIG.get(section, "watcher")
+            pattern = CONFIG.get(section, "pattern")
+            parser = Parser(pattern)
+            glob = parser.globify()
+        except NoOptionError:
+            observer_class = None
+
+        try:
+            publish_topic = CONFIG.get(section, "publish_topic")
+        except NoOptionError:
+            publish_topic = None
+
+        if observer_class in ["PollingObserver", "Observer"]:
+            LOGGER.debug("Using %s for %s", observer_class, section)
+            granule_trigger = \
+                trigger.WatchDogTrigger(collectors,
+                                        terminator,
+                                        decoder,
+                                        [glob],
+                                        observer_class,
+                                        publish_topic=publish_topic)
+
+        else:
+            LOGGER.debug("Using posttroll for %s", section)
+            granule_trigger = trigger.PostTrollTrigger(
+                collectors, terminator,
+                CONFIG.get(section, 'service').split(','),
+                CONFIG.get(section, 'topics').split(','),
+                publish_topic=publish_topic)
+        granule_triggers.append(granule_trigger)
+
+    return granule_triggers
+
+
+def main():
+    """Main() for gatherer.
+    """
+
+    global LOGGER
+    global PUB
+
+    opts = arg_parse()
+    CONFIG.read(opts.config)
+
+    print "Setting timezone to UTC"
+    os.environ["TZ"] = "UTC"
+    time.tzset()
+
+    handlers = []
     if opts.log:
-        import logging.handlers
-        handler = logging.handlers.TimedRotatingFileHandler(opts.log,
-                                                            "midnight",
-                                                            backupCount=7)
-    else:
-        handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("[%(levelname)s: %(asctime)s :"
-                                           " %(name)s] %(message)s",
-                                           '%Y-%m-%d %H:%M:%S'))
+        handlers.append(logging.handlers.TimedRotatingFileHandler(opts.log,
+                                                                  "midnight",
+                                                                  backupCount=7))
+
+    handlers.append(logging.StreamHandler())
+
     if opts.verbose:
         loglevel = logging.DEBUG
     else:
         loglevel = logging.INFO
-    handler.setLevel(loglevel)
-    logging.getLogger('').setLevel(loglevel)
-    logging.getLogger('').addHandler(handler)
+    for handler in handlers:
+        handler.setFormatter(logging.Formatter("[%(levelname)s: %(asctime)s :"
+                                               " %(name)s] %(message)s",
+                                               '%Y-%m-%d %H:%M:%S'))
+        handler.setLevel(loglevel)
+        logging.getLogger('').setLevel(loglevel)
+        logging.getLogger('').addHandler(handler)
+
     logging.getLogger("posttroll").setLevel(logging.INFO)
-    logger = logging.getLogger("gatherer")
+    LOGGER = logging.getLogger("gatherer")
+
+    if opts.config_item:
+        for section in opts.config_item:
+            if section not in CONFIG.sections():
+                LOGGER.warning("No config item called %s found in config file.", section)
+        for section in CONFIG.sections():
+            if section not in opts.config_item:
+                CONFIG.remove_section(section)
+        if len(CONFIG.sections()) == 0:
+            LOGGER.error("No valid config item provided")
+            return
 
     decoder = get_metadata
 
-    granule_triggers = []
+    PUB = publisher.NoisyPublisher("gatherer")
 
-    pub = publisher.NoisyPublisher("gatherer")
+    granule_triggers = setup(decoder)
 
-    # TODO: get this from the product config files
-    regions = [get_area_def(region)
-               for region in config.get("default", "regions").split()]
+    PUB.start()
 
-    for section in config.sections():
-        if section == "default":
-            continue
-
-        timeliness = timedelta(minutes=config.getint(section, "timeliness"))
-        try:
-            duration = timedelta(seconds=config.getfloat(section, "duration"))
-        except NoOptionError:
-            duration = None
-        collectors = [region_collector.RegionCollector(
-            region, timeliness, duration) for region in regions]
-
-        try:
-            pattern = config.get(section, "pattern")
-            try:
-                observer_class = config.get(section, "watcher")
-            except NoOptionError:
-                observer_class = None
-            logger.debug("Using watchdog for %s", section)
-            parser = Parser(pattern)
-
-            granule_trigger = trigger.WatchDogTrigger(collectors, terminator,
-                                                      decoder,
-                                                      [parser.globify()],
-                                                      observer_class)
-
-        except NoOptionError:
-            logger.debug("Using posttroll for %s", section)
-            granule_trigger = trigger.PostTrollTrigger(
-                collectors, terminator,
-                config.get(section, 'service').split(','),
-                config.get(section, 'topics').split(','))
-        granule_triggers.append(granule_trigger)
-
-    pub.start()
     for granule_trigger in granule_triggers:
         granule_trigger.start()
     try:
         while True:
             time.sleep(1)
+            for granule_trigger in granule_triggers:
+                if not granule_trigger.is_alive():
+                    raise RuntimeError
     except KeyboardInterrupt:
-        logger.info("Shutting down...")
+        LOGGER.info("Shutting down...")
+    except RuntimeError:
+        LOGGER.critical('Something went wrong!')
+    finally:
         for granule_trigger in granule_triggers:
             granule_trigger.stop()
-        pub.stop()
+        PUB.stop()
+
+if __name__ == '__main__':
+
+    main()

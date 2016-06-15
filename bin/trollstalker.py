@@ -36,7 +36,10 @@ from trollsift import Parser
 from ConfigParser import ConfigParser
 import logging
 import logging.config
+import os
 import os.path
+import datetime as dt
+from collections import deque
 
 LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +54,7 @@ class EventHandler(ProcessEvent):
     """
 
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
-                 aliases=None, tbus_orbit=False):
+                 aliases=None, tbus_orbit=False, history=0, granule_length=0):
         super(EventHandler, self).__init__()
 
         self._pub = NoisyPublisher("trollstalker", posttroll_port, topic)
@@ -64,6 +67,8 @@ class EventHandler(ProcessEvent):
         self.instrument = instrument
         self.aliases = aliases
         self.tbus_orbit = tbus_orbit
+        self.granule_length = granule_length
+        self._deque = deque([], history)
 
     def stop(self):
         '''Stop publisher.
@@ -113,9 +118,14 @@ class EventHandler(ProcessEvent):
             # parse information and create self.info dict{}
             self.parse_file_info(event)
             if len(self.info) > 0:
-                message = self.create_message()
-                LOGGER.info("Publishing message %s" % str(message))
-                self.pub.send(str(message))
+                # Check if this file has been recently dealt with
+                if event.pathname not in self._deque:
+                    self._deque.append(event.pathname)
+                    message = self.create_message()
+                    LOGGER.info("Publishing message %s", str(message))
+                    self.pub.send(str(message))
+                else:
+                    LOGGER.info("Data has been published recently, skipping.")
             self.__clean__()
 
     def create_message(self):
@@ -149,10 +159,40 @@ class EventHandler(ProcessEvent):
 
             # replace values with corresponding aliases, if any are given
             if self.aliases:
-                for key in self.info:
+                info = self.info.copy()
+                for key in info:
                     if key in self.aliases:
+                        self.info['orig_'+key] = self.info[key]
                         self.info[key] = self.aliases[key][str(self.info[key])]
 
+            # add start_time and end_time if not present
+            try:
+                base_time = self.info["time"]
+            except KeyError:
+                try:
+                    base_time = self.info["nominal_time"]
+                except KeyError:
+                    base_time = self.info["start_time"]
+            if "start_time" not in self.info:
+                self.info["start_time"] = base_time
+            if "start_date" in self.info:
+                self.info["start_time"] = \
+                    dt.datetime.combine(self.info["start_date"].date(),
+                                        self.info["start_time"].time())
+                if "end_date" not in self.info:
+                    self.info["end_date"] = self.info["start_date"]
+                del self.info["start_date"]
+            if "end_date" in self.info:
+                self.info["end_time"] = \
+                    dt.datetime.combine(self.info["end_date"].date(),
+                                        self.info["end_time"].time())
+                del self.info["end_date"]
+            if "end_time" not in self.info and self.granule_length > 0:
+                self.info["end_time"] = base_time + dt.timedelta(seconds=self.granule_length)
+
+            if "end_time" in self.info:
+                while self.info["start_time"] > self.info["end_time"]:
+                    self.info["end_time"] += dt.timedelta(days=1)
 
 class NewThreadedNotifier(ThreadedNotifier):
 
@@ -166,7 +206,7 @@ class NewThreadedNotifier(ThreadedNotifier):
 
 def create_notifier(topic, instrument, posttroll_port, filepattern,
                     event_names, monitored_dirs, aliases=None,
-                    tbus_orbit=False):
+                    tbus_orbit=False, history=0, granule_length=0):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
@@ -186,7 +226,10 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
                                  posttroll_port=posttroll_port,
                                  filepattern=filepattern,
                                  aliases=aliases,
-                                 tbus_orbit=tbus_orbit)
+                                 tbus_orbit=tbus_orbit,
+                                 history=history,
+                                 granule_length=granule_length)
+
     notifier = NewThreadedNotifier(manager, event_handler)
 
     # Add directories and event masks to watch manager
@@ -228,6 +271,10 @@ def parse_aliases(config):
 
 def main():
     '''Main(). Commandline parsing and stalker startup.'''
+
+    print "Setting timezone to UTC"
+    os.environ["TZ"] = "UTC"
+    time.tzset()
 
     parser = argparse.ArgumentParser()
 
@@ -317,8 +364,16 @@ def main():
             instrument = instrument or config['instruments']
         except KeyError:
             pass
+        try:
+            history = int(config['history'])
+        except KeyError:
+            history = 0
+
         aliases = parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
+
+        granule_length = float(config.get("granule", 0))
+
         try:
             log_config = config["stalker_log_config"]
         except KeyError:
@@ -350,7 +405,7 @@ def main():
     # Start watching for new files
     notifier = create_notifier(topic, instrument, posttroll_port, filepattern,
                                event_names, monitored_dirs, aliases=aliases,
-                               tbus_orbit=tbus_orbit)
+                               tbus_orbit=tbus_orbit, history=history, granule_length=granule_length)
     notifier.start()
 
     try:
