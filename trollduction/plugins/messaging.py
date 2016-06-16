@@ -1,5 +1,5 @@
 
-"""Classes for handling messaging"""
+"""Classes for handling messaging for Trollflow based Trollduction"""
 
 from trollflow.workflow_component import AbstractWorkflowComponent
 from mpop.satellites import GenericFactory as GF
@@ -8,8 +8,11 @@ class MessageLoader(AbstractWorkflowComponent):
 
     """Creates a scene object from a message."""
 
+    def __init__(self):
+        super(MessageLoader, self).__init__()
+
     def pre_invoke(self):
-        """Pre invoke"""
+        """Pre-invoke"""
         pass
 
     @staticmethod
