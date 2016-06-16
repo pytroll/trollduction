@@ -1,24 +1,25 @@
 config:
-    - product_list: bla.xml
+    - product_list: &product_list
+        bla.xml
 work:
-    - daemon:
-        name: listener
-        components:
-            - class: trollduction.listener.ListenerContainer
-              topics:
-                  - /foo/bar
-                  - /foo/baz
-    - workflow:
-        name: processor
-        components:
-            - trollflow.readers.load
-            - trollflow.transformers.q_check
-            - trollflow.transformers.resample
-            - trollflow.transformers.generate_composites
-            - trollflow.transformers.add_overlay
-    - daemon:
-        name: writer
-        components:
-            - class: trollflow.writers.write
-            - class: trollflow.publish
-              topic: /kool/finished
+    - type: daemon
+      name: listener
+      components:
+        - class: !!python/object:trollduction.listener.ListenerContainer
+            topics:
+              - /foo/bar
+              - /foo/baz
+    - type: workflow
+      name: processor
+      Workflow:
+        - trollduction.plugins.messaging.MessageLoader:
+            {}
+
+#        - trollduction.plugins.compositor.CompositeGenerator:
+#            product_list: *product_list
+#    - type: daemon
+#      name: writer
+#      components:
+#        - class: trollflow.writers.write
+#        - class: trollflow.publish
+#          topic: /kool/finished
