@@ -60,6 +60,28 @@
                 <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
             </product>
         </area>
+        
+        <!-- 
+        Example on how to use same product_config.xml with multiple parellel running l2processor instances:
+            1. Start l2processor with additional argument "-N <PROCNUM>" (PROCNUM should be an int value).
+            2. Add attribute "process_num" to <area> elements in product_config.xml to assign l2processor instance to an area
+               that it should process.
+            3. If the logger.ini should be shared between l2processor instances, use "%PROCNUM%" in configured log filenames. 
+               It will be replaced by the assigned PROCNUM at runtime when l2processor starts.    
+        -
+        <!-- area should only processed by l2processor instance 1 (started with arg "-N 1") -->
+        <area id="euron1" name="North europe, 1km/pixel" process_num="1">
+            <product id="ir108" name="ir108">
+                <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
+            </product>
+        </area>
+        <!-- area should only processed by l2processor instance 2 (started with arg "-N 2") -->
+        <area id="euron1" name="North europe, 1km/pixel" process_num="1">
+            <product id="ir108" name="ir108">
+                <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
+            </product>
+        </area>
+        
     </product_list>
 </product_config>
 

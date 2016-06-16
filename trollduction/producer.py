@@ -402,7 +402,8 @@ class DataProcessor(object):
 
     def __init__(self, publish_topic=None, port=0, nameservers=[],
                  viewZenCacheManager=None,
-                 wait_for_channel_cfg={}):
+                 wait_for_channel_cfg={},
+                 process_num=None):
         self.global_data = None
         self.local_data = None
         self.product_config = None
@@ -412,6 +413,7 @@ class DataProcessor(object):
         self.writer = DataWriter(publish_topic=self._publish_topic, port=port,
                                  nameservers=nameservers)
         self.writer.start()
+        self.process_num = process_num
         self.viewZenCacheManager = viewZenCacheManager
 
     def set_publish_topic(self, publish_topic):
@@ -593,6 +595,19 @@ class DataProcessor(object):
             do_generic_coverage = False
 
             for area_item in group.data:
+
+                if self.process_num is not None \
+                        and 'process_num' in area_item.attrib:
+                    if int(area_item.attrib['process_num']) \
+                            != self.process_num:
+                        LOGGER.info('Skipping area %s, assigned to process '
+                                    'number %s (own num: %s)',
+                                    area_item.attrib['id'],
+                                    area_item.attrib['process_num'],
+                                    self.process_num)
+                        skip.append(area_item)
+                        continue
+
                 try:
                     if not covers(self.global_data.overpass, area_item):
                         skip.append(area_item)
@@ -1359,6 +1374,7 @@ class Trollduction(object):
             DataProcessor(publish_topic=self.td_config.get('publish_topic'),
                           port=int(self.td_config.get('port', 0)),
                           nameservers=nameservers,
+                          process_num=config["process_num"],
                           wait_for_channel_cfg=self.wait_for_channel_cfg,
                           viewZenCacheManager=self.viewZenCacheManager)
 
