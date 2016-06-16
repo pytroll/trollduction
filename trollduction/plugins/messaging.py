@@ -12,19 +12,20 @@ class MessageLoader(AbstractWorkflowComponent):
         """Pre invoke"""
         pass
 
-    def invoke(self, context):
+    @staticmethod
+    def invoke(context):
         """Invoke"""
-        context['global_data'] = self.create_scene_from_message(context)
+        context['global_data'] = create_scene_from_message(context)
 
     def post_invoke(self):
         """Post-invoke"""
         pass
 
-    def create_scene_from_message(self, msg):
-        """Parse the message *msg* and return a corresponding MPOP scene.
-        """
-        if msg.type in ["file", 'collection', 'dataset']:
-            return create_scene_from_mda(msg.data)
+def create_scene_from_message(msg):
+    """Parse the message *msg* and return a corresponding MPOP scene.
+    """
+    if msg.type in ["file", 'collection', 'dataset']:
+        return create_scene_from_mda(msg.data)
 
 def create_scene_from_mda(mda):
     """Read the metadata *mda* and return a corresponding MPOP scene.
