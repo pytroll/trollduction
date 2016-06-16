@@ -53,6 +53,9 @@ class ListenerContainer(object):
             self.thread.setDaemon(True)
             self.thread.start()
 
+    def __setstate__(self, state):
+        self.__init__(**state)
+
     def restart_listener(self, topics):
         '''Restart listener after configuration update.
         '''
