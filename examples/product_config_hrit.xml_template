@@ -82,6 +82,18 @@
             </product>
         </area>
         
+        <!-- it is possible to build parametrized composites -->
+        <!-- 
+        <product id="sample_comp" name="my_sample">
+            <composite_params>
+                <param1>[0.0, 0.3, 0.0]</param1>
+                <paramX>None</paramX>
+                ..
+            </composite_params>
+            <file>sample.tif</file>
+        </product>
+        -->
+        
     </product_list>
 </product_config>
 
