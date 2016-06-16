@@ -21,6 +21,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
 '''Trollduction module
 
 TODO:
@@ -1032,7 +1033,7 @@ class DataProcessor(object):
         return True
 
 
-def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
+def _create_message(obj, filename, uri, params, publish_topic=None, uid=None, source_uri=None):
     """Create posttroll message.
     """
     to_send = obj.info.copy()
@@ -1062,6 +1063,8 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
     # FIXME: fishy: what if the uri already has a scheme ?
     to_send["uri"] = urlunsplit(("file", "", uri, "", ""))
     to_send["uid"] = uid or os.path.basename(filename)
+    if source_uri is not None:
+        to_send["source_uri"] = source_uri
     # we should have more info on format...
     fformat = os.path.splitext(filename)[1][1:]
     if fformat.startswith("tif"):
@@ -1211,7 +1214,7 @@ class DataWriter(Thread):
                                 del attrib[key]
                         if 'format' not in attrib:
                             attrib.setdefault('format',
-                                              os.path.splitext(item.text)[1][1:])
+                                              os.path.splitext(item.text.strip())[1][1:])
 
                         key = tuple(sorted(attrib.items()))
                         sorted_items.setdefault(key, []).append(item)
@@ -1236,9 +1239,12 @@ class DataWriter(Thread):
                             output_dir = copy.attrib.get("output_dir",
                                                          params["output_dir"])
 
-                            fname = compose(os.path.join(output_dir, copy.text),
+                            fname = compose(os.path.join(output_dir, copy.text.strip()),
                                             local_params)
-                            tempfd, tempname = tempfile.mkstemp(dir=os.path.dirname(fname))
+                            dir = os.path.dirname(fname)
+                            if not os.path.exists(dir):
+                                os.makedirs(dir)
+                            tempfd, tempname = tempfile.mkstemp(dir=dir)
                             os.chmod(tempname, default_mode)
                             os.close(tempfd)
                             LOGGER.debug("Saving %s", fname)
