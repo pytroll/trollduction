@@ -39,15 +39,15 @@ class ListenerContainer(object):
 
     def __init__(self, topics=None):
         self.listener = None
-        self.queue = None
+        self.output_queue = None
         self.thread = None
 
         if topics is not None:
-            # Create queue for the messages
-            self.queue = Queue()  # Pipe()
+            # Create output_queue for the messages
+            self.output_queue = Queue()  # Pipe()
 
             # Create a Listener instance
-            self.listener = Listener(topics=topics, queue=self.queue)
+            self.listener = Listener(topics=topics, queue=self.output_queue)
             # Start Listener instance into a new daemonized thread.
             self.thread = Thread(target=self.listener.run)
             self.thread.setDaemon(True)
