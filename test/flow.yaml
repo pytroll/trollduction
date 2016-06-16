@@ -1,0 +1,24 @@
+config:
+    - product_list: bla.xml
+work:
+    - daemon:
+        name: listener
+        components:
+            - class: trollduction.listener.ListenerContainer
+              topics:
+                  - /foo/bar
+                  - /foo/baz
+    - workflow:
+        name: processor
+        components:
+            - trollflow.readers.load
+            - trollflow.transformers.q_check
+            - trollflow.transformers.resample
+            - trollflow.transformers.generate_composites
+            - trollflow.transformers.add_overlay
+    - daemon:
+        name: writer
+        components:
+            - class: trollflow.writers.write
+            - class: trollflow.publish
+              topic: /kool/finished
