@@ -1248,7 +1248,8 @@ class DataWriter(Thread):
                             output_dir = copy.attrib.get("output_dir",
                                                          params["output_dir"])
 
-                            fname = compose(os.path.join(output_dir, copy.text.strip()),
+                            fname = compose(os.path.join(output_dir,
+                                                         copy.text.strip()),
                                             local_params)
                             dir = os.path.dirname(fname)
                             if not os.path.exists(dir):
@@ -1256,12 +1257,16 @@ class DataWriter(Thread):
                             tempfd, tempname = tempfile.mkstemp(dir=dir)
                             os.chmod(tempname, default_mode)
                             os.close(tempfd)
+
+                            save_params = self.get_save_arguments(copy,
+                                                                  local_params)
+
                             LOGGER.debug("Saving %s", fname)
                             if not saved:
                                 try:
                                     obj.save(tempname,
                                              fformat=fformat,
-                                             compression=copy.attrib.get("compression", 6))
+                                             **save_params)
                                 except IOError:  # retry once
                                     try:
                                         obj.save(tempname,
@@ -1324,6 +1329,32 @@ class DataWriter(Thread):
                 finally:
                     self.prod_queue.task_done()
 
+    def get_save_arguments(self, fileelem, params):
+        save_kwords = {}
+
+        fp = fileelem.find('format_params')
+        if fp:
+            fpp = {item.tag: item.text for item in fp.getchildren()}
+            save_kwords.update(fpp)
+
+        # set some defaults
+        if 'compression' not in save_kwords:
+            save_kwords['compression'] = fileelem.attrib.get("compression", 6)
+
+        if 'blocksize' not in save_kwords:
+            blk_sz = fileelem.attrib.get("blocksize", None)
+            if blk_sz is not None:
+                save_kwords['blocksize'] = blk_sz 
+
+        if 'nbits' in save_kwords:
+            save_kwords['tags'] = {'NBITS': save_kwords['nbits']}
+            del save_kwords['nbits']
+        elif 'nbits' in params:
+            save_kwords['tags'] = {'NBITS':
+                                   params['nbits']}
+            
+        return save_kwords
+    
     def write(self, obj, item, params):
         """Write to queue."""
         self.prod_queue.put((obj, list(item), params.copy()))

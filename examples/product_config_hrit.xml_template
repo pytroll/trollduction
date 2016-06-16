@@ -94,6 +94,21 @@
         </product>
         -->
         
+        <!--it is also possible to define additional parameters for
+            the file format specified with the attribute "format" of the file
+            node. A new xml node "format_params" has to be inserted after the
+            file name.
+            Example:
+        <file format="mpop.imageo.formats.ninjotiff">
+            METEOSAT_EUROPA_GESAMT_RGB-Staub_nqeuro3km_{time:%Y%m%d%H%M}_ninjo.tif
+            <format_params>
+                <ninjo_product_name>abc</ninjo_product_name>
+                ...
+                <nbits>16</nbits>
+            </format_params>
+        </file>
+        -->
+        
     </product_list>
 </product_config>
 
