@@ -2,12 +2,12 @@
 
 from trollflow.workflow_component import AbstractWorkflowComponent
 
-class CompositeManager(AbstractWorkflowComponent):
+class CompositeGenerator(AbstractWorkflowComponent):
 
     """Creates composites from a product config."""
 
     def __init__(self):
-        super(CompositeManager, self).__init__()
+        super(CompositeGenerator, self).__init__()
 
     def pre_invoke(self):
         """Pre-invoke"""
@@ -16,13 +16,16 @@ class CompositeManager(AbstractWorkflowComponent):
     @staticmethod
     def invoke(context):
         """Invoke"""
-        output_queue = context["output_queue"]
-        for prodname in context["products"]:
-            func = getattr(context["scene"].image, prodname)
+        data = context["content"]
+        for prod in data.info["products"]:
+            print "Creating composite", prod
+            func = getattr(data.image, prod)
             img = func()
-            params = {'prodname': prodname}
-            img.info.update(params)
-            output_queue.put(img)
+            # TODO: Get filename pattern from config?
+            file_items = None
+            params = None
+            context["output_queue"].put((img, file_items, params))
+            img.show()
 
     def post_invoke(self):
         """Post-invoke"""

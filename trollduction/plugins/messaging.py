@@ -3,6 +3,8 @@
 
 from trollflow.workflow_component import AbstractWorkflowComponent
 from mpop.satellites import GenericFactory as GF
+from trollduction.xml_read import ProductList
+import logging
 
 class MessageLoader(AbstractWorkflowComponent):
 
@@ -18,7 +20,24 @@ class MessageLoader(AbstractWorkflowComponent):
     @staticmethod
     def invoke(context):
         """Invoke"""
-        context['global_data'] = create_scene_from_message(context)
+        global_data = create_scene_from_message(context['content'])
+        global_data.info['product_list'] = {}
+        product_config = ProductList(context["product_list"]["content"])
+
+        for group in product_config.groups:
+            grp_area_def_names = [item.attrib["id"]
+                                  for item in group.data
+                                  if item.tag == "area"]
+            reqs = get_prerequisites_xml(global_data, group.data)
+            print "Loading required channels for this group: %s" % \
+                (sorted(reqs),)
+            global_data.load(reqs, area_def_names=grp_area_def_names)
+            for area_item in group.data:
+                global_data.info["product_list"][area_item.attrib['id']] = \
+                        [item.attrib["id"] for \
+                         item in area_item if item.tag == "product"]
+
+            context["output_queue"].put(global_data)
 
     def post_invoke(self):
         """Post-invoke"""
@@ -43,7 +62,7 @@ def create_scene_from_mda(mda):
 
     platform = mda["platform_name"]
 
-    print "platform %s time %s" % (str(platform), str(time_slot))
+    logging.debug("platform %s time %s", (str(platform), str(time_slot)))
 
     if isinstance(mda['sensor'], (list, tuple, set)):
         sensor = mda['sensor'][0]
@@ -66,3 +85,12 @@ def create_scene_from_mda(mda):
     global_data.info['time'] = time_slot
 
     return global_data
+
+def get_prerequisites_xml(global_data, grp_config):
+    """Get composite prerequisite channels for a group"""
+    reqs = set()
+    for area in grp_config:
+        for product in area:
+            composite = getattr(global_data.image, product.attrib['id'])
+            reqs |= composite.prerequisites
+    return reqs
