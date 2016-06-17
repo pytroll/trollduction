@@ -16,12 +16,13 @@ class TemplateClass(AbstractWorkflowComponent):
     @staticmethod
     def invoke(context):
         """Invoke"""
-        context["something"] = do_something()
+        something = do_something_with_content(context["content"])
+        context["output_queue"].put(something)
 
     def post_invoke(self):
         """Post-invoke"""
         pass
 
-def do_something():
+def do_something_with_content(something):
     """Do something"""
-    return "something"
+    return 2 * something
