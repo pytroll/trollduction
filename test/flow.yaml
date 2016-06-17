@@ -1,11 +1,11 @@
 config:
     - product_list: &product_list
-        bla.xml
+        /tmp/bla.xml
 work:
     - type: daemon
       name: listener
       components:
-        - class: !!python/object:trollduction.listener.ListenerContainer
+        - class: !!python/object:trollduction.plugins.listener.ListenerContainer
             topics:
               - /foo/bar
               - /foo/baz
@@ -13,10 +13,23 @@ work:
       name: processor
       Workflow:
         - trollduction.plugins.messaging.MessageLoader:
-            {}
+            product_list: *product_list
+    - type: workflow
+      name: processor
+      Workflow:
+        - trollduction.plugins.resampler.Resampler:
+            product_list: *product_list
+    - type: workflow
+      name: processor
+      Workflow:
+        - trollduction.plugins.compositor.CompositeGenerator:
+            product_list: *product_list
+#    - type: daemon
+#      name: writer
+#      components:
+#        - class: !!python/object:trollduction.plugins.writer.DataWriterContainer
+#            {}
 
-#        - trollduction.plugins.compositor.CompositeGenerator:
-#            product_list: *product_list
 #    - type: daemon
 #      name: writer
 #      components:
