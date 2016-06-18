@@ -633,12 +633,13 @@ class DataProcessor(object):
                              area_item.attrib['name'])
                 try:
                     try:
-                        actual_srch_radius = \
-                                int(area_item.attrib["srch_radius"])
+                        actual_srch_radius = int(
+                            area_item.attrib["srch_radius"])
                         LOGGER.debug("Overriding search radius %s with %s",
                                      str(srch_radius), str(actual_srch_radius))
                     except KeyError:
-                        LOGGER.debug("Using search radius %s", str(srch_radius))
+                        LOGGER.debug(
+                            "Using search radius %s", str(srch_radius))
                         actual_srch_radius = srch_radius
 
                     self.local_data = \
@@ -1078,6 +1079,7 @@ def hash_color(colorstring):
 
 
 class DataWriter(Thread):
+
     """Writes data to disk.
 
     This is separate from the DataProcessor since it takes IO time and
@@ -1148,7 +1150,8 @@ class DataWriter(Thread):
 
                             fname = compose(os.path.join(output_dir, copy.text),
                                             local_params)
-                            tempfd, tempname = tempfile.mkstemp(dir=os.path.dirname(fname))
+                            tempfd, tempname = tempfile.mkstemp(
+                                dir=os.path.dirname(fname))
                             os.chmod(tempname, default_mode)
                             os.close(tempfd)
                             LOGGER.debug("Saving %s", fname)
@@ -1163,7 +1166,8 @@ class DataWriter(Thread):
                                                  fformat=fformat,
                                                  compression=copy.attrib.get("compression", 6))
                                     except IOError:
-                                        LOGGER.exception("Can't save file %s", fname)
+                                        LOGGER.exception(
+                                            "Can't save file %s", fname)
                                         continue
                                 os.rename(tempname, fname)
 
@@ -1171,7 +1175,8 @@ class DataWriter(Thread):
                                 saved = fname
                                 uid = os.path.basename(fname)
                             else:
-                                LOGGER.info("Copied/Linked %s to %s", saved, fname)
+                                LOGGER.info(
+                                    "Copied/Linked %s to %s", saved, fname)
                                 link_or_copy(saved, fname, tempname)
                                 saved = fname
                             if ("thumbnail_name" in copy.attrib and
