@@ -10,17 +10,30 @@ work:
               - /foo/bar
               - /foo/baz
     - type: workflow
-      name: processor
+      name: scene_loader
       Workflow:
         - trollduction.plugins.messaging.MessageLoader:
             product_list: *product_list
     - type: workflow
-      name: processor
+      name: pansharpener
+      Workflow:
+        - trollduction.plugins.enhance.Pansharpener:
+            # List of channels to sharpen
+            pan_sharpen_chans:
+              - VIS006
+              - VIS008
+              - IR_016
+            # Keep the original channel data, add sharpened channels
+            # as a new channel named "pan_"+chan.name. Default is to
+            # overwrite.
+            overwrite: False
+    - type: workflow
+      name: resampler
       Workflow:
         - trollduction.plugins.resampler.Resampler:
             product_list: *product_list
     - type: workflow
-      name: processor
+      name: compositor
       Workflow:
         - trollduction.plugins.compositor.CompositeGenerator:
             product_list: *product_list
