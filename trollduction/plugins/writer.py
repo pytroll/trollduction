@@ -9,6 +9,8 @@ class DataWriterContainer(object):
     '''Container for DataWriter instance
     '''
 
+    logger = logging.getLogger("DataWriterContainer")
+
     def __init__(self, topic=None, port=0, nameservers=[],
                  save_settings=None):
         self.topic = topic
@@ -48,8 +50,10 @@ class DataWriterContainer(object):
 
     def stop(self):
         '''Stop writer.'''
+        self.logger.debug("Stopping writer.")
         self.writer.stop()
         self.thread.join()
+        self.logger.debug("Writer stopped.")
         self.thread = None
 
 class DataWriter(Thread):
@@ -89,7 +93,6 @@ class DataWriter(Thread):
 
     def stop(self):
         """Stop writer."""
-        self.logger.debug("Stopping writer.")
         self._loop = False
 
     @property
