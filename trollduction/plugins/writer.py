@@ -8,28 +8,31 @@ LOGGER = logging.getLogger("DataWriter")
 
 class DataWriterContainer(object):
 
-    '''Container for listener instance
+    '''Container for DataWriter instance
     '''
 
-    def __init__(self, topics=None):
-        self.listener = None
-        self.input_queue = None
+    def __init__(self, topic=None):
+        self.topic = topic
+        self._input_queue = None
         self.output_queue = Queue.Queue()
         self.thread = None
 
         # Create a Writer instance
         self.writer = DataWriter(queue=self.input_queue)
-        # Start Listener instance into a new daemonized thread.
+        # Start Writer instance into a new daemonized thread.
         self.thread = Thread(target=self.writer.run)
         self.thread.setDaemon(True)
         self.thread.start()
 
     @property
-    def writer(self):
-        return self.writer
+    def input_queue(self):
+        """Property writer"""
+        return self._input_queue
 
-    @writer.setter
-    def writer(self, queue):
+    @input_queue.setter
+    def input_queue(self, queue):
+        """Set writer queue"""
+        self._input_queue = queue
         self.writer.queue = queue
 
     def __setstate__(self, state):
@@ -37,13 +40,13 @@ class DataWriterContainer(object):
 
 #    def __
 
-    def restart_listener(self, topics):
-        '''Restart listener after configuration update.
+    def restart_writer(self, topic):
+        '''Restart writer after configuration update.
         '''
-        if self.listener is not None:
-            if self.listener.running:
+        if self.writer is not None:
+            if self.writer.loop:
                 self.stop()
-        self.__init__(topics=topics)
+        self.__init__(topic=topic)
 
     def stop(self):
         '''Stop writer.'''
@@ -70,7 +73,6 @@ class DataWriter(Thread):
                 try:
                     obj, fname = self.queue.get(True, 1)
                 except Queue.Empty:
-                    print self.queue
                     continue
 
                 obj.save(fname)
@@ -80,3 +82,8 @@ class DataWriter(Thread):
     def stop(self):
         """Stop writer."""
         self._loop = False
+
+    @property
+    def loop(self):
+        """Property loop"""
+        return self._loop
