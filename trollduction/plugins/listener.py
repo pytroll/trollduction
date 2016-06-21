@@ -29,13 +29,12 @@ from threading import Thread
 import time
 import logging
 
-logger = logging.getLogger(__name__)
-
-
 class ListenerContainer(object):
 
     '''Container for listener instance
     '''
+
+    logger = logging.getLogger("ListenerContainer")
 
     def __init__(self, topics=None):
         self.listener = None
@@ -66,11 +65,11 @@ class ListenerContainer(object):
 
     def stop(self):
         '''Stop listener.'''
-        logger.debug("Stopping listener.")
+        self.logger.debug("Stopping listener.")
         self.listener.stop()
         self.thread.join()
         self.thread = None
-        logger.debug("Listener stopped.")
+        self.logger.debug("Listener stopped.")
 
 
 class Listener(object):

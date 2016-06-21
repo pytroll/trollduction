@@ -4,11 +4,11 @@ import logging
 
 from trollflow.workflow_component import AbstractWorkflowComponent
 
-LOGGER = logging.getLogger("DataWriter")
-
 class Resampler(AbstractWorkflowComponent):
 
     """Creates resampled local area scenes."""
+
+    logger = logging.getLogger("Resampler")
 
     def __init__(self):
         super(Resampler, self).__init__()
@@ -17,12 +17,11 @@ class Resampler(AbstractWorkflowComponent):
         """Pre-invoke"""
         pass
 
-    @staticmethod
-    def invoke(context):
+    def invoke(self, context):
         """Invoke"""
         glbl = context["content"]
         for area in glbl.info["product_list"]:
-            LOGGER.info("Resampling to area %s", area)
+            self.logger.info("Resampling to area %s", area)
             lcl = glbl.project(area)
             lcl.info["area"] = area
             lcl.info["products"] = glbl.info["product_list"][area]

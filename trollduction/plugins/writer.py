@@ -4,14 +4,12 @@ from threading import Thread
 import logging
 import time
 
-LOGGER = logging.getLogger("DataWriter")
-
 class DataWriterContainer(object):
 
     '''Container for DataWriter instance
     '''
 
-    def __init__(self, topic=None):
+    def __init__(self, topic=None, port=0, nameservers=[]):
         self.topic = topic
         self._input_queue = None
         self.output_queue = Queue.Queue()
@@ -38,8 +36,6 @@ class DataWriterContainer(object):
     def __setstate__(self, state):
         self.__init__(**state)
 
-#    def __
-
     def restart_writer(self, topic):
         '''Restart writer after configuration update.
         '''
@@ -50,15 +46,15 @@ class DataWriterContainer(object):
 
     def stop(self):
         '''Stop writer.'''
-        LOGGER.debug("Stopping writer.")
         self.writer.stop()
         self.thread.join()
         self.thread = None
-        LOGGER.debug("Writer stopped.")
 
 class DataWriter(Thread):
     """Writes data to disk.
     """
+
+    logger = logging.getLogger("DataWriter")
 
     def __init__(self, queue=None):
         Thread.__init__(self)
@@ -74,13 +70,14 @@ class DataWriter(Thread):
                     obj, fname = self.queue.get(True, 1)
                 except Queue.Empty:
                     continue
-
+                self.logger.info("Saving %s", fname)
                 obj.save(fname)
             else:
                 time.sleep(1)
 
     def stop(self):
         """Stop writer."""
+        self.logger.debug("Stopping writer.")
         self._loop = False
 
     @property

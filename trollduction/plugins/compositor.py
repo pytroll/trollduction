@@ -7,11 +7,11 @@ from trollflow.workflow_component import AbstractWorkflowComponent
 from trollduction.xml_read import ProductList
 from trollsift import compose
 
-LOGGER = logging.getLogger("DataWriter")
-
 class CompositeGenerator(AbstractWorkflowComponent):
 
     """Creates composites from a product config."""
+
+    logger = logging.getLogger("Compositor")
 
     def __init__(self):
         super(CompositeGenerator, self).__init__()
@@ -20,20 +20,19 @@ class CompositeGenerator(AbstractWorkflowComponent):
         """Pre-invoke"""
         pass
 
-    @staticmethod
-    def invoke(context):
+    def invoke(self, context):
         """Invoke"""
         data = context["content"]
         prod_list = ProductList(context["product_list"]["content"])
         for prod in data.info["products"]:
-            LOGGER.info("Creating composite %s", prod)
+            self.logger.info("Creating composite %s", prod)
             func = getattr(data.image, prod)
             img = func()
             # Get filename from product config
             fname = create_fname(data.info, prod_list, prod)
             if fname is None:
-                LOGGER.error("Could not generate a valid filename, "
-                              "product not saved!")
+                self.logger.error("Could not generate a valid filename, "
+                                  "product not saved!")
             else:
                 context["output_queue"].put((img, fname))
             # img.show()

@@ -1,10 +1,14 @@
 """Classes for handling XYZ for Trollflow based Trollduction"""
 
+import logging
+
 from trollflow.workflow_component import AbstractWorkflowComponent
 
 class TemplateClass(AbstractWorkflowComponent):
 
     """Do something"""
+
+    logger = logging.getLogger("TemplateClass")
 
     def __init__(self):
         super(TemplateClass, self).__init__()
@@ -13,9 +17,9 @@ class TemplateClass(AbstractWorkflowComponent):
         """Pre-invoke"""
         pass
 
-    @staticmethod
-    def invoke(context):
+    def invoke(self, context):
         """Invoke"""
+        self.logger.info("Doing something.")
         something = do_something_with_content(context["content"])
         context["output_queue"].put(something)
 

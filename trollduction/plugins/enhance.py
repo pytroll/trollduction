@@ -5,11 +5,11 @@ import logging
 
 from trollflow.workflow_component import AbstractWorkflowComponent
 
-LOGGER = logging.getLogger("DataWriter")
-
 class Pansharpener(AbstractWorkflowComponent):
 
     """Pansharpen the configured channels"""
+
+    logger = logging.getLogger("Pansharpener")
 
     def __init__(self):
         super(Pansharpener, self).__init__()
@@ -18,13 +18,13 @@ class Pansharpener(AbstractWorkflowComponent):
         """Pre-invoke"""
         pass
 
-    @staticmethod
-    def invoke(context):
+    def invoke(self, context):
         """Invoke"""
         glbl = context["content"]
         # Read list of channels to be sharpened
         pan_chans = context["pan_sharpen_chans"]["content"]
-        LOGGER.info("Applying pansharpening to channels: %s", str(pan_chans))
+        self.logger.info("Applying pansharpening to channels: %s",
+                         str(pan_chans))
         # Check if the original data should be overwritten (default)
         # or create a new channel named "pan_"+chan.name
         try:
@@ -33,9 +33,9 @@ class Pansharpener(AbstractWorkflowComponent):
             overwrite = True
 
         if overwrite:
-            LOGGER.info("Original data will be overwritten.")
+            self.logger.info("Original data will be overwritten.")
         else:
-            LOGGER.info("New channels will be named with 'pan_' prefix.")
+            self.logger.info("New channels will be named with 'pan_' prefix.")
 
         # Apply pansharpening
         pansharpen(glbl, pan_chans, overwrite)
