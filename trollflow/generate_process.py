@@ -22,7 +22,8 @@ with open(path_to_workflow, "r") as fid:
 
 for item in config["config"]:
     if "log_config" in item.keys():
-        logging.config.fileConfig(item["log_config"])
+        logging.config.fileConfig(item["log_config"],
+                                  disable_existing_loggers=False)
         break
 logger = logging.getLogger("main")
 logger.info("Initializing pluginized Trollduction")
