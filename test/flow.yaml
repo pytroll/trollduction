@@ -1,6 +1,8 @@
 config:
     - product_list: &product_list
         /tmp/bla.xml
+    - log_config:
+        /tmp/log.ini
 work:
     - type: daemon
       name: listener
@@ -37,11 +39,12 @@ work:
       Workflow:
         - trollduction.plugins.compositor.CompositeGenerator:
             product_list: *product_list
-#    - type: daemon
-#      name: writer
-#      components:
-#        - class: !!python/object:trollduction.plugins.writer.DataWriterContainer
-#            {}
+    - type: daemon
+      name: writer
+      components:
+        - class: !!python/object:trollduction.plugins.writer.DataWriterContainer
+            nameservers: []
+            port: 0
 
 #    - type: daemon
 #      name: writer
