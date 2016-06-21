@@ -1,6 +1,10 @@
 """Classes for generating image composites for Trollflow based Trollduction"""
 
+import logging
+
 from trollflow.workflow_component import AbstractWorkflowComponent
+
+LOGGER = logging.getLogger("DataWriter")
 
 class Resampler(AbstractWorkflowComponent):
 
@@ -18,7 +22,7 @@ class Resampler(AbstractWorkflowComponent):
         """Invoke"""
         glbl = context["content"]
         for area in glbl.info["product_list"]:
-            print "Resampling to area:", area
+            LOGGER.info("Resampling to area %s", area)
             lcl = glbl.project(area)
             lcl.info["area"] = area
             lcl.info["products"] = glbl.info["product_list"][area]

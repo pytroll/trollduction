@@ -1,7 +1,11 @@
 """Classes for data enhancements Trollflow based Trollduction"""
 
 import numpy as np
+import logging
+
 from trollflow.workflow_component import AbstractWorkflowComponent
+
+LOGGER = logging.getLogger("DataWriter")
 
 class Pansharpener(AbstractWorkflowComponent):
 
@@ -20,12 +24,19 @@ class Pansharpener(AbstractWorkflowComponent):
         glbl = context["content"]
         # Read list of channels to be sharpened
         pan_chans = context["pan_sharpen_chans"]["content"]
+        LOGGER.info("Applying pansharpening to channels: %s", str(pan_chans))
         # Check if the original data should be overwritten (default)
         # or create a new channel named "pan_"+chan.name
         try:
             overwrite = context["overwrite"]["content"]
         except KeyError:
             overwrite = True
+
+        if overwrite:
+            LOGGER.info("Original data will be overwritten.")
+        else:
+            LOGGER.info("New channels will be named with 'pan_' prefix.")
+
         # Apply pansharpening
         pansharpen(glbl, pan_chans, overwrite)
 
