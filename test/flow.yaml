@@ -33,6 +33,11 @@ work:
       name: resampler
       Workflow:
         - trollduction.plugins.resampler.Resampler:
+            # Use "null" instead of "None"
+            radius: null
+            precompute: False
+            nprocs: 1
+            proj_method: nearest
             product_list: *product_list
     - type: workflow
       name: compositor
@@ -45,6 +50,17 @@ work:
         - class: !!python/object:trollduction.plugins.writer.DataWriterContainer
             nameservers: []
             port: 0
+            save_settings:
+              compression: 6
+              # Use "null" instead of "None"
+              tags: null
+              # Use "null" instead of "None"
+              fformat: null
+              # Use "null" instead of "None"
+              gdal_options: null
+              # Use "null" instead of "None"
+              fformat: null
+              blocksize: 256
 
 #    - type: daemon
 #      name: writer
