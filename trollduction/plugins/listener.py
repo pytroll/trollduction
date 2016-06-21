@@ -43,7 +43,7 @@ class ListenerContainer(object):
 
         if topics is not None:
             # Create output_queue for the messages
-            self.output_queue = Queue()  # Pipe()
+            self.output_queue = Queue()
 
             # Create a Listener instance
             self.listener = Listener(topics=topics, queue=self.output_queue)
@@ -76,6 +76,8 @@ class Listener(object):
 
     '''PyTroll listener class for reading messages for Trollduction
     '''
+
+    logger = logging.getLogger("Listener")
 
     def __init__(self, topics=None, queue=None):
         '''Init Listener object
@@ -115,6 +117,7 @@ class Listener(object):
                 else:
                     break
 
+            self.logger.debug("New message received: %s", str(msg))
             self.add_to_queue(msg)
 
     def stop(self):
