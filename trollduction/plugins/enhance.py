@@ -35,7 +35,8 @@ class Pansharpener(AbstractWorkflowComponent):
         if overwrite:
             self.logger.info("Original data will be overwritten.")
         else:
-            self.logger.info("New channels will be named with 'pan_' prefix.")
+            self.logger.info("Pansharpened channels will be named with "
+                             "'pan_' prefix.")
 
         # Apply pansharpening
         pansharpen(glbl, pan_chans, overwrite)
