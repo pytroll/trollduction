@@ -24,6 +24,9 @@ class MessageLoader(AbstractWorkflowComponent):
         global_data = self.create_scene_from_message(context['content'])
         global_data.info['product_list'] = {}
         product_config = ProductList(context["product_list"]["content"])
+        use_extern_calib = product_config.attrib.get("output_dir",
+                                                     "False").lower() in \
+            ["true", "1", "yes"]
 
         for group in product_config.groups:
             grp_area_def_names = [item.attrib["id"]
@@ -32,7 +35,8 @@ class MessageLoader(AbstractWorkflowComponent):
             reqs = get_prerequisites_xml(global_data, group.data)
             self.logger.info("Loading required channels for this group: %s",
                              str(sorted(reqs)))
-            global_data.load(reqs, area_def_names=grp_area_def_names)
+            global_data.load(reqs, area_def_names=grp_area_def_names,
+                             use_extern_calib=use_extern_calib)
             for area_item in group.data:
                 global_data.info["product_list"][area_item.attrib['id']] = \
                         [item.attrib["id"] for \

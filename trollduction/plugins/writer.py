@@ -9,14 +9,16 @@ class DataWriterContainer(object):
     '''Container for DataWriter instance
     '''
 
-    def __init__(self, topic=None, port=0, nameservers=[]):
+    def __init__(self, topic=None, port=0, nameservers=[],
+                 save_settings=None):
         self.topic = topic
         self._input_queue = None
         self.output_queue = Queue.Queue()
         self.thread = None
 
         # Create a Writer instance
-        self.writer = DataWriter(queue=self.input_queue)
+        self.writer = DataWriter(queue=self.input_queue,
+                                 save_settings=save_settings)
         # Start Writer instance into a new daemonized thread.
         self.thread = Thread(target=self.writer.run)
         self.thread.setDaemon(True)
@@ -56,14 +58,22 @@ class DataWriter(Thread):
 
     logger = logging.getLogger("DataWriter")
 
-    def __init__(self, queue=None):
+    def __init__(self, queue=None, save_settings=None):
         Thread.__init__(self)
         self.queue = queue
         self._loop = False
+        self._save_settings = save_settings
 
     def run(self):
         """Run the thread."""
         self._loop = True
+        # Parse settings for saving
+        compression = self._save_settings.get('compression', 6)
+        tags = self._save_settings.get('tags', None)
+        fformat = self._save_settings.get('fformat', None)
+        gdal_options = self._save_settings.get('gdal_options', None)
+        blocksize = self._save_settings.get('blocksize', None)
+
         while self._loop:
             if self.queue is not None:
                 try:
@@ -71,7 +81,9 @@ class DataWriter(Thread):
                 except Queue.Empty:
                     continue
                 self.logger.info("Saving %s", fname)
-                obj.save(fname)
+                obj.save(fname, compression=compression, tags=tags,
+                         fformat=fformat, gdal_options=gdal_options,
+                         blocksize=blocksize)
             else:
                 time.sleep(1)
 
