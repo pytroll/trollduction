@@ -20,7 +20,7 @@ class TemplateContainer(object):
         self.thread = None
 
         # Create a worker instance
-        self.worker = Worker()
+        self.worker = Worker(self.input_queue, self.output_queue)
 
         # Start the Worker into a new daemonized thread.
         self.thread = Thread(target=self.worker.run)
@@ -36,7 +36,7 @@ class TemplateContainer(object):
     def input_queue(self, queue):
         """Setter for input queue property"""
         self._input_queue = queue
-        self.gatherer.queue = queue
+        self.worker.input_queue = queue
 
     def __setstate__(self, state):
         self.__init__(**state)
@@ -44,7 +44,7 @@ class TemplateContainer(object):
     def stop(self):
         """Stop gatherer."""
         self.logger.debug("Stopping Worker.")
-        self.gatherer.stop()
+        self.worker.stop()
         self.thread.join()
         self.logger.debug("Worker stopped.")
         self.thread = None
@@ -55,24 +55,24 @@ class Worker(Thread):
 
     logger = logging.getLogger("Worker")
 
-    def __init__(self, arg1, arg2=None):
+    def __init__(self, input_queue, output_queue):
         Thread.__init__(self)
-        self.queue = queue
+        self.input_queue = input_queue
+        self.output_queue = output_queue
         self._loop = False
-        self.arg1 = arg1
-        self.arg2 = arg2
 
     def run(self):
         """Run the worker"""
         self._loop = True
         while self._loop:
-            if self.queue is not None:
+            if self.input_queue is not None:
                 try:
-                    data = self.queue.get(True, 1)
+                    data = self.input_queue.get(True, 1)
                 except Queue.Empty:
                     continue
                 self.logger.info("New data received.")
                 res = do_stuff(data)
+                self.output_queue.put(res)
             else:
                 time.sleep(1)
 
@@ -84,3 +84,7 @@ class Worker(Thread):
     def loop(self):
         """Loop property"""
         return self._loop
+
+def do_stuff(data):
+    """Do something"""
+    return data
