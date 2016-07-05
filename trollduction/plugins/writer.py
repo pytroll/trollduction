@@ -40,13 +40,13 @@ class DataWriterContainer(object):
     def __setstate__(self, state):
         self.__init__(**state)
 
-    def restart_writer(self, topic):
+    def restart(self):
         '''Restart writer after configuration update.
         '''
         if self.writer is not None:
             if self.writer.loop:
                 self.stop()
-        self.__init__(topic=topic)
+        self.__init__()
 
     def stop(self):
         '''Stop writer.'''
