@@ -11,6 +11,12 @@ work:
             topics:
               - /foo/bar
               - /foo/baz
+    - type: daemon
+      name: segment_gatherer
+      components:
+        - class: !!python/object:trollduction.plugins.gatherer.SegmentGathererContainer
+            config: /tmp/seg_conf.ini
+            section: rss
     - type: workflow
       name: scene_loader
       Workflow:
