@@ -15,8 +15,7 @@ work:
       name: segment_gatherer
       components:
         - class: !!python/object:trollduction.plugins.gatherer.SegmentGathererContainer
-            config: /tmp/seg_conf.ini
-            section: rss
+            config: /tmp/seg_conf_msg.yaml
     - type: workflow
       name: scene_loader
       Workflow:
