@@ -5,7 +5,7 @@ import Queue
 from threading import Thread
 import time
 import datetime as dt
-from ConfigParser import RawConfigParser, NoOptionError
+import yaml
 from collections import OrderedDict
 
 from trollsift import Parser
@@ -24,15 +24,15 @@ class SegmentGathererContainer(object):
 
     logger = logging.getLogger("SegmentGathererContainer")
 
-    def __init__(self, config, section):
+    def __init__(self, config):
         self.gatherer = None
         self._input_queue = None
         self.output_queue = Queue.Queue()
         self.thread = None
 
         # Create a SegmentGatherer instance
-        self.gatherer = SegmentGatherer(config, section,
-                                        self.input_queue, self.output_queue)
+        self.gatherer = SegmentGatherer(config, self.input_queue,
+                                        self.output_queue)
 
         # Start SegmentGatherer into a new daemonized thread.
         self.thread = Thread(target=self.gatherer.run)
@@ -67,32 +67,31 @@ class SegmentGatherer(Thread):
 
     logger = logging.getLogger("SegmentGatherer")
 
-    def __init__(self, config, section, input_queue, output_queue):
+    def __init__(self, config, input_queue, output_queue):
         Thread.__init__(self)
         self.input_queue = input_queue
         self.output_queue = output_queue
         self._loop = False
-        self._config = RawConfigParser()
-        self._config.read(config)
-        self._section = section
-        self._pattern = self._config.get(section, "pattern")
-        self._parser = Parser(self._pattern)
+        self._parsers = []
+        with open(config, 'r') as fid:
+            self._config = yaml.load(fid)
+
+        self._set_parsers()
 
         try:
             self._timeliness = \
-                dt.timedelta(seconds=self._config.getint(section,
-                                                         "timeliness"))
-        except (NoOptionError, ValueError):
+                dt.timedelta(seconds=self._config["config"]["timeliness"])
+        except KeyError:
             self._timeliness = dt.timedelta(seconds=1200)
         try:
             self._num_files_premature_publish = \
-                self._config.getint(section, "num_files_premature_publish")
-        except (NoOptionError, ValueError):
+                self._config["config"]["num_files_premature_publish"]
+        except KeyError:
             self._num_files_premature_publish = -1
 
         self.slots = OrderedDict()
 
-        self.time_name = self._config.get(section, 'time_name')
+        self.time_name = self._config["config"]["time_name"]
 
         self.logger = logging.getLogger("SegmentGatherer")
 
@@ -119,24 +118,8 @@ class SegmentGatherer(Thread):
 
         # Critical files that are required, otherwise production will fail.
         # If there are no critical files, empty set([]) is used.
-        try:
-            critical_segments = self._config.get(self._section,
-                                                 "critical_files")
-            self.slots[time_slot]['critical_files'] = \
-                    self._compose_filenames(time_slot, critical_segments)
-        except (NoOptionError, ValueError):
-            self.slots[time_slot]['critical_files'] = set([])
-
-        # These files are wanted, but not critical to production
-        self.slots[time_slot]['wanted_files'] = \
-            self._compose_filenames(time_slot,
-                                    self._config.get(self._section,
-                                                     "wanted_files"))
-        # Name of all the files
-        self.slots[time_slot]['all_files'] = \
-            self._compose_filenames(time_slot,
-                                    self._config.get(self._section,
-                                                     "all_files"))
+        #self.slots[time_slot]['critical_files'] = \
+        self._compose_filenames(time_slot)
 
         self.slots[time_slot]['received_files'] = set([])
         self.slots[time_slot]['delayed_files'] = dict()
@@ -145,12 +128,17 @@ class SegmentGatherer(Thread):
         self.slots[time_slot]['files_till_premature_publish'] = \
             self._num_files_premature_publish
 
-    def _compose_filenames(self, time_slot, itm_str):
-        """Compose filename set()s based on a pattern and item string.
-        itm_str is formated like ':PRO,:EPI' or 'VIS006:8,VIS008:1-8,...'"""
+    def _set_parsers(self):
+        """Set parsers"""
+        files = self._config["files"]
 
-        # Empty set
-        result = set()
+        for fle in files:
+            pattern = fle["pattern"]
+            parser = Parser(pattern)
+            self._parsers.append(parser)
+
+    def _compose_filenames(self, time_slot):
+        """Compose filename set()s"""
 
         # Get copy of metadata
         meta = self.slots[time_slot]['metadata'].copy()
@@ -158,25 +146,37 @@ class SegmentGatherer(Thread):
         # Replace variable tags (such as processing time) with
         # wildcards, as these can't be forecasted.
         try:
-            meta = _copy_without_ignore_items(
-                meta, ignored_keys=self._config.get(self._section,
-                                                    'variable_tags').split(','))
-        except NoOptionError:
+            ignored_keys = self._config["config"]["variable_tags"].split(',')
+            meta = _copy_without_ignore_items(meta, ignored_keys=ignored_keys)
+        except KeyError:
             pass
 
-        for itm in itm_str.split(','):
-            channel_name, segments = itm.split(':')
-            segments = segments.split('-')
-            if len(segments) > 1:
-                segments = ['%d' % i for i in range(int(segments[0]),
-                                                    int(segments[-1]) + 1)]
-            meta['channel_name'] = channel_name
-            for seg in segments:
-                meta['segment'] = seg
-                fname = self._parser.globify(meta)
-                result.add(fname)
+        critical_files, wanted_files, all_files = [], [], []
+        files = self._config["files"]
 
-        return result
+        for fle in files:
+            pattern = fle["pattern"]
+            parser = Parser(pattern)
+            for seg in fle["segments"]:
+                chans = seg.get('channel_name', [''])
+                critical_segments = seg.get('critical_segments', [''])
+                wanted_segments = seg.get('wanted_segments', [''])
+                all_segments = seg.get('all_segments', [''])
+                for chan in chans:
+                    meta['channel_name'] = chan
+                    for seg2 in critical_segments:
+                        meta['segment'] = seg2
+                        critical_files.append(parser.globify(meta))
+                    for seg2 in wanted_segments:
+                        meta['segment'] = seg2
+                        wanted_files.append(parser.globify(meta))
+                    for seg2 in all_segments:
+                        meta['segment'] = seg2
+                        all_files.append(parser.globify(meta))
+
+        self.slots[time_slot]['critical_files'] = set(critical_files)
+        self.slots[time_slot]['wanted_files'] = set(wanted_files)
+        self.slots[time_slot]['all_files'] = set(all_files)
 
     def slot_ready(self, slot):
         """Determine if slot is ready to be published."""
@@ -297,9 +297,16 @@ class SegmentGatherer(Thread):
 
     def process(self, msg):
         """Process message"""
-        try:
-            mda = self._parser.parse(msg.data["uid"])
-        except ValueError:
+
+        mda = None
+        for parser in self._parsers:
+            try:
+                mda = parser.parse(msg.data["uid"])
+                break
+            except ValueError:
+                continue
+
+        if mda is None:
             self.logger.debug("Unknown file, skipping.")
             return
 
@@ -320,15 +327,20 @@ class SegmentGatherer(Thread):
         # Replace variable tags (such as processing time) with
         # wildcards, as these can't be forecasted.
         try:
-            mda = _copy_without_ignore_items(
-                mda, ignored_keys=self._config.get(self._section,
-                                                   'variable_tags').split(','))
-        except NoOptionError:
+            variable_tags = self._config["config"]["variable_tags"].split(',')
+            mda = _copy_without_ignore_items(mda, ignored_keys=variable_tags)
+        except KeyError:
             pass
 
-        mask = self._parser.globify(mda)
+        mask = None
+        for parser in self._parsers:
+            try:
+                mask = parser.globify(mda)
+                break
+            except ValueError:
+                continue
 
-        if mask in slot['received_files']:
+        if mask is None or mask in slot['received_files']:
             return
 
         # Add uid and uri
@@ -367,8 +379,7 @@ class SegmentGatherer(Thread):
 
         # Although we're not publishing a message, generate one anyway
         # for compatibility
-        msg = message.Message(self._config.get(self._section, "publish_topic"),
-                              "dataset", data['metadata'])
+        msg = message.Message("/placeholder", "dataset", data['metadata'])
         self.logger.info("Forwarding: %s", str(msg))
         self.output_queue.put(msg)
 
