@@ -191,9 +191,9 @@ class SegmentGatherer(Thread):
         num_wanted_and_critical_files_received = \
             len(wanted_and_critical_files & slot['received_files'])
 
-        self.logger.debug("Got %d wanted or critical files in slot %s.",
-                          num_wanted_and_critical_files_received,
-                          time_slot)
+        # self.logger.debug("Got %d wanted or critical files in slot %s.",
+        #                   num_wanted_and_critical_files_received,
+        #                   time_slot)
 
         if num_wanted_and_critical_files_received \
                 == slot['files_till_premature_publish']:
