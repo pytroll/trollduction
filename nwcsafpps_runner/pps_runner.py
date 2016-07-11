@@ -194,7 +194,7 @@ def terminate_process(popen_obj, scene):
     return
 
 
-def pps_worker(semaphore_obj, scene, job_id, publish_q, input_msg):
+def pps_worker(semaphore_obj, scene, job_dict, job_key, publish_q, input_msg):
     """Spawn/Start a PPS run on a new thread if available
 
         scene = {'platform_name': platform_name,
@@ -339,9 +339,10 @@ def pps_worker(semaphore_obj, scene, job_id, publish_q, input_msg):
                 LOG.info("Sending: " + str(pubmsg))
                 publish_q.put(pubmsg)
 
+                job_id = job_dict[job_key]
                 if isinstance(job_id, datetime):
                     dt_ = datetime.utcnow() - job_id
-                    LOG.info("PPS on scene " + str(job_id) +
+                    LOG.info("PPS on scene " + str(job_key) +
                              " finished. It took: " + str(dt_))
                 else:
                     LOG.warning(
@@ -710,8 +711,8 @@ def pps():
             t_nwp_pp.start()
 
             t__ = threading.Thread(target=pps_worker, args=(sema, scene,
-                                                            jobs_dict[
-                                                                keyname],
+                                                            jobs_dict,
+                                                            keyname,
                                                             publisher_q,
                                                             msg))
             threads.append(t__)
