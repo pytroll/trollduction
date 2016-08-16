@@ -63,7 +63,7 @@ class SegmentGathererContainer(object):
 
 class SegmentGatherer(Thread):
 
-    """Message handler to collect files for one time stamp."""
+    """Class for gathering segments of one time slot together."""
 
     logger = logging.getLogger("SegmentGatherer")
 
