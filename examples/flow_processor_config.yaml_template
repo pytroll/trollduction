@@ -14,12 +14,12 @@ work:
     - type: daemon
       name: segment_gatherer
       components:
-        - class: !!python/object:trollduction.plugins.gatherer.SegmentGathererContainer
+        - class: !!python/object:trollduction.plugins.segment_gatherer.SegmentGathererContainer
             config: /tmp/seg_conf_msg.yaml
     - type: workflow
       name: scene_loader
       Workflow:
-        - trollduction.plugins.messaging.MessageLoader:
+        - trollduction.plugins.scene_loader.SceneLoader:
             product_list: *product_list
     - type: workflow
       name: pansharpener
