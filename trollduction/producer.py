@@ -1271,7 +1271,7 @@ class DataWriter(Thread):
                                     try:
                                         obj.save(tempname,
                                                  fformat=fformat,
-                                                 compression=copy.attrib.get("compression", 6))
+                                                 **save_params)
                                     except IOError:
                                         LOGGER.exception("Can't save file %s", fname)
                                         continue
