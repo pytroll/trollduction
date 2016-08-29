@@ -47,6 +47,7 @@ import shutil
 import socket
 import tempfile
 import time
+from copy import deepcopy
 from fnmatch import fnmatch
 from struct import error as StructError
 from threading import Thread
@@ -56,6 +57,7 @@ from xml.etree.ElementTree import tostring
 import netifaces
 import numpy as np
 import pyinotify
+from pyresample.utils import AreaNotFound
 
 from mpop.projector import get_area_def
 from mpop.satellites import GenericFactory as GF
@@ -63,7 +65,6 @@ from mpop.satout.cfscene import CFScene
 from posttroll.message import Message
 from posttroll.publisher import Publish
 from pyorbital import astronomy
-from pyresample.utils import AreaNotFound
 from trollduction import helper_functions
 from trollsched.boundary import AreaDefBoundary, Boundary
 from trollsched.satpass import Pass
@@ -1208,7 +1209,7 @@ class DataWriter(Thread):
 
             while self._loop:
                 try:
-                    obj, file_items, params = self.prod_queue.get(True, 1)
+                    orig_obj, file_items, params = self.prod_queue.get(True, 1)
                 except Queue.Empty:
                     continue
                 local_params = params.copy()
@@ -1235,6 +1236,7 @@ class DataWriter(Thread):
                             local_params[key] = aliases.get(params[key],
                                                             params[key])
                     for item, copies in sorted_items.items():
+                        obj = deepcopy(orig_obj)
                         attrib = dict(item)
                         if attrib.get("overlay", "").startswith("#"):
                             obj.add_overlay(hash_color(attrib.get("overlay")))
