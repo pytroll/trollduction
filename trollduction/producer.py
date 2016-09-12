@@ -37,33 +37,40 @@ TODO:
    (crude/nearest/<something new>)
 '''
 
-from .listener import ListenerContainer
-from mpop.satellites import GenericFactory as GF
-import time
+import errno
 import glob
-from mpop.projector import get_area_def
-from threading import Thread
-from pyorbital import astronomy
-import numpy as np
-import os
-import Queue
 import logging
 import logging.handlers
-from fnmatch import fnmatch
-from trollduction import helper_functions
-from trollsift import compose
-from urlparse import urlparse, urlunsplit
-import socket
+import os
+import Queue
 import shutil
-from mpop.satout.cfscene import CFScene
-from posttroll.publisher import Publish
-from posttroll.message import Message
-from pyresample.utils import AreaNotFound
-from trollsched.satpass import Pass
-from trollsched.boundary import Boundary, AreaDefBoundary
-import errno
-import netifaces
+import socket
 import tempfile
+import time
+from copy import deepcopy
+from fnmatch import fnmatch
+from struct import error as StructError
+from threading import Thread
+from urlparse import urlparse, urlunsplit
+from xml.etree.ElementTree import tostring
+
+import netifaces
+import numpy as np
+import pyinotify
+from pyresample.utils import AreaNotFound
+
+from mpop.projector import get_area_def
+from mpop.satellites import GenericFactory as GF
+from mpop.satout.cfscene import CFScene
+from posttroll.message import Message
+from posttroll.publisher import Publish
+from pyorbital import astronomy
+from trollduction import helper_functions
+from trollsched.boundary import AreaDefBoundary, Boundary
+from trollsched.satpass import Pass
+from trollsift import compose
+
+from .listener import ListenerContainer
 
 try:
     from mipp import DecodeError
@@ -79,8 +86,6 @@ else:
     import gc
     import pprint
 
-from xml.etree.ElementTree import tostring
-from struct import error as StructError
 
 try:
     from dwd_extensions.tools.view_zenith_angle import ViewZenithAngleCacheManager
@@ -91,8 +96,6 @@ except ImportError:
 LOGGER = logging.getLogger(__name__)
 
 # Config watcher stuff
-
-import pyinotify
 
 
 def get_local_ips():
@@ -646,7 +649,7 @@ class DataProcessor(object):
                     keywords["resolution"] = int(group.resolution)
 
                 self.check_ready_to_read(req_channels)
-                
+
                 self.global_data.load(req_channels, **keywords)
                 LOGGER.debug("loaded data: %s", str(self.global_data))
             except (IndexError, IOError, DecodeError, StructError):
@@ -678,7 +681,7 @@ class DataProcessor(object):
                 try:
                     try:
                         actual_srch_radius = \
-                                int(area_item.attrib["srch_radius"])
+                            int(area_item.attrib["srch_radius"])
                         LOGGER.debug("Overriding search radius %s with %s",
                                      str(srch_radius), str(actual_srch_radius))
                     except KeyError:
@@ -802,8 +805,8 @@ class DataProcessor(object):
                 info_dict = self.get_parameters()
                 pattern = compose(wait_for_ch_cfg['pattern'], info_dict)
                 if self.wait_until_exists(pattern,
-                                     wait_for_ch_cfg['timeout'],
-                                     wait_for_ch_cfg['wait_after_found']):
+                                          wait_for_ch_cfg['timeout'],
+                                          wait_for_ch_cfg['wait_after_found']):
                     LOGGER.debug('found %s', pattern)
                 else:
                     LOGGER.error('timeout! did not found %s', pattern)
@@ -856,7 +859,7 @@ class DataProcessor(object):
 
         return True
 
-    def get_parameters(self, item = None):
+    def get_parameters(self, item=None):
         """Get the parameters for filename sifting.
         """
 
@@ -1206,7 +1209,7 @@ class DataWriter(Thread):
 
             while self._loop:
                 try:
-                    obj, file_items, params = self.prod_queue.get(True, 1)
+                    orig_obj, file_items, params = self.prod_queue.get(True, 1)
                 except Queue.Empty:
                     continue
                 local_params = params.copy()
@@ -1219,8 +1222,7 @@ class DataWriter(Thread):
                         for key in ["output_dir",
                                     "thumbnail_name",
                                     "thumbnail_size"]:
-                            if key in attrib:
-                                del attrib[key]
+                            attrib.pop(key, None)
                         if 'format' not in attrib:
                             attrib.setdefault('format',
                                               os.path.splitext(item.text.strip())[1][1:])
@@ -1234,6 +1236,7 @@ class DataWriter(Thread):
                             local_params[key] = aliases.get(params[key],
                                                             params[key])
                     for item, copies in sorted_items.items():
+                        obj = deepcopy(orig_obj)
                         attrib = dict(item)
                         if attrib.get("overlay", "").startswith("#"):
                             obj.add_overlay(hash_color(attrib.get("overlay")))
@@ -1271,7 +1274,7 @@ class DataWriter(Thread):
                                     try:
                                         obj.save(tempname,
                                                  fformat=fformat,
-                                                 compression=copy.attrib.get("compression", 6))
+                                                 **save_params)
                                     except IOError:
                                         LOGGER.exception("Can't save file %s", fname)
                                         continue
@@ -1344,7 +1347,7 @@ class DataWriter(Thread):
         if 'blocksize' not in save_kwords:
             blk_sz = fileelem.attrib.get("blocksize", None)
             if blk_sz is not None:
-                save_kwords['blocksize'] = blk_sz 
+                save_kwords['blocksize'] = blk_sz
 
         if 'nbits' in save_kwords:
             save_kwords['tags'] = {'NBITS': save_kwords['nbits']}
@@ -1352,9 +1355,9 @@ class DataWriter(Thread):
         elif 'nbits' in params:
             save_kwords['tags'] = {'NBITS':
                                    params['nbits']}
-            
+
         return save_kwords
-    
+
     def write(self, obj, item, params):
         """Write to queue."""
         self.prod_queue.put((obj, list(item), params.copy()))
@@ -1446,7 +1449,7 @@ class Trollduction(object):
             #            self.listener.restart_listener('file')
             self.listener.restart_listener(self.td_config['topics'].split(','))
             LOGGER.info("Listener restarted")
-        
+
         self.set_wait_for_channel_cfg()
 
         try:
@@ -1491,7 +1494,7 @@ class Trollduction(object):
         self.wait_for_channel_cfg = wait_for_channel_cfg
         if self.data_processor is not None:
             self.data_processor.set_wait_for_channel_cfg(wait_for_channel_cfg)
-            
+
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
         '''
@@ -1505,7 +1508,7 @@ class Trollduction(object):
                 self.config_watcher.stop()
             if self.listener is not None:
                 self.listener.stop()
-                
+
             if self.viewZenCacheManager is not None:
                 self.viewZenCacheManager.shutdown()
                 self.viewZenCacheManager = None
