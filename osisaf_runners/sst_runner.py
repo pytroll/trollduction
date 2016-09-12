@@ -127,14 +127,19 @@ def start_sst_processing(sst_file, message, **kwargs):
         platform_name = message.data['platform_name']
         sst_file[scene_id] = os.path.join(path, fname)
 
-    elif (message.data['satellite'] in METOP_NAMES and
-            message.data['instruments'] == 'avhrr/3'):
+    elif message.data['instruments'] == 'avhrr/3':
+        # if message.data['platform_name'] not in METOP_NAMES and
 
         path, fname = os.path.split(urlobj.path)
         LOG.debug("path " + str(path) + " filename = " + str(fname))
 
         instrument = str(message.data['instruments'])
-        platform_name = str("Metop-" + str(message.data['metop_letter']))
+        if 'metop_letter' in message.data:
+            platform_name = str("Metop-" + str(message.data['metop_letter']))
+        else:
+            LOG.warning("Don't know which Metop satellite this is. " +
+                        "Set it to Metop-B")
+            platform_name = 'Metop-B'
         sst_file[scene_id] = os.path.join(path, fname)
 
     else:
