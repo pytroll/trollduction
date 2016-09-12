@@ -331,7 +331,8 @@ def pps_worker(semaphore_obj, scene, job_dict, job_key, publish_q, input_msg):
                 environment = MODE
                 to_send['start_time'], to_send['end_time'] = scene[
                     'starttime'], scene['endtime']
-                pubmsg = Message('/' + to_send['format'] + '/' + to_send['data_processing_level'] +
+                pubmsg = Message('/' + to_send['format'] + '/' +
+                                 to_send['data_processing_level'] +
                                  '/norrköping/' + environment +
                                  '/polar/direct_readout/',
                                  "file", to_send).encode()
