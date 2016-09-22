@@ -88,6 +88,7 @@ class DataWriter(Thread):
                 obj.save(fname, compression=compression, tags=tags,
                          fformat=fformat, gdal_options=gdal_options,
                          blocksize=blocksize)
+                self.logger.info("Saved %s", fname)
             else:
                 time.sleep(1)
 
