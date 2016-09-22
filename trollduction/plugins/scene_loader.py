@@ -27,7 +27,7 @@ class SceneLoader(AbstractWorkflowComponent):
         if global_data is None:
             return
         global_data.info['product_list'] = {}
-        use_extern_calib = product_config.attrib.get("output_dir",
+        use_extern_calib = product_config.attrib.get("use_extern_calib",
                                                      "False").lower() in \
             ["true", "1", "yes"]
 
