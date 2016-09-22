@@ -99,6 +99,9 @@ def get_prerequisites_xml(global_data, grp_config):
     reqs = set()
     for area in grp_config:
         for product in area:
-            composite = getattr(global_data.image, product.attrib['id'])
+            try:
+                composite = getattr(global_data.image, product.attrib['id'])
+            except AttributeError:
+                continue
             reqs |= composite.prerequisites
     return reqs

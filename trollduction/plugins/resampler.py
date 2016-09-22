@@ -70,7 +70,10 @@ def get_prerequisites_xml(global_data, product_config, area_name):
             if area.attrib["name"] != area_name:
                 continue
             for product in area:
-                composite = getattr(global_data.image, product.attrib['id'])
+                try:
+                    composite = getattr(global_data.image, product.attrib['id'])
+                except AttributeError:
+                    continue
                 reqs |= composite.prerequisites
     return reqs
 

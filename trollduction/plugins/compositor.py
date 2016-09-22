@@ -26,8 +26,12 @@ class CompositeGenerator(AbstractWorkflowComponent):
         prod_list = ProductList(context["product_list"]["content"])
         for prod in data.info["products"]:
             self.logger.info("Creating composite %s", prod)
-            func = getattr(data.image, prod)
-            img = func()
+            try:
+                func = getattr(data.image, prod)
+                img = func()
+            except (AttributeError, KeyError):
+                self.logger.warning("Invalid composite, skipping")
+                continue
             # Get filename from product config
             fname = create_fname(data.info, prod_list, prod)
             if fname is None:
