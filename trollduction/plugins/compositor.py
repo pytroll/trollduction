@@ -29,6 +29,8 @@ class CompositeGenerator(AbstractWorkflowComponent):
             try:
                 func = getattr(data.image, prod)
                 img = func()
+                if img is None:
+                    continue
             except (AttributeError, KeyError):
                 self.logger.warning("Invalid composite, skipping")
                 continue
@@ -51,6 +53,7 @@ def create_fname(info, prod_list, prod):
     info["productname"] = prod
     info["areaname"] = area
     pattern = _get_pattern_xml(prod_list, area, prod)
+
     if pattern is not None:
         return compose(pattern, info)
     else:
@@ -60,10 +63,12 @@ def _get_pattern_xml(prod_list, area_name, prod_name):
     """Get filepattern for area *area* and product *prod*"""
     for grp in prod_list.groups:
         for area in grp.data:
+            # FIXME: area name might be different than the projection name
             if area.attrib["name"] != area_name:
                 continue
             for product in area:
-                if product.attrib["name"] == prod_name:
+                # FIXME: prod_name might be something different
+                if product.attrib["name"] in prod_name:
                     output_dir = \
                         product.attrib.get("output_dir",
                                            prod_list.attrib["output_dir"])
