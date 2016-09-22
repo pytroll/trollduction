@@ -62,6 +62,7 @@ from pyresample.utils import AreaNotFound
 from mpop.projector import get_area_def
 from mpop.satellites import GenericFactory as GF
 from mpop.satout.cfscene import CFScene
+import mpop.imageo.formats.writer_options as writer_opts
 from posttroll.message import Message
 from posttroll.publisher import Publish
 from pyorbital import astronomy
@@ -1265,7 +1266,7 @@ class DataWriter(Thread):
                                                                   local_params)
 
                             LOGGER.debug("Saving %s", fname)
-                            if not saved:
+                            if not saved or copy.attrib.get("copy","true") == "false":
                                 try:
                                     obj.save(tempname,
                                              fformat=fformat,
@@ -1333,29 +1334,33 @@ class DataWriter(Thread):
                     self.prod_queue.task_done()
 
     def get_save_arguments(self, fileelem, params):
-        save_kwords = {}
+        writer_options = {}
 
+        # take all parameters of format_params section in file element
         fp = fileelem.find('format_params')
         if fp:
             fpp = {item.tag: item.text for item in fp.getchildren()}
-            save_kwords.update(fpp)
+        writer_options.update(fpp)
 
-        # set some defaults
-        if 'compression' not in save_kwords:
-            save_kwords['compression'] = fileelem.attrib.get("compression", 6)
+        # check for special attributes in file element
+        if writer_opts.WR_OPT_COMPRESSION not in writer_options:
+            writer_options[writer_opts.WR_OPT_COMPRESSION] = fileelem.attrib.get(writer_opts.WR_OPT_COMPRESSION, 6)
+       
+        if writer_opts.WR_OPT_BLOCKSIZE not in writer_options:
+            blksz = fileelem.attrib.get(writer_opts.WR_OPT_BLOCKSIZE, None)
+            if blksz:
+                writer_options[writer_opts.WR_OPT_BLOCKSIZE] = blksz
 
-        if 'blocksize' not in save_kwords:
-            blk_sz = fileelem.attrib.get("blocksize", None)
-            if blk_sz is not None:
-                save_kwords['blocksize'] = blk_sz
-
-        if 'nbits' in save_kwords:
-            save_kwords['tags'] = {'NBITS': save_kwords['nbits']}
-            del save_kwords['nbits']
-        elif 'nbits' in params:
-            save_kwords['tags'] = {'NBITS':
-                                   params['nbits']}
-
+        if writer_opts.WR_OPT_NBITS not in writer_options:
+            nbits = fileelem.attrib.get(writer_opts.WR_OPT_NBITS, None)
+            if nbits:
+                writer_options[writer_opts.WR_OPT_NBITS] = nbits 
+            
+        # default parameter from <common> section of product config
+        if writer_opts.WR_OPT_NBITS not in writer_options and writer_opts.WR_OPT_NBITS in params:
+            writer_options[writer_opts.WR_OPT_NBITS] = params[writer_opts.WR_OPT_NBITS]
+            
+        save_kwords = {'writer_options': writer_options}
         return save_kwords
 
     def write(self, obj, item, params):
