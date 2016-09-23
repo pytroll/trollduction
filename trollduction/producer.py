@@ -1340,7 +1340,7 @@ class DataWriter(Thread):
         fp = fileelem.find('format_params')
         if fp:
             fpp = {item.tag: item.text for item in fp.getchildren()}
-        writer_options.update(fpp)
+            writer_options.update(fpp)
 
         # check for special attributes in file element
         if writer_opts.WR_OPT_COMPRESSION not in writer_options:
