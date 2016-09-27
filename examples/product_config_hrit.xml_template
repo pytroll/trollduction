@@ -98,16 +98,57 @@
             the file format specified with the attribute "format" of the file
             node. A new xml node "format_params" has to be inserted after the
             file name.
+            
+            All items listed in <format_params> will be forwarded to custom writers (like NinJoTiff)
+            as a dictionary named "writer_options".
+  
             Example:
-        <file format="mpop.imageo.formats.ninjotiff">
-            METEOSAT_EUROPA_GESAMT_RGB-Staub_nqeuro3km_{time:%Y%m%d%H%M}_ninjo.tif
-            <format_params>
-                <ninjo_product_name>abc</ninjo_product_name>
-                ...
-                <nbits>16</nbits>
-            </format_params>
-        </file>
+        <product id="sample_comp" name="my_sample">
+            <file format="mpop.imageo.formats.ninjotiff">
+                METEOSAT_EUROPA_GESAMT_RGB-Staub_nqeuro3km_{time:%Y%m%d%H%M}_ninjo.tif
+                <format_params>
+                    <ninjo_product_name>abc</ninjo_product_name>
+                    ...
+                    <nbits>16</nbits>
+                </format_params>
+            </file>
+        </product>
         -->
+        
+        <!--
+            Additionally, the following format parameters can be used as attributes
+            of the <file> element: compression, nbits, blocksize   
+            Example:
+            
+        <product id="sample_comp" name="my_sample">
+             <file compression="5" nbits="16" blocksize="256">geotiff-sample.tif</file>
+        </product>
+        
+        -->
+        
+        <!-- to save the same product in different output formats, it is necessary to 
+            add the attribute copy="false". Otherwise all further files are only 
+            copies/links of file created by the first <file> tag. 
+            Example:
+            
+        <product id="sample_comp" name="my_sample">
+            <file copy="false" compression="5" nbits="8" blocksize="256">geotiff-sample.tif</file>
+        
+            <file copy="false" format="mpop.imageo.formats.ninjotiff">
+                ninjotiff-sample.tif
+                <format_params>
+                  <nbits>8</nbits>
+                  <compression>5</compression>
+                  <ninjo_product_name>msg_rgb-12-12-9i-n</ninjo_product_name>
+                  <sat_id>6300014</sat_id>
+                  <chan_id>9900015</chan_id>
+                  <data_cat>GORN</data_cat>
+                </format_params>
+            </file>
+         </product>  
+         
+         -->
+                 
         
     </product_list>
 </product_config>
