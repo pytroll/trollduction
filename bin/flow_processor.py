@@ -46,7 +46,10 @@ def main():
     for worker in workers:
         if queue is not None:
             worker.input_queue = queue
-        queue = worker.output_queue
+        try:
+            queue = worker.output_queue
+        except AttributeError:
+            queue = worker.queue
 
     logger.info("Ready to process new scenes")
 
