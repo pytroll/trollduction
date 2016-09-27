@@ -1339,13 +1339,14 @@ class DataWriter(Thread):
         # take all parameters of format_params section in file element
         fp = fileelem.find('format_params')
         if fp:
-            fpp = {item.tag: item.text for item in fp.getchildren()}
+            fpp = dict((item.tag, item.text) for item in fp.getchildren())
             writer_options.update(fpp)
 
         # check for special attributes in file element
         if writer_opts.WR_OPT_COMPRESSION not in writer_options:
-            writer_options[writer_opts.WR_OPT_COMPRESSION] = fileelem.attrib.get(writer_opts.WR_OPT_COMPRESSION, 6)
-       
+            writer_options[writer_opts.WR_OPT_COMPRESSION] = \
+                fileelem.attrib.get(writer_opts.WR_OPT_COMPRESSION, 6)
+
         if writer_opts.WR_OPT_BLOCKSIZE not in writer_options:
             blksz = fileelem.attrib.get(writer_opts.WR_OPT_BLOCKSIZE, None)
             if blksz:
@@ -1354,12 +1355,14 @@ class DataWriter(Thread):
         if writer_opts.WR_OPT_NBITS not in writer_options:
             nbits = fileelem.attrib.get(writer_opts.WR_OPT_NBITS, None)
             if nbits:
-                writer_options[writer_opts.WR_OPT_NBITS] = nbits 
-            
+                writer_options[writer_opts.WR_OPT_NBITS] = nbits
+
         # default parameter from <common> section of product config
-        if writer_opts.WR_OPT_NBITS not in writer_options and writer_opts.WR_OPT_NBITS in params:
-            writer_options[writer_opts.WR_OPT_NBITS] = params[writer_opts.WR_OPT_NBITS]
-            
+        if writer_opts.WR_OPT_NBITS not in writer_options \
+                and writer_opts.WR_OPT_NBITS in params:
+            writer_options[writer_opts.WR_OPT_NBITS] = \
+                params[writer_opts.WR_OPT_NBITS]
+
         save_kwords = {'writer_options': writer_options}
         return save_kwords
 
