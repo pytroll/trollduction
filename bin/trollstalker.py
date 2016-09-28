@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from trollduction import helper_functions
 
 # Copyright (c) 2013, 2014, 2015
 
@@ -32,14 +33,15 @@ import sys
 import time
 from posttroll.publisher import NoisyPublisher
 from posttroll.message import Message
-from trollsift import Parser
+from trollsift import Parser, compose
 from ConfigParser import ConfigParser
 import logging
 import logging.config
 import os
 import os.path
+import re
 import datetime as dt
-from collections import deque
+from collections import deque, OrderedDict
 
 LOGGER = logging.getLogger(__name__)
 
@@ -54,18 +56,21 @@ class EventHandler(ProcessEvent):
     """
 
     def __init__(self, topic, instrument, posttroll_port=0, filepattern=None,
-                 aliases=None, tbus_orbit=False, history=0, granule_length=0):
+                 aliases=None, tbus_orbit=False, history=0, granule_length=0,
+                 custom_vars=None, nameservers=[]):
         super(EventHandler, self).__init__()
 
-        self._pub = NoisyPublisher("trollstalker", posttroll_port, topic)
+        self._pub = NoisyPublisher("trollstalker", posttroll_port, topic,
+                                   nameservers=nameservers)
         self.pub = self._pub.start()
         self.topic = topic
-        self.info = {}
+        self.info = OrderedDict()
         if filepattern is None:
             filepattern = '{filename}'
         self.file_parser = Parser(filepattern)
         self.instrument = instrument
         self.aliases = aliases
+        self.custom_vars = custom_vars
         self.tbus_orbit = tbus_orbit
         self.granule_length = granule_length
         self._deque = deque([], history)
@@ -78,7 +83,7 @@ class EventHandler(ProcessEvent):
     def __clean__(self):
         '''Clean instance attributes.
         '''
-        self.info = {}
+        self.info = OrderedDict()
 
     def process_IN_CLOSE_WRITE(self, event):
         """When a file is closed, process the associated event.
@@ -115,7 +120,7 @@ class EventHandler(ProcessEvent):
         # New file created and closed
         if not event.dir:
             LOGGER.debug("processing %s", event.pathname)
-            # parse information and create self.info dict{}
+            # parse information and create self.info OrderedDict{}
             self.parse_file_info(event)
             if len(self.info) > 0:
                 # Check if this file has been recently dealt with
@@ -131,7 +136,7 @@ class EventHandler(ProcessEvent):
     def create_message(self):
         """Create broadcasted message
         """
-        return Message(self.topic, 'file', self.info)
+        return Message(self.topic, 'file', dict(self.info))
 
     def parse_file_info(self, event):
         '''Parse satellite and orbit information from the filename.
@@ -140,13 +145,14 @@ class EventHandler(ProcessEvent):
         try:
             LOGGER.debug("filter: %s\t event: %s",
                          self.file_parser.fmt, event.pathname)
-            self.info = self.file_parser.parse(
-                os.path.basename(event.pathname))
+            self.info = OrderedDict()
+            self.info.update(self.file_parser.parse(
+                os.path.basename(event.pathname)))
             LOGGER.debug("Extracted: %s", str(self.info))
         except ValueError:
             # Filename didn't match pattern, so empty the info dict
             LOGGER.info("Couldn't extract any usefull information")
-            self.info = {}
+            self.info = OrderedDict()
         else:
             self.info['uri'] = event.pathname
             self.info['uid'] = os.path.basename(event.pathname)
@@ -194,6 +200,18 @@ class EventHandler(ProcessEvent):
                 while self.info["start_time"] > self.info["end_time"]:
                     self.info["end_time"] += dt.timedelta(days=1)
 
+            if self.custom_vars is not None:
+                for var_name in self.custom_vars:
+                    var_pattern = self.custom_vars[var_name]
+                    var_val = None
+                    if '%' in var_pattern:
+                        var_val = helper_functions.create_aligned_datetime_var(
+                            var_pattern, self.info)
+                    if var_val is None:
+                        var_val = compose(var_pattern, self.info)
+                    self.info[var_name] = var_val
+
+
 class NewThreadedNotifier(ThreadedNotifier):
 
     '''Threaded notifier class
@@ -206,7 +224,8 @@ class NewThreadedNotifier(ThreadedNotifier):
 
 def create_notifier(topic, instrument, posttroll_port, filepattern,
                     event_names, monitored_dirs, aliases=None,
-                    tbus_orbit=False, history=0, granule_length=0):
+                    tbus_orbit=False, history=0, granule_length=0,
+                    custom_vars=None, nameservers=[]):
     '''Create new notifier'''
 
     # Event handler observes the operations in defined folder
@@ -228,7 +247,9 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
                                  aliases=aliases,
                                  tbus_orbit=tbus_orbit,
                                  history=history,
-                                 granule_length=granule_length)
+                                 granule_length=granule_length,
+                                 custom_vars=custom_vars,
+                                 nameservers=nameservers)
 
     notifier = NewThreadedNotifier(manager, event_handler)
 
@@ -239,34 +260,25 @@ def create_notifier(topic, instrument, posttroll_port, filepattern,
     return notifier
 
 
-def parse_aliases(config):
-    '''Parse aliases from the config.
+def parse_vars(config):
+    '''Parse custom variables from the config.
 
     Aliases are given in the config as:
 
-    {'alias_<name>': 'value:alias'}, or
-    {'alias_<name>': 'value1:alias1|value2:alias2'},
+    {'var_<name>': 'value'}
 
     where <name> is the name of the key which value will be
-    replaced. The later form is there to support several possible
-    substitutions (eg. '2' -> '9' and '3' -> '10' in the case of MSG).
+    added to metadata. <value> is a trollsift pattern.
 
     '''
-    aliases = {}
+    vars = OrderedDict()
 
     for key in config:
-        if 'alias' in key:
-            alias = config[key]
-            new_key = key.replace('alias_', '')
-            if '|' in alias or ':' in alias:
-                parts = alias.split('|')
-                aliases2 = {}
-                for part in parts:
-                    key2, val2 = part.split(':')
-                    aliases2[key2] = val2
-                alias = aliases2
-            aliases[new_key] = alias
-    return aliases
+        if 'var_' in key:
+            new_key = key.replace('var_', '')
+            var = config[key]
+            vars[new_key] = var
+    return vars
 
 
 def main():
@@ -307,6 +319,10 @@ def main():
     parser.add_argument("-i", "--instrument",
                         type=str, default=None,
                         help="Instrument name in the satellite")
+    parser.add_argument("-n", "--nameservers",
+                        type=str, default=None,
+                        help="Posttroll nameservers to register own address,"
+                        " otherwise multicasting is used")
 
     if len(sys.argv) <= 1:
         parser.print_help()
@@ -326,6 +342,7 @@ def main():
     topic = args.topic
     event_names = args.event_names
     instrument = args.instrument
+    nameservers = args.nameservers
 
     filepattern = args.filepattern
     if args.filepattern == '':
@@ -341,7 +358,7 @@ def main():
 
         config = ConfigParser()
         config.read(config_fname)
-        config = dict(config.items(args.config_item))
+        config = OrderedDict(config.items(args.config_item))
         config['name'] = args.configuration_file
 
         topic = topic or config['topic']
@@ -369,10 +386,17 @@ def main():
         except KeyError:
             history = 0
 
-        aliases = parse_aliases(config)
+        try:
+            nameservers = nameservers or config['nameservers']
+        except KeyError:
+            nameservers = []
+
+        aliases = helper_functions.parse_aliases(config)
         tbus_orbit = bool(config.get("tbus_orbit", False))
 
         granule_length = float(config.get("granule", 0))
+
+        custom_vars = parse_vars(config)
 
         try:
             log_config = config["stalker_log_config"]
@@ -402,10 +426,18 @@ def main():
     if type(monitored_dirs) is not list:
         monitored_dirs = [monitored_dirs]
 
+    if nameservers:
+        nameservers = nameservers.split(',')
+    else:
+        nameservers = []
+
     # Start watching for new files
     notifier = create_notifier(topic, instrument, posttroll_port, filepattern,
                                event_names, monitored_dirs, aliases=aliases,
-                               tbus_orbit=tbus_orbit, history=history, granule_length=granule_length)
+                               tbus_orbit=tbus_orbit, history=history,
+                               granule_length=granule_length,
+                               custom_vars=custom_vars,
+                               nameservers=nameservers)
     notifier.start()
 
     try:

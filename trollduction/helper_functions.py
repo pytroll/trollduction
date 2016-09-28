@@ -27,6 +27,8 @@
 import numpy as np
 import os
 import xml_read
+import datetime as dt
+import re
 from mpop.projector import get_area_def
 from pyresample.geometry import Boundary
 import logging
@@ -304,3 +306,143 @@ def overlapping_timeinterval(start_end_times, timelist):
             return tstart, tend
 
     return False
+
+
+def _conv_datetime(stri, convdef, transform):
+    """
+    Convert the string *stri* to the given datetime
+    conversion definition *convdef*.
+    Do some transformation of the parsed data when
+    *transform* is defined
+    """
+    result = dt.datetime.strptime(stri, convdef)
+    if transform:
+        params = _parse_align_time_transform(transform)
+        if params:
+            result = align_time(result,
+                                dt.timedelta(minutes=params[0]),
+                                dt.timedelta(minutes=params[1]),
+                                params[2])
+    return result
+
+
+def create_aligned_datetime_var(var_pattern, info_dict):
+    """
+    uses *var_patterns* like "{time:%Y%m%d%H%M|align(15)}"
+    to new datetime including support for temporal
+    alignment (Ceil/Round a datetime object to a multiple of a timedelta.
+    Useful to equalize small time differences in name of files
+    belonging to the same timeslot)
+    """
+    mtch = re.match(
+        '{(.*?)(!(.*?))?(\\:(.*?))?(\\|(.*?))?}',
+        var_pattern)
+    
+    if mtch is None:
+        return None
+        
+    # parse date format pattern
+    key = mtch.groups()[0]
+    format_spec = mtch.groups()[4]
+    transform = mtch.groups()[6]
+    date_val = info_dict[key]
+    
+    if not isinstance(date_val, dt.datetime):
+        return None
+    
+    # only for datetime types
+    res = date_val
+    if transform:
+        align_params = _parse_align_time_transform(transform)
+        if align_params:
+            res = align_time(
+                date_val,
+                dt.timedelta(minutes=align_params[0]),
+                dt.timedelta(minutes=align_params[1]),
+                align_params[2])
+    
+    if res is None:
+        # fallback to default compose when no special handling needed
+        res = compose(var_val, self.info) 
+                
+    return res
+
+
+def _parse_align_time_transform(transform_spec):
+    """
+    Parse the align-time transformation string "align(15,0,-1)"
+    and returns *(steps, offset, intv_add)*
+    """
+    match = re.search('align\\((.*)\\)', transform_spec)
+    if match:
+        al_args = match.group(1).split(',')
+        steps = int(al_args[0])
+        if len(al_args) > 1:
+            offset = int(al_args[1])
+        else:
+            offset = 0
+        if len(al_args) > 2:
+            intv_add = int(al_args[2])
+        else:
+            intv_add = 0
+        return (steps, offset, intv_add)
+    else:
+        return None
+
+
+def align_time(input_val, steps=dt.timedelta(minutes=5),
+               offset=dt.timedelta(minutes=0), intervals_to_add=0):
+    """
+    Ceil/Round a datetime object to a multiple of a timedelta.
+    Useful to equalize small time differences in name of files
+    belonging to the same timeslot
+    """
+    stepss = steps.total_seconds()
+    val = input_val - offset
+    vals = (val - val.min).seconds
+    result = val - dt.timedelta(seconds=(vals - (vals // stepss) * stepss))
+    result = result + (intervals_to_add * steps)
+    return result
+
+
+def parse_aliases(config):
+    '''Parse aliases from the config.
+
+    Aliases are given in the config as:
+
+    {'alias_<name>': 'value:alias'}, or
+    {'alias_<name>': 'value1:alias1|value2:alias2'},
+
+    where <name> is the name of the key which value will be
+    replaced. The later form is there to support several possible
+    substitutions (eg. '2' -> '9' and '3' -> '10' in the case of MSG).
+
+    '''
+    aliases = {}
+
+    for key in config:
+        if 'alias' in key:
+            alias = config[key]
+            new_key = key.replace('alias_', '')
+            if '|' in alias or ':' in alias:
+                parts = alias.split('|')
+                aliases2 = {}
+                for part in parts:
+                    key2, val2 = part.split(':')
+                    aliases2[key2] = val2
+                alias = aliases2
+            aliases[new_key] = alias
+    return aliases
+
+
+def eval_default(expression, default_res=None):
+    """Calls eval on expression and returns default_res if it throws
+    exceptions
+    """
+    if default_res is None:
+        default_res = expression
+    try:
+        return eval(expression)
+    except:
+        pass
+    return default_res

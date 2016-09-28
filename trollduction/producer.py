@@ -21,6 +21,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
 '''Trollduction module
 
 TODO:
@@ -36,32 +37,40 @@ TODO:
    (crude/nearest/<something new>)
 '''
 
-from .listener import ListenerContainer
-from mpop.satellites import GenericFactory as GF
-import time
-from mpop.projector import get_area_def
-from threading import Thread
-from pyorbital import astronomy
-import numpy as np
-import os
-import Queue
+import errno
+import glob
 import logging
 import logging.handlers
-from fnmatch import fnmatch
-from trollduction import helper_functions
-from trollsift import compose
-from urlparse import urlparse, urlunsplit
-import socket
+import os
+import Queue
 import shutil
-from mpop.satout.cfscene import CFScene
-from posttroll.publisher import Publish
-from posttroll.message import Message
-from pyresample.utils import AreaNotFound
-from trollsched.satpass import Pass
-from trollsched.boundary import Boundary, AreaDefBoundary
-import errno
-import netifaces
+import socket
 import tempfile
+import time
+from copy import deepcopy
+from fnmatch import fnmatch
+from struct import error as StructError
+from threading import Thread
+from urlparse import urlparse, urlunsplit
+from xml.etree.ElementTree import tostring
+
+import netifaces
+import numpy as np
+import pyinotify
+from pyresample.utils import AreaNotFound
+
+from mpop.projector import get_area_def
+from mpop.satellites import GenericFactory as GF
+from mpop.satout.cfscene import CFScene
+from posttroll.message import Message
+from posttroll.publisher import Publish
+from pyorbital import astronomy
+from trollduction import helper_functions
+from trollsched.boundary import AreaDefBoundary, Boundary
+from trollsched.satpass import Pass
+from trollsift import compose
+
+from .listener import ListenerContainer
 
 try:
     from mipp import DecodeError
@@ -77,14 +86,16 @@ else:
     import gc
     import pprint
 
-from xml.etree.ElementTree import tostring
-from struct import error as StructError
+
+try:
+    from dwd_extensions.tools.view_zenith_angle import ViewZenithAngleCacheManager
+    use_dwd_extensions = True
+except ImportError:
+    use_dwd_extensions = False
 
 LOGGER = logging.getLogger(__name__)
 
 # Config watcher stuff
-
-import pyinotify
 
 
 def get_local_ips():
@@ -393,14 +404,21 @@ class DataProcessor(object):
     """Process the data.
     """
 
-    def __init__(self, publish_topic=None, port=0):
+    def __init__(self, publish_topic=None, port=0, nameservers=[],
+                 viewZenCacheManager=None,
+                 wait_for_channel_cfg={},
+                 process_num=None):
         self.global_data = None
         self.local_data = None
         self.product_config = None
         self._publish_topic = publish_topic
         self._data_ok = True
-        self.writer = DataWriter(publish_topic=self._publish_topic, port=port)
+        self.wait_for_channel_cfg = wait_for_channel_cfg
+        self.writer = DataWriter(publish_topic=self._publish_topic, port=port,
+                                 nameservers=nameservers)
         self.writer.start()
+        self.process_num = process_num
+        self.viewZenCacheManager = viewZenCacheManager
 
     def set_publish_topic(self, publish_topic):
         '''Set published topic.'''
@@ -493,6 +511,9 @@ class DataProcessor(object):
                 LOGGER.info("Unloading data after netcdf4 conversion.")
                 data.unload(*loaded_channels)
 
+    def set_wait_for_channel_cfg(self, wait_for_channel_cfg):
+        self.wait_for_channel_cfg = wait_for_channel_cfg
+
     def run(self, product_config, msg):
         """Process the data
         """
@@ -578,6 +599,19 @@ class DataProcessor(object):
             do_generic_coverage = False
 
             for area_item in group.data:
+
+                if self.process_num is not None \
+                        and 'process_num' in area_item.attrib:
+                    if int(area_item.attrib['process_num']) \
+                            != self.process_num:
+                        LOGGER.info('Skipping area %s, assigned to process '
+                                    'number %s (own num: %s)',
+                                    area_item.attrib['id'],
+                                    area_item.attrib['process_num'],
+                                    self.process_num)
+                        skip.append(area_item)
+                        continue
+
                 try:
                     if not covers(self.global_data.overpass, area_item):
                         skip.append(area_item)
@@ -614,6 +648,8 @@ class DataProcessor(object):
                 if "resolution" in group.info:
                     keywords["resolution"] = int(group.resolution)
 
+                self.check_ready_to_read(req_channels)
+
                 self.global_data.load(req_channels, **keywords)
                 LOGGER.debug("loaded data: %s", str(self.global_data))
             except (IndexError, IOError, DecodeError, StructError):
@@ -627,6 +663,18 @@ class DataProcessor(object):
                 elif (do_generic_coverage and
                       not generic_covers(self.global_data, area_item)):
                     continue
+
+                if self.viewZenCacheManager is not None:
+                    # retrieve the satellite zenith angles for the
+                    # corresponding area
+                    self.viewZenCacheManager.prepare(msg,
+                                                     area_item.attrib['id'],
+                                                     self.global_data.info['time'])
+
+                    # update viewZenCacheManager with loaded channels to notify about
+                    # satellite position infos
+                    self.viewZenCacheManager.notify_channels_loaded(
+                        self.global_data.loaded_channels())
 
                 # reproject to local domain
                 LOGGER.debug("Projecting data to area %s",
@@ -659,6 +707,20 @@ class DataProcessor(object):
 
                 LOGGER.info('Data reprojected for area: %s',
                             area_item.attrib['name'])
+
+                # create a shallow copy of the info dictionary in local_data
+                # to provide information which should be local only
+                # independent from the global_data object
+                self.local_data.info = self.local_data.info.copy()
+                # do the same for each channel in local_data
+                for chn in self.local_data.channels:
+                    chn.info = chn.info.copy()
+
+                if self.viewZenCacheManager is not None:
+                    # wait for the satellite zenith angle calculation process
+                    vza_chn = \
+                        self.viewZenCacheManager.waitForViewZenithChannel()
+                    self.local_data.channels.append(vza_chn)
 
                 # Draw requested images for this area.
                 self.draw_images(area_item)
@@ -736,6 +798,36 @@ class DataProcessor(object):
 
         return def_names
 
+    def check_ready_to_read(self, channels_to_load):
+        lcase_channels_to_load = [str(x).lower() for x in channels_to_load]
+        LOGGER.debug(
+            'check if ready to load: %s', ', '.join(lcase_channels_to_load))
+        for ch_name, wait_for_ch_cfg in self.wait_for_channel_cfg.iteritems():
+            if ch_name in lcase_channels_to_load:
+                info_dict = self.get_parameters()
+                pattern = compose(wait_for_ch_cfg['pattern'], info_dict)
+                if self.wait_until_exists(pattern,
+                                          wait_for_ch_cfg['timeout'],
+                                          wait_for_ch_cfg['wait_after_found']):
+                    LOGGER.debug('found %s', pattern)
+                else:
+                    LOGGER.error('timeout! did not found %s', pattern)
+
+    def wait_until_exists(self, pattern, timeout_sec, wait_after_found_sec):
+        ''' waits for files matching the given pattern with
+        '''
+        waited = 0
+        wait_period = 5
+
+        while waited < timeout_sec:
+            if glob.glob(pattern):
+                time.sleep(wait_after_found_sec)
+                return True
+            time.sleep(wait_period)
+            waited += wait_period
+
+        return False
+
     def check_satellite(self, config):
         '''Check if the current configuration allows the use of this
         satellite.
@@ -769,16 +861,17 @@ class DataProcessor(object):
 
         return True
 
-    def get_parameters(self, item):
+    def get_parameters(self, item=None):
         """Get the parameters for filename sifting.
         """
 
         params = self.product_config.attrib.copy()
 
         params.update(self.global_data.info)
-        for key, attrib in item.attrib.items():
-            params["".join((item.tag, key))] = attrib
-        params.update(item.attrib)
+        if item is not None:
+            for key, attrib in item.attrib.items():
+                params["".join((item.tag, key))] = attrib
+            params.update(item.attrib)
 
         params['aliases'] = self.product_config.aliases.copy()
 
@@ -831,11 +924,19 @@ class DataProcessor(object):
                     continue
 
             try:
+                # Collect optional composite parameters from config
+                composite_params = {}
+                cp = product.find('composite_params')
+                if cp is not None:
+                    composite_params = dict(
+                        (item.tag, helper_functions.eval_default(item.text))
+                        for item in cp.getchildren())
+
                 # Check if this combination is defined
                 func = getattr(self.local_data.image, product.attrib['id'])
                 LOGGER.debug("Generating composite \"%s\"",
                              product.attrib['id'])
-                img = func()
+                img = func(**composite_params)
                 img.info.update(self.global_data.info)
                 img.info["product_name"] = \
                     product.attrib.get("name", product.attrib["id"])
@@ -854,7 +955,8 @@ class DataProcessor(object):
                                  product.attrib['name'],
                                  area.attrib['name'])
             else:
-                self.writer.write(img, product, params)
+                file_items = [x for x in product if x.tag == 'file']
+                self.writer.write(img, file_items, params)
 
         # log and publish completion of this area def
         LOGGER.info('Area %s completed', area.attrib['name'])
@@ -945,7 +1047,7 @@ class DataProcessor(object):
         return True
 
 
-def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
+def _create_message(obj, filename, uri, params, publish_topic=None, uid=None, source_uri=None):
     """Create posttroll message.
     """
     to_send = obj.info.copy()
@@ -975,6 +1077,8 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
     # FIXME: fishy: what if the uri already has a scheme ?
     to_send["uri"] = urlunsplit(("file", "", uri, "", ""))
     to_send["uid"] = uid or os.path.basename(filename)
+    if source_uri is not None:
+        to_send["source_uri"] = source_uri
     # we should have more info on format...
     fformat = os.path.splitext(filename)[1][1:]
     if fformat.startswith("tif"):
@@ -1086,11 +1190,12 @@ class DataWriter(Thread):
     we don't want to block processing.
     """
 
-    def __init__(self, publish_topic=None, port=0):
+    def __init__(self, publish_topic=None, port=0, nameservers=[]):
         Thread.__init__(self)
         self.prod_queue = Queue.Queue()
         self._publish_topic = publish_topic
         self._port = port
+        self._nameservers = nameservers
         self._loop = True
 
     def set_publish_topic(self, publish_topic):
@@ -1099,14 +1204,15 @@ class DataWriter(Thread):
 
     def run(self):
         """Run the thread."""
-        with Publish("l2producer", port=self._port) as pub:
+        with Publish("l2producer", port=self._port,
+                     nameservers=self._nameservers) as pub:
             umask = os.umask(0)
             os.umask(umask)
             default_mode = int('666', 8) - umask
 
             while self._loop:
                 try:
-                    obj, file_items, params = self.prod_queue.get(True, 1)
+                    orig_obj, file_items, params = self.prod_queue.get(True, 1)
                 except Queue.Empty:
                     continue
                 local_params = params.copy()
@@ -1119,11 +1225,10 @@ class DataWriter(Thread):
                         for key in ["output_dir",
                                     "thumbnail_name",
                                     "thumbnail_size"]:
-                            if key in attrib:
-                                del attrib[key]
+                            attrib.pop(key, None)
                         if 'format' not in attrib:
                             attrib.setdefault('format',
-                                              os.path.splitext(item.text)[1][1:])
+                                              os.path.splitext(item.text.strip())[1][1:])
 
                         key = tuple(sorted(attrib.items()))
                         sorted_items.setdefault(key, []).append(item)
@@ -1134,6 +1239,7 @@ class DataWriter(Thread):
                             local_params[key] = aliases.get(params[key],
                                                             params[key])
                     for item, copies in sorted_items.items():
+                        obj = deepcopy(orig_obj)
                         attrib = dict(item)
                         if attrib.get("overlay", "").startswith("#"):
                             obj.add_overlay(hash_color(attrib.get("overlay")))
@@ -1148,23 +1254,30 @@ class DataWriter(Thread):
                             output_dir = copy.attrib.get("output_dir",
                                                          params["output_dir"])
 
-                            fname = compose(os.path.join(output_dir, copy.text),
+                            fname = compose(os.path.join(output_dir,
+                                                         copy.text.strip()),
                                             local_params)
-                            tempfd, tempname = tempfile.mkstemp(
-                                dir=os.path.dirname(fname))
+                            dir = os.path.dirname(fname)
+                            if not os.path.exists(dir):
+                                os.makedirs(dir)
+                            tempfd, tempname = tempfile.mkstemp(dir=dir)
                             os.chmod(tempname, default_mode)
                             os.close(tempfd)
+
+                            save_params = self.get_save_arguments(copy,
+                                                                  local_params)
+
                             LOGGER.debug("Saving %s", fname)
                             if not saved:
                                 try:
                                     obj.save(tempname,
                                              fformat=fformat,
-                                             compression=copy.attrib.get("compression", 6))
+                                             **save_params)
                                 except IOError:  # retry once
                                     try:
                                         obj.save(tempname,
                                                  fformat=fformat,
-                                                 compression=copy.attrib.get("compression", 6))
+                                                 **save_params)
                                     except IOError:
                                         LOGGER.exception(
                                             "Can't save file %s", fname)
@@ -1193,10 +1306,20 @@ class DataWriter(Thread):
                                 copy.attrib["thumbnail_name"] = thname
                                 thumbnail(fname, thname, thsize, fformat)
 
+                            if 'uri' in params:
+                                source_uri = [params['uri']]
+                            elif 'dataset' in params:
+                                source_uri = \
+                                    [e['uri'] for e in params['dataset']
+                                     if 'uri' in e]
+                            else:
+                                source_uri = None
+
                             msg = _create_message(obj, os.path.basename(fname),
                                                   fname, params,
                                                   publish_topic=self._publish_topic,
-                                                  uid=uid)
+                                                  uid=uid,
+                                                  source_uri=source_uri)
                             pub.send(str(msg))
                             LOGGER.debug("Sent message %s", str(msg))
                 except Exception as e:
@@ -1213,6 +1336,32 @@ class DataWriter(Thread):
                                      local_params)
                 finally:
                     self.prod_queue.task_done()
+
+    def get_save_arguments(self, fileelem, params):
+        save_kwords = {}
+
+        fp = fileelem.find('format_params')
+        if fp:
+            fpp = {item.tag: item.text for item in fp.getchildren()}
+            save_kwords.update(fpp)
+
+        # set some defaults
+        if 'compression' not in save_kwords:
+            save_kwords['compression'] = fileelem.attrib.get("compression", 6)
+
+        if 'blocksize' not in save_kwords:
+            blk_sz = fileelem.attrib.get("blocksize", None)
+            if blk_sz is not None:
+                save_kwords['blocksize'] = blk_sz
+
+        if 'nbits' in save_kwords:
+            save_kwords['tags'] = {'NBITS': save_kwords['nbits']}
+            del save_kwords['nbits']
+        elif 'nbits' in params:
+            save_kwords['tags'] = {'NBITS':
+                                   params['nbits']}
+
+        return save_kwords
 
     def write(self, obj, item, params):
         """Write to queue."""
@@ -1244,6 +1393,7 @@ class Trollduction(object):
 
         self.data_processor = None
         self.config_watcher = None
+        self.viewZenCacheManager = None
 
         self._previous_pass = {"platform_name": None,
                                "start_time": None}
@@ -1263,9 +1413,24 @@ class Trollduction(object):
             self.td_config = config
             self.update_td_config()
 
+        nameservers = self.td_config.get('nameservers', None)
+        if nameservers:
+            nameservers = nameservers.split(',')
+        else:
+            nameservers = []
+
+        if use_dwd_extensions:
+            aliases = helper_functions.parse_aliases(self.td_config)
+            self.viewZenCacheManager = ViewZenithAngleCacheManager(
+                self.td_config.get('tle_path', ''), aliases)
+
         self.data_processor = \
             DataProcessor(publish_topic=self.td_config.get('publish_topic'),
-                          port=int(self.td_config.get('port', 0)))
+                          port=int(self.td_config.get('port', 0)),
+                          nameservers=nameservers,
+                          process_num=config["process_num"],
+                          wait_for_channel_cfg=self.wait_for_channel_cfg,
+                          viewZenCacheManager=self.viewZenCacheManager)
 
     def update_td_config_from_file(self, fname, config_item=None):
         '''Read Trollduction config file and use the new parameters.
@@ -1290,6 +1455,8 @@ class Trollduction(object):
             self.listener.restart_listener(self.td_config['topics'].split(','))
             LOGGER.info("Listener restarted")
 
+        self.set_wait_for_channel_cfg()
+
         try:
             self.update_product_config(self.td_config['product_config_file'])
         except KeyError:
@@ -1313,6 +1480,26 @@ class Trollduction(object):
 
         LOGGER.info('Product config read from %s', fname)
 
+    def set_wait_for_channel_cfg(self):
+        '''Parses configuration to waiting for a channel
+        '''
+        key_prefix = 'wait_for_channel_'
+        wait_for_channel_cfg = {}
+        for key, value in self.td_config.iteritems():
+            if key.startswith(key_prefix):
+                ch_name = key[len(key_prefix):]
+                vals = value.split('|')
+                pattern = vals[0]
+                timeout = int(vals[1])
+                wait_after_found = int(vals[2])
+                wait_for_channel_cfg[ch_name] = {
+                    'pattern': pattern,
+                    'timeout': timeout,
+                    'wait_after_found': wait_after_found}
+        self.wait_for_channel_cfg = wait_for_channel_cfg
+        if self.data_processor is not None:
+            self.data_processor.set_wait_for_channel_cfg(wait_for_channel_cfg)
+
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
         '''
@@ -1326,6 +1513,10 @@ class Trollduction(object):
                 self.config_watcher.stop()
             if self.listener is not None:
                 self.listener.stop()
+
+            if self.viewZenCacheManager is not None:
+                self.viewZenCacheManager.shutdown()
+                self.viewZenCacheManager = None
 
     def stop(self):
         """Stop running.

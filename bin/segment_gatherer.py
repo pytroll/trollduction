@@ -42,6 +42,7 @@ SLOT_READY = 1
 SLOT_READY_BUT_WAIT_FOR_MORE = 2
 SLOT_OBSOLETE_TIMEOUT = 3
 
+DO_NOT_COPY_KEYS = ("uid", "uri", "channel_name", "segment")
 
 class SegmentGatherer(object):
 
@@ -52,8 +53,16 @@ class SegmentGatherer(object):
         self._config = config
         self._section = section
         topics = config.get(section, 'topics').split()
+        
+        try:
+            nameservers = config.get(section, 'nameservers')
+            nameservers = nameservers.split(',')
+        except (NoOptionError, ValueError):
+            nameservers = []
+        
         self._listener = ListenerContainer(topics=topics)
-        self._publisher = publisher.NoisyPublisher("segment_gatherer")
+        self._publisher = publisher.NoisyPublisher("segment_gatherer",
+                                                   nameservers=nameservers)
         self._subject = config.get(section, "publish_topic")
         self._pattern = config.get(section, 'pattern')
         self._parser = Parser(self._pattern)
@@ -87,7 +96,7 @@ class SegmentGatherer(object):
         # Init metadata struct
         metadata = {}
         for key in msg.data:
-            if key not in ("uid", "uri", "channel_name", "segment"):
+            if key not in DO_NOT_COPY_KEYS:
                 metadata[key] = msg.data[key]
         metadata['dataset'] = []
 
@@ -136,12 +145,12 @@ class SegmentGatherer(object):
         # Get copy of metadata
         meta = self.slots[time_slot]['metadata'].copy()
 
-        # Replace variable tags (such as processing time) with a
-        # wildcard, as these can't be forecasted.
+        # Replace variable tags (such as processing time) with
+        # wildcards, as these can't be forecasted.
         try:
-            for tag in self._config.get(self._section,
-                                        'variable_tags').split(','):
-                meta[tag] = '*'
+            meta = _copy_without_ignore_items(
+                meta, ignored_keys=self._config.get(self._section,
+                                                    'variable_tags').split(','))
         except NoOptionError:
             pass
 
@@ -154,7 +163,7 @@ class SegmentGatherer(object):
             meta['channel_name'] = channel_name
             for seg in segments:
                 meta['segment'] = seg
-                fname = self._parser.compose(meta)
+                fname = self._parser.globify(meta)
                 result.add(fname)
 
         return result
@@ -308,7 +317,14 @@ class SegmentGatherer(object):
         except ValueError:
             self.logger.debug("Unknown file, skipping.")
             return
-        time_slot = str(mda[self.time_name])
+
+        metadata = {}
+        for key in msg.data:
+            if key not in DO_NOT_COPY_KEYS:
+                metadata[key] = msg.data[key]
+        metadata.update(mda)
+
+        time_slot = str(metadata[self.time_name])
 
         # Init metadata etc if this is the first file
         if time_slot not in self.slots:
@@ -316,16 +332,16 @@ class SegmentGatherer(object):
 
         slot = self.slots[time_slot]
 
-        # Replace variable tags (such as processing time) with a
-        # wildcard, as these can't be forecasted.
+        # Replace variable tags (such as processing time) with
+        # wildcards, as these can't be forecasted.
         try:
-            for tag in self._config.get(self._section,
-                                       'variable_tags').split(','):
-                mda[tag] = '*'
+            mda = _copy_without_ignore_items(
+                mda, ignored_keys=self._config.get(self._section,
+                                                   'variable_tags').split(','))
         except NoOptionError:
             pass
 
-        mask = self._parser.compose(mda)
+        mask = self._parser.globify(mda)
 
         if mask in slot['received_files']:
             return
@@ -343,6 +359,18 @@ class SegmentGatherer(object):
 
         # Add to received files
         slot['received_files'].add(mask)
+
+
+def _copy_without_ignore_items(the_dict, ignored_keys=['ignore']):
+    """
+    get a copy of *the_dict* without entries having substring
+    'ignore' in key
+    """
+    new_dict = {}
+    for (key, val) in list(the_dict.items()):
+        if key not in ignored_keys:
+            new_dict[key] = val
+    return new_dict
 
 
 def arg_parse():
