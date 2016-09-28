@@ -10,14 +10,27 @@
         <!-- <check_coverage>False</check_coverage> -->
         <!-- number of processor used for parallel work -->
         <nprocs>1</nprocs>
-	<!-- Set default maximum search radius for all the areas, in
+        <!-- Set default maximum search radius for all the areas, in
 	     meters.  Can be overridden for each area, see the "eurol"
 	     area below.  Comment out if default (radius=None) is
 	     sufficient. -->
-	<srch_radius>20000</srch_radius>
-	<!-- Define the interpolation method.  Defaults to "nearest"
+        <srch_radius>20000</srch_radius>
+        <!-- Define the interpolation method.  Defaults to "nearest"
 	     if omitted.-->
-	<proj_method>nearest</proj_method>
+        <proj_method>nearest</proj_method>
+
+        <!-- Default parameters for the file writers.
+            All items listed in <format_params> will be as well forwarded
+            to custom writers (like NinJoTiff)
+            as a dictionary named "writer_options".
+            Example:
+            
+        <format_params>
+            <nbits>8</nbits>
+            <fill_value_subst>1</fill_value_subst>
+        </format_params>
+        -->
+
     </common>
 
     <variables>
@@ -68,7 +81,7 @@
                that it should process.
             3. If the logger.ini should be shared between l2processor instances, use "%PROCNUM%" in configured log filenames. 
                It will be replaced by the assigned PROCNUM at runtime when l2processor starts.    
-        -
+        -->
         <!-- area should only processed by l2processor instance 1 (started with arg "-N 1") -->
         <area id="euron1" name="North europe, 1km/pixel" process_num="1">
             <product id="ir108" name="ir108">

@@ -38,6 +38,11 @@ xmlstuff = """<?xml version="1.0" encoding='utf-8'?>
 
   <common>
     <output_dir>/tmp</output_dir>
+    <proj_method>nearest</proj_method>
+    <format_params>
+        <nbits>8</nbits>
+        <fill_value_subst>1</fill_value_subst>
+    </format_params>
   </common>
 
   <variables>
@@ -50,9 +55,9 @@ xmlstuff = """<?xml version="1.0" encoding='utf-8'?>
   <product_list>
     <!-- dump to netcdf -->
     <!-- calibrated, satellite projection -->
-    <dump>
+ <!--   <dump>
       <file output_dir="sir" format="netcdf4">{time:%Y%m%d_%H%M}_{platform}{satnumber}.nc</file>
-    </dump>
+    </dump> -->
     <area id="eurol" name="Europe_large">
       <!-- Generate the product only if sun is above the horizon at the
            defined longitude/latitude -->
@@ -96,17 +101,26 @@ from StringIO import StringIO
 
 class TestProductList(unittest.TestCase):
 
-    # def test_vars(self):
-    #     pconfig = ProductList(StringIO(xmlstuff))
-    #     self.assertEquals(pconfig.vars,
-    #                       {'output_dir': {'local_sir': '/local_disk/data/sir',
-    #                                       'rgb': '/local_disk/data/out/rgb',
-    #                                       'sir': '/local_disk/data/out/sir',
-    #                                       'tmp': '/tmp'}})
-    #     dump_item = pconfig.prodlist.findall('./dump/file')[0]
-    #     self.assertEquals(dump_item.attrib["output_dir"],
-    #                      '/local_disk/data/out/sir')
-    pass
+    def setUp(self):
+        self.pconfig = ProductList(StringIO(xmlstuff))
+
+    def test_vars(self):
+        self.assertEquals(self.pconfig.vars,
+                          {'output_dir': {'local_sir': '/local_disk/data/sir',
+                                          'rgb': '/local_disk/data/out/rgb',
+                                          'sir': '/local_disk/data/out/sir',
+                                          'tmp': '/tmp'}})
+#         dump_item = self.pconfig.prodlist.findall('./dump/file')[0]
+#         self.assertEquals(dump_item.attrib["output_dir"],
+#                          '/local_disk/data/out/sir')
+
+    def test_attrib(self):
+        self.assertEquals(self.pconfig.attrib,
+                          {'output_dir': '/tmp',
+                           'proj_method': 'nearest',
+                           'format_params': {'nbits': '8',
+                                             'fill_value_subst': '1'}
+                           })
 
 
 def suite():

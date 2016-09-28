@@ -1363,6 +1363,14 @@ class DataWriter(Thread):
             writer_options[writer_opts.WR_OPT_NBITS] = \
                 params[writer_opts.WR_OPT_NBITS]
 
+        # default parameters of format_params section in <common>
+        # section of product config
+        fp = params.get('format_params', None)
+        if fp:
+            for key in fp.keys():
+                if key not in writer_options:
+                    writer_options[key] = fp[key]
+
         save_kwords = {'writer_options': writer_options}
         return save_kwords
 
