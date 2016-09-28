@@ -66,6 +66,6 @@ setup(name="trollduction",
                         'trollimage', 'pyorbital',
                         'trollsift', 'netifaces',
                         'pytroll-schedule', 'netcdf4'],
-      test_requires=['mock'],
+      tests_require=['mock'],
       test_suite='trollduction.tests.suite',
       )
