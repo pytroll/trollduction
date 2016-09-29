@@ -749,6 +749,11 @@ class AappLvl1Processor(object):
 
             LOG.info("Communicate done...")
 
+            if aapplvl1_proc.returncode > 0:
+                LOG.critical("AAPP processing failed!")
+                LOG.critical(err)
+                return True
+
             # Add to job register to avoid this to be run again
             if keyname not in self.job_register.keys():
                 self.job_register[keyname] = []
@@ -756,7 +761,7 @@ class AappLvl1Processor(object):
             self.job_register[keyname].append((self.starttime, self.endtime))
             LOG.debug("End: job register = " + str(self.job_register))
 
-            # Block any future run on this scene for time_to_block_before_rerun
+            # Block any future run on this scene for locktime_before_rerun
             # (e.g. 10) minutes from now:
             t__ = threading.Timer(self.locktime_before_rerun * 60.0,
                                   reset_job_registry, args=(self.job_register,
@@ -767,11 +772,6 @@ class AappLvl1Processor(object):
 
             LOG.debug(
                 "After timer call: job register = " + str(self.job_register))
-
-            if aapplvl1_proc.returncode > 0:
-                LOG.critical("AAPP processing failed!")
-                LOG.critical(err)
-                return True
 
             LOG.info(
                 "Ready with AAPP level-1 processing on NOAA scene: " + str(fname))
