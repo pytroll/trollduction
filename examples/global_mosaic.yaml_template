@@ -1,0 +1,51 @@
+# Log filename with full path
+log_fname: /tmp/global_mosaic.log
+
+# Log level
+log_level: DEBUG
+
+# Use UTC time zone. If false or not set, use local time
+use_utc: true
+
+# ID of the used area def from areas.def
+area_def: EPSG4326
+
+# Number of images to be expected for each slot and composite
+num_expected: 5
+
+# Filename for the output images, with full path
+out_pattern: "/tmp/foo_{nominal_time:%Y%m%d_%H%M}_{areaname}_{composite}.tif"
+
+# Timeout N minutes after the first image has arrived for each
+# _composite_ in a time slot
+timeout: 60
+
+# List of posttroll message topics to listen
+topics:
+  - /new/image/yay
+
+# Longitude limits for each satellite in the composite. Set to null if
+# no limiting should be done, or comment out to use default values.
+lon_limits:
+  Meteosat-10:
+    - -37.5
+    - 20.75
+  Meteosat-8:
+    - 20.75
+    - 91.1
+  Himawari-8:
+    - 91.1
+    - -177.15
+  GOES-15:
+    - -177.15
+    - -105.
+  GOES-13:
+    - -105.
+    - -37.5
+# lon_limits: null
+
+# Blend settings. Uncomment to use, and adjust lon_limits so that
+# there's overlap, for example set to null
+# blend_settings:
+#   erosion_width: 40
+#   smooth_width: 40
