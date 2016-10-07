@@ -48,14 +48,15 @@ class Resampler(AbstractWorkflowComponent):
         except KeyError:
             radius = None
 
-        for area in glbl.info["product_list"]:
+        for area_name in glbl.info["product_list"]:
             # Reproject only needed channels
-            channels = get_prerequisites_xml(glbl, product_config, area)
-            self.logger.info("Resampling to area %s", area)
-            lcl = glbl.project(area, channels=channels, precompute=precompute,
+            channels = get_prerequisites_xml(glbl, product_config, area_name)
+            self.logger.info("Resampling to area %s", area_name)
+            lcl = glbl.project(area_name, channels=channels,
+                               precompute=precompute,
                                mode=proj_method, radius=radius, nprocs=nprocs)
-            lcl.info["area"] = area
-            lcl.info["products"] = glbl.info["product_list"][area]
+            lcl.info["areaname"] = area_name
+            lcl.info["products"] = glbl.info["product_list"][area_name]
             context["output_queue"].put(lcl)
 
     def post_invoke(self):

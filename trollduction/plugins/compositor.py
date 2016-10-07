@@ -31,35 +31,38 @@ class CompositeGenerator(AbstractWorkflowComponent):
                 img = func()
                 if img is None:
                     continue
+                img.info.update(data.info)
             except (AttributeError, KeyError):
                 self.logger.warning("Invalid composite, skipping")
                 continue
-            # Get filename from product config
-            fname = create_fname(data.info, prod_list, prod)
+
+            # Get filename and product name from product config
+            fname, productname = create_fname(data.info, prod_list, prod)
+
             if fname is None:
                 self.logger.error("Could not generate a valid filename, "
                                   "product not saved!")
             else:
-                context["output_queue"].put((img, fname))
-            # img.show()
+                context["output_queue"].put((img, fname, productname))
 
     def post_invoke(self):
         """Post-invoke"""
         pass
 
-def create_fname(info, prod_list, prod):
+def create_fname(info, prod_list, prod_name):
     """Create filename for product *prod*"""
-    area = info["area"]
-    info["productname"] = prod
-    info["areaname"] = area
-    pattern = _get_pattern_xml(prod_list, area, prod)
+    area_name = info["areaname"]
 
+    pattern, prod_name = _get_pattern_and_prodname_xml(prod_list,
+                                                       area_name,
+                                                       prod_name)
+    info["productname"] = prod_name
     if pattern is not None:
-        return compose(pattern, info)
+        return (compose(pattern, info), prod_name)
     else:
-        return None
+        return (None, prod_name)
 
-def _get_pattern_xml(prod_list, area_name, prod_name):
+def _get_pattern_and_prodname_xml(prod_list, area_name, prod_name):
     """Get filepattern for area *area* and product *prod*"""
     for grp in prod_list.groups:
         for area in grp.data:
@@ -72,5 +75,6 @@ def _get_pattern_xml(prod_list, area_name, prod_name):
                     output_dir = \
                         product.attrib.get("output_dir",
                                            prod_list.attrib["output_dir"])
-                    return os.path.join(output_dir, product[0].text)
-    return None
+                    return (os.path.join(output_dir, product[0].text),
+                            product.attrib["name"])
+    return None, None
