@@ -49,7 +49,7 @@ def calc_pixel_mask_limits(adef, lon_limits):
 
 def read_image(fname, tslot, adef, lon_limits=None):
     """Read image to numpy array"""
-    print "Read", fname
+    print "Reading", fname
     # Convert to float32 to save memory in later steps
     img = np.array(Image.open(fname)).astype(np.float32)
     mask = img[:, :, 3]
@@ -59,7 +59,6 @@ def read_image(fname, tslot, adef, lon_limits=None):
         for sat in lon_limits:
             if sat in fname:
                 mask_limits = calc_pixel_mask_limits(adef, lon_limits[sat])
-                print mask_limits
                 for lim in mask_limits:
                     mask[:, lim[0]:lim[1]] = 0
                 break
@@ -78,6 +77,7 @@ def create_world_composite(fnames, tslot, adef_name, sat_limits, blend=None):
     adef = get_area_def(adef_name)
     for fname in fnames:
         next_img = read_image(fname, tslot, adef, sat_limits)
+
         if img is None:
             img = next_img
         else:
@@ -90,9 +90,9 @@ def create_world_composite(fnames, tslot, adef_name, sat_limits, blend=None):
 
             if blend and ndi:
                 scaled_erosion_size = \
-                    blend["erosion"] * (float(img.width) / 1000.0)
+                    blend["erosion_width"] * (float(img.width) / 1000.0)
                 scaled_smooth_width = \
-                    blend["erosion"] * (float(img.width) / 1000.0)
+                    blend["smooth_width"] * (float(img.width) / 1000.0)
                 alpha = np.ones(next_img_mask.shape, dtype='float')
                 alpha[next_img_mask] = 0.0
                 smooth_alpha = ndi.uniform_filter(
@@ -107,18 +107,21 @@ def create_world_composite(fnames, tslot, adef_name, sat_limits, blend=None):
 
             for i in range(3):
                 if blend and ndi:
-                    chmask2 = np.invert(chmask)
-                    idxs = img.channels[i] == 0
-                    chmask2[idxs] = False
-                    if np.sum(chmask2) == 0:
-                        scaling = 1.0
-                    else:
-                        scaling = \
-                            np.nanmean(next_img.channels[i][chmask2]) / \
-                            np.nanmean(img.channels[i][chmask2])
-                        if not np.isfinite(scaling):
+                    if blend["scale"]:
+                        chmask2 = np.invert(chmask)
+                        idxs = img.channels[i] == 0
+                        chmask2[idxs] = False
+                        if np.sum(chmask2) == 0:
                             scaling = 1.0
-                    if scaling == 0.0:
+                        else:
+                            scaling = \
+                                np.nanmean(next_img.channels[i][chmask2]) / \
+                                np.nanmean(img.channels[i][chmask2])
+                            if not np.isfinite(scaling):
+                                scaling = 1.0
+                        if scaling == 0.0:
+                            scaling = 1.0
+                    else:
                         scaling = 1.0
 
                     chdata = \
@@ -137,33 +140,6 @@ def create_world_composite(fnames, tslot, adef_name, sat_limits, blend=None):
 
     return img
 
-def update_composite(fname, tslot, adef, img=None):
-    next_img = read_image(fname, tslot, adef)
-
-    if img is None:
-        img = next_img
-    else:
-        img_mask = reduce(np.ma.mask_or,
-                          [chn.mask for chn in img.channels])
-        next_img_mask = reduce(np.ma.mask_or,
-                               [chn.mask for chn in next_img.channels])
-
-        chmask = np.logical_and(img_mask, next_img_mask)
-
-        dtype = img.channels[0].dtype
-        chdata = np.zeros(img_mask.shape, dtype=dtype)
-
-        for i in range(3):
-            chdata[img_mask] = next_img.channels[i].data[img_mask]
-            chdata[next_img_mask] = img.channels[i].data[next_img_mask]
-            img.channels[i] = np.ma.masked_where(chmask, chdata)
-
-        chdata = np.max(np.dstack((img.channels[3].data,
-                                   next_img.channels[3].data)),
-                        2)
-        img.channels[3] = np.ma.masked_where(chmask, chdata)
-
-    return img
 
 class WorldCompositeDaemon(object):
 
@@ -193,7 +169,7 @@ class WorldCompositeDaemon(object):
             lon_limits = None
 
         try:
-            blend = self.config["blend_config"]
+            blend = self.config["blend_settings"]
         except KeyError:
             blend = None
 
@@ -258,25 +234,6 @@ class WorldCompositeDaemon(object):
                          dt.timedelta(minutes=self.config["timeout"])}
                 self.slots[tslot][composite]["fnames"].append(fname)
                 self.slots[tslot][composite]["num"] += 1
-                # self.update_composite(fname, tslot, composite)
-
-    def build_composite(self, fnames, tslot):
-        """Build composite from given list of files."""
-        img = None
-        for fname in fnames:
-            img = update_composite(fname, tslot, self.adef, img=img)
-        return img
-
-    def update_composite(self, fname, tslot, composite):
-        """Update composite with new file"""
-
-        self.logger.info("Updating composite %s for time slot %s",
-                         composite, str(tslot))
-
-        self.slots[tslot][composite]["img"] = \
-            update_composite(fname, tslot, self.adef,
-                             img=self.slots[tslot][composite]["img"])
-        self.slots[tslot][composite]["num"] += 1
 
     def stop(self):
         """Stop"""
