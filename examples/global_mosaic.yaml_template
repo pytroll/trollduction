@@ -7,14 +7,14 @@ log_level: DEBUG
 # Use UTC time zone. If false or not set, use local time
 use_utc: true
 
-# ID of the used area def from areas.def
+# ID of the used area definition from areas.def
 area_def: EPSG4326
 
 # Number of images to be expected for each slot and composite
 num_expected: 5
 
 # Filename for the output images, with full path
-out_pattern: "/tmp/foo_{nominal_time:%Y%m%d_%H%M}_{areaname}_{composite}.tif"
+out_pattern: "/tmp/bar_{nominal_time:%Y%m%d_%H%M}_{areaname}_{composite}.tif"
 
 # Timeout N minutes after the first image has arrived for each
 # _composite_ in a time slot
@@ -26,6 +26,7 @@ topics:
 
 # Longitude limits for each satellite in the composite. Set to null if
 # no limiting should be done, or comment out to use default values.
+# NOTE: For now, the satellite name needs to be in the processed file
 lon_limits:
   Meteosat-10:
     - -37.5
