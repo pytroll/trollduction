@@ -26,23 +26,23 @@ topics:
 
 # Longitude limits for each satellite in the composite. Set to null if
 # no limiting should be done, or comment out to use default values.
-# NOTE: For now, the satellite name needs to be in the processed file
-lon_limits:
-  Meteosat-10:
-    - -37.5
-    - 20.75
-  Meteosat-8:
-    - 20.75
-    - 91.1
-  Himawari-8:
-    - 91.1
-    - -177.15
-  GOES-15:
-    - -177.15
-    - -105.
-  GOES-13:
-    - -105.
-    - -37.5
+# NOTE: For now, the satellite name needs to be in the processed filename
+#lon_limits:
+#  Meteosat-10:
+#    - -37.5
+#    - 20.75
+#  Meteosat-8:
+#    - 20.75
+#    - 91.1
+#  Himawari-8:
+#    - 91.1
+#    - -177.15
+#  GOES-15:
+#    - -177.15
+#    - -105.
+#  GOES-13:
+#    - -105.
+#    - -37.5
 # lon_limits: null
 
 # Blend settings. Uncomment to use, and adjust lon_limits so that
@@ -50,3 +50,16 @@ lon_limits:
 # blend_settings:
 #   erosion_width: 40
 #   smooth_width: 40
+
+save_settings:
+  compression: 6
+  # Use "null" instead of "None"
+  tags: null
+  # Use "null" instead of "None"
+  fformat: null
+  # Use "null" instead of "None"
+  gdal_options: null
+  # Use "null" instead of "None"
+  fformat: null
+  # TIFF blocksize.  Needs to be 0 for PIL/Pillow to be able to read the images
+  blocksize: 0

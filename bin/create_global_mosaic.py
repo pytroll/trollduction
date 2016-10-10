@@ -173,6 +173,21 @@ class WorldCompositeDaemon(object):
         except KeyError:
             blend = None
 
+        # Get image save options
+        try:
+            compression = self.config["save_settings"].get('compression', 6)
+            tags = self.config["save_settings"].get('tags', None)
+            fformat = self.config["save_settings"].get('fformat', None)
+            gdal_options = self.config["save_settings"].get('gdal_options',
+                                                            None)
+            blocksize = self.config["save_settings"].get('blocksize', 0)
+        except KeyError:
+            compression = 6
+            tags = None
+            fformat = None
+            gdal_options = None
+            blocksize = 0
+
         self._loop = True
 
         while self._loop:
@@ -205,7 +220,10 @@ class WorldCompositeDaemon(object):
                                                      lon_limits,
                                                      blend=blend, img=img)
                         self.logger.info("Saving %s", fname_out)
-                        img.save(fname_out)
+                        img.save(fname_out, compression=compression,
+                                 tags=tags, fformat=fformat,
+                                 gdal_options=gdal_options,
+                                 blocksize=blocksize)
                         del self.slots[slot][composite]
                         del img
                         img = None
