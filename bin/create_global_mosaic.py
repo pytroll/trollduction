@@ -128,6 +128,8 @@ def create_world_composite(fnames, tslot, adef_name, sat_limits,
                         next_img.channels[i].data * smooth_alpha / scaling + \
                         img.channels[i].data * (1 - smooth_alpha)
                 else:
+                    # Be sure that that also overlapping data is updated
+                    img_mask[~next_img_mask & ~img_mask] = True
                     chdata[img_mask] = next_img.channels[i].data[img_mask]
                     chdata[next_img_mask] = img.channels[i].data[next_img_mask]
 
