@@ -196,8 +196,7 @@ class WorldCompositeDaemon(object):
                         # Check if we already have an image with this filename
                         try:
                             img = read_image(fname_out, slot,
-                                             self.config["area_def"],
-                                             lon_limits)
+                                             self.config["area_def"])
                         except IOError:
                             img = None
                         img = create_world_composite(fnames,
