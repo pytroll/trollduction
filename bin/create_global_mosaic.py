@@ -72,8 +72,8 @@ def read_image(fname, tslot, adef, lon_limits=None):
     return GeoImage(chans, adef, tslot, fill_value=None, mode="RGBA",
                     crange=((0, 1), (0, 1), (0, 1), (0, 1)))
 
-def create_world_composite(fnames, tslot, adef_name, sat_limits, blend=None):
-    img = None
+def create_world_composite(fnames, tslot, adef_name, sat_limits,
+                           blend=None, img=None):
     adef = get_area_def(adef_name)
     for fname in fnames:
         next_img = read_image(fname, tslot, adef, sat_limits)
@@ -191,13 +191,20 @@ class WorldCompositeDaemon(object):
                         self.logger.info("Building composite %s for slot %s",
                                          composite, str(slot))
                         fnames = self.slots[slot][composite]["fnames"]
+                        fname_out = compose(self.config["out_pattern"],
+                                            file_parts)
+                        # Check if we already have an image with this filename
+                        try:
+                            img = read_image(fname_out, slot,
+                                             self.config["area_def"],
+                                             lon_limits)
+                        except IOError:
+                            img = None
                         img = create_world_composite(fnames,
                                                      slot,
                                                      self.config["area_def"],
                                                      lon_limits,
-                                                     blend=blend)
-                        fname_out = compose(self.config["out_pattern"],
-                                            file_parts)
+                                                     blend=blend, img=img)
                         self.logger.info("Saving %s", fname_out)
                         img.save(fname_out)
                         del self.slots[slot][composite]
