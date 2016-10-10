@@ -233,11 +233,16 @@ class WorldCompositeDaemon(object):
                 composite = msg.data["productname"]
                 if tslot not in self.slots:
                     self.slots[tslot] = {}
+                    self.logger.debug("Adding new timeslot: %s", str(tslot))
                 if composite not in self.slots[tslot]:
                     self.slots[tslot][composite] = \
                         {"fnames": [], "num": 0,
                          "timeout": dt.datetime.utcnow() + \
                          dt.timedelta(minutes=self.config["timeout"])}
+                    self.logger.debug("Adding new composite to slot %s: %s",
+                                      str(tslot), composite)
+                self.logger.debug("Adding file to slot %s/%s: %s",
+                                  str(tslot), composite, fname)
                 self.slots[tslot][composite]["fnames"].append(fname)
                 self.slots[tslot][composite]["num"] += 1
 
