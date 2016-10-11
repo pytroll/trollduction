@@ -63,3 +63,10 @@ save_settings:
   fformat: null
   # TIFF blocksize.  Needs to be 0 for PIL/Pillow to be able to read the images
   blocksize: 0
+
+# Reference epoch for timeouts:
+# - nominal_time = satellite data nominal time
+# - message = sending time of the message
+# - receive = receiving time of the message
+# If not given, default to nominal_time
+timeout_epoch: nominal_time

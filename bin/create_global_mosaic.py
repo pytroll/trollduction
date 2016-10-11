@@ -190,6 +190,13 @@ class WorldCompositeDaemon(object):
             gdal_options = None
             blocksize = 0
 
+        # Check which time should be used as basis for timeout:
+        # - "message" = time of message sending
+        # - "nominal_time" = time of satellite data, read from message data
+        # - "receive" = current time when message is read from queue
+        # Default to use slot nominal time
+        timeout_epoch = self.config.get("timeout_epoch", "nominal_time")
+
         self._loop = True
 
         while self._loop:
@@ -255,9 +262,15 @@ class WorldCompositeDaemon(object):
                     self.slots[tslot] = {}
                     self.logger.debug("Adding new timeslot: %s", str(tslot))
                 if composite not in self.slots[tslot]:
+                    if timeout_epoch == "message":
+                        epoch = msg.time
+                    elif timeout_epoch == "receive":
+                        epoch = dt.datetime.utcnow()
+                    else:
+                        epoch = tslot
                     self.slots[tslot][composite] = \
                         {"fnames": [], "num": 0,
-                         "timeout": dt.datetime.utcnow() + \
+                         "timeout": epoch + \
                          dt.timedelta(minutes=self.config["timeout"])}
                     self.logger.debug("Adding new composite to slot %s: %s",
                                       str(tslot), composite)
