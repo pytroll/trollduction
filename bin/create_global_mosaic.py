@@ -2,7 +2,7 @@
 
 import sys
 import numpy as np
-import Image
+from PIL import Image
 import logging
 import logging.handlers
 import datetime as dt
