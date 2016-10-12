@@ -29,23 +29,25 @@ LON_LIMITS = {'Meteosat-11': [-37.5, 20.75],
               'Himawari-8': [91.1, -177.15],
               'GOES-15': [-177.15, -105.],
               'GOES-13': [-105., -37.5],
-              'Meteosat-7': [41.5, 41.50001], # placeholder
-              'GOES-R': [-90., -90.0001] # placeholder
-}
+              'Meteosat-7': [41.5, 41.50001],  # placeholder
+              'GOES-R': [-90., -90.0001]  # placeholder
+              }
+
 
 def calc_pixel_mask_limits(adef, lon_limits):
     """Calculate pixel intervals from longitude ranges."""
     # We'll assume global grid from -180 to 180 longitudes
-    scale = 360./adef.shape[1] # degrees per pixel
-    
-    left_limit = int((lon_limits[0] + 180)/scale)
-    right_limit = int((lon_limits[1] + 180)/scale)
+    scale = 360. / adef.shape[1]  # degrees per pixel
+
+    left_limit = int((lon_limits[0] + 180) / scale)
+    right_limit = int((lon_limits[1] + 180) / scale)
 
     # Satellite data spans 180th meridian
     if right_limit < left_limit:
         return [[right_limit, left_limit]]
     else:
         return [[0, left_limit], [right_limit, adef.shape[1]]]
+
 
 def read_image(fname, tslot, adef, lon_limits=None):
     """Read image to numpy array"""
@@ -67,10 +69,11 @@ def read_image(fname, tslot, adef, lon_limits=None):
 
     chans = []
     for i in range(4):
-        chans.append(np.ma.masked_where(mask, img[:, :, i]/255.))
+        chans.append(np.ma.masked_where(mask, img[:, :, i] / 255.))
 
     return GeoImage(chans, adef, tslot, fill_value=None, mode="RGBA",
                     crange=((0, 1), (0, 1), (0, 1), (0, 1)))
+
 
 def create_world_composite(fnames, tslot, adef_name, sat_limits,
                            blend=None, img=None):
@@ -100,7 +103,6 @@ def create_world_composite(fnames, tslot, adef_name, sat_limits,
                                                   scaled_erosion_size)),
                     scaled_smooth_width)
                 smooth_alpha[img_mask] = alpha[img_mask]
-
 
             dtype = img.channels[0].dtype
             chdata = np.zeros(img_mask.shape, dtype=dtype)
@@ -208,7 +210,7 @@ class WorldCompositeDaemon(object):
             for slot in self.slots:
                 for composite in self.slots[slot].keys():
                     if (check_time > self.slots[slot][composite]["timeout"] or
-                        self.slots[slot][composite]["num"] == num_expected):
+                            self.slots[slot][composite]["num"] == num_expected):
                         file_parts = {'composite': composite,
                                       'nominal_time': slot,
                                       'areaname': self.config["area_def"]}
@@ -241,7 +243,8 @@ class WorldCompositeDaemon(object):
                     empty_slots.append(slot)
 
             for slot in empty_slots:
-                self.logger.debug("Removing empty time slot")
+                self.logger.debug("Removing empty time slot: %s",
+                                  str(slot))
                 del self.slots[slot]
 
             msg = None
@@ -270,7 +273,7 @@ class WorldCompositeDaemon(object):
                         epoch = tslot
                     self.slots[tslot][composite] = \
                         {"fnames": [], "num": 0,
-                         "timeout": epoch + \
+                         "timeout": epoch +
                          dt.timedelta(minutes=self.config["timeout"])}
                     self.logger.debug("Adding new composite to slot %s: %s",
                                       str(tslot), composite)
@@ -288,6 +291,7 @@ class WorldCompositeDaemon(object):
         """Set logger."""
         self.logger = logger
 
+
 def main():
     """main()"""
 
@@ -304,10 +308,10 @@ def main():
     # TODO: move log config to config file
 
     handlers = []
-    handlers.append(\
-            logging.handlers.TimedRotatingFileHandler(config["log_fname"],
-                                                      "midnight",
-                                                      backupCount=21))
+    handlers.append(
+        logging.handlers.TimedRotatingFileHandler(config["log_fname"],
+                                                  "midnight",
+                                                  backupCount=21))
 
     handlers.append(logging.StreamHandler())
 
