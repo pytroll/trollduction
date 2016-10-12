@@ -207,18 +207,18 @@ def pps_worker(semaphore_obj, scene, job_dict, job_key, publish_q, input_msg):
         LOG.debug("Waiting for acquired semaphore...")
         with semaphore_obj:
             LOG.debug("Acquired semaphore")
-            if scene['platform_name'] in SUPPORTED_EOS_SATELLITES:
-                cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT,
-                                             SATELLITE_NAME[
-                                                 scene['platform_name']],
-                                             scene['orbit_number'], scene[
-                                                 'satday'],
-                                             scene['sathour'])
-            else:
-                cmdstr = "%s %s %s 0 0" % (PPS_SCRIPT,
-                                           SATELLITE_NAME[
-                                               scene['platform_name']],
-                                           scene['orbit_number'])
+            # if scene['platform_name'] in SUPPORTED_EOS_SATELLITES:
+            cmdstr = "%s %s %s %s %s" % (PPS_SCRIPT,
+                                         SATELLITE_NAME[
+                                             scene['platform_name']],
+                                         scene['orbit_number'], scene[
+                                             'satday'],
+                                         scene['sathour'])
+            # else:
+            #     cmdstr = "%s %s %s 0 0" % (PPS_SCRIPT,
+            #                                SATELLITE_NAME[
+            #                                    scene['platform_name']],
+            #                                scene['orbit_number'])
 
             if scene['platform_name'] in SUPPORTED_JPSS_SATELLITES and LVL1_NPP_PATH:
                 cmdstr = cmdstr + ' ' + str(LVL1_NPP_PATH)

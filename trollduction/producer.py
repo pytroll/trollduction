@@ -670,7 +670,8 @@ class DataProcessor(object):
                     continue
 
                 if self.viewZenCacheManager is not None:
-                    # retrieve the satellite zenith angles for the corresponding area
+                    # retrieve the satellite zenith angles for the
+                    # corresponding area
                     self.viewZenCacheManager.prepare(msg,
                                                      area_item.attrib['id'],
                                                      self.global_data.info['time'])
@@ -685,12 +686,13 @@ class DataProcessor(object):
                              area_item.attrib['name'])
                 try:
                     try:
-                        actual_srch_radius = \
-                            int(area_item.attrib["srch_radius"])
+                        actual_srch_radius = int(
+                            area_item.attrib["srch_radius"])
                         LOGGER.debug("Overriding search radius %s with %s",
                                      str(srch_radius), str(actual_srch_radius))
                     except KeyError:
-                        LOGGER.debug("Using search radius %s", str(srch_radius))
+                        LOGGER.debug(
+                            "Using search radius %s", str(srch_radius))
                         actual_srch_radius = srch_radius
 
                     self.local_data = \
@@ -1186,6 +1188,7 @@ def hash_color(colorstring):
 
 
 class DataWriter(Thread):
+
     """Writes data to disk.
 
     This is separate from the DataProcessor since it takes IO time and
@@ -1281,7 +1284,8 @@ class DataWriter(Thread):
                                                  fformat=fformat,
                                                  **save_params)
                                     except IOError:
-                                        LOGGER.exception("Can't save file %s", fname)
+                                        LOGGER.exception(
+                                            "Can't save file %s", fname)
                                         continue
                                 os.rename(tempname, fname)
 
@@ -1289,7 +1293,8 @@ class DataWriter(Thread):
                                 saved = fname
                                 uid = os.path.basename(fname)
                             else:
-                                LOGGER.info("Copied/Linked %s to %s", saved, fname)
+                                LOGGER.info(
+                                    "Copied/Linked %s to %s", saved, fname)
                                 link_or_copy(saved, fname, tempname)
                                 saved = fname
                             if ("thumbnail_name" in copy.attrib and
