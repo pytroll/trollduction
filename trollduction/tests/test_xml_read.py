@@ -38,6 +38,11 @@ xmlstuff = """<?xml version="1.0" encoding='utf-8'?>
 
   <common>
     <output_dir>/tmp</output_dir>
+    <proj_method>nearest</proj_method>
+    <format_params>
+        <nbits>8</nbits>
+        <fill_value_subst>1</fill_value_subst>
+    </format_params>
   </common>
 
   <variables>
@@ -50,9 +55,9 @@ xmlstuff = """<?xml version="1.0" encoding='utf-8'?>
   <product_list>
     <!-- dump to netcdf -->
     <!-- calibrated, satellite projection -->
-    <dump>
+ <!--   <dump>
       <file output_dir="sir" format="netcdf4">{time:%Y%m%d_%H%M}_{platform}{satnumber}.nc</file>
-    </dump>
+    </dump> -->
     <area id="eurol" name="Europe_large">
       <!-- Generate the product only if sun is above the horizon at the
            defined longitude/latitude -->
@@ -86,6 +91,19 @@ xmlstuff = """<?xml version="1.0" encoding='utf-8'?>
       </product>
 
     </area>
+
+    <!-- same area but with different product list -->
+    <area id="nsea" name="North_Baltic_Sea">
+        <product id="night_fog" name="night_fog" sunzen_night_minimum="90" sunzen_lonlat="25, 60">
+            <file>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+          </product>
+    </area>
+    <area id="nsea" name="North_Baltic_Sea">
+        <product id="night_overview" name="night_overview" sunzen_night_minimum="90" sunzen_lonlat="25, 60">
+            <file format="png">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+        </product>
+    </area>
+
   </product_list>
 </product_config>
 """
@@ -96,17 +114,38 @@ from StringIO import StringIO
 
 class TestProductList(unittest.TestCase):
 
-    # def test_vars(self):
-    #     pconfig = ProductList(StringIO(xmlstuff))
-    #     self.assertEquals(pconfig.vars,
-    #                       {'output_dir': {'local_sir': '/local_disk/data/sir',
-    #                                       'rgb': '/local_disk/data/out/rgb',
-    #                                       'sir': '/local_disk/data/out/sir',
-    #                                       'tmp': '/tmp'}})
-    #     dump_item = pconfig.prodlist.findall('./dump/file')[0]
-    #     self.assertEquals(dump_item.attrib["output_dir"],
-    #                      '/local_disk/data/out/sir')
-    pass
+    def setUp(self):
+        self.pconfig = ProductList(StringIO(xmlstuff))
+
+    def test_vars(self):
+        self.assertEquals(self.pconfig.vars,
+                          {'output_dir': {'local_sir': '/local_disk/data/sir',
+                                          'rgb': '/local_disk/data/out/rgb',
+                                          'sir': '/local_disk/data/out/sir',
+                                          'tmp': '/tmp'}})
+#         dump_item = self.pconfig.prodlist.findall('./dump/file')[0]
+#         self.assertEquals(dump_item.attrib["output_dir"],
+#                          '/local_disk/data/out/sir')
+
+    def test_attrib(self):
+        self.assertEquals(self.pconfig.attrib,
+                          {'output_dir': '/tmp',
+                           'proj_method': 'nearest',
+                           'format_params': {'nbits': '8',
+                                             'fill_value_subst': '1'}
+                           })
+
+    def test_duplicate_areas(self):
+        group = self.pconfig.groups[0]
+        self.assertEquals(len(group.data), 3)
+        self.assertEquals(group.data[0].attrib.get('id'), 'eurol')
+        self.assertEquals(group.data[1].attrib.get('id'), 'nsea')
+        self.assertEquals(group.data[1].find('product').attrib.get('id'),
+                          'night_fog')
+        self.assertEquals(group.data[2].attrib.get('id'), 'nsea')
+        self.assertEquals(group.data[2].find('product').attrib.get('id'),
+                          'night_overview')
+        group.data[0]
 
 
 def suite():
