@@ -24,7 +24,7 @@ import os.path
 import datetime as dt
 import numpy as np
 
-sys.path.append(os.path.abspath("../../bin"))
+sys.path.append(os.path.abspath("bin"))
 import create_global_mosaic as cgm
 
 from pyresample.geometry import AreaDefinition
@@ -56,26 +56,32 @@ class TestGlobalMosaic(unittest.TestCase):
         # Images from individual satellites
         self.sat_fnames = \
             [os.path.abspath(fname) for fname in
-             ['data/20161012_1200_GOES-15_EPSG4326_wv.png',
-              'data/20161012_1200_GOES-13_EPSG4326_wv.png',
-              'data/20161012_1200_Meteosat-10_EPSG4326_wv.png',
-              'data/20161012_1200_Meteosat-8_EPSG4326_wv.png',
-              'data/20161012_1200_Himawari-8_EPSG4326_wv.png']]
+             ['trollduction/tests/data/20161012_1200_GOES-15_EPSG4326_wv.png',
+              'trollduction/tests/data/20161012_1200_GOES-13_EPSG4326_wv.png',
+              'trollduction/tests/data/' +
+              '20161012_1200_Meteosat-10_EPSG4326_wv.png',
+              'trollduction/tests/data/' +
+              '20161012_1200_Meteosat-8_EPSG4326_wv.png',
+              'trollduction/tests/data/' +
+              '20161012_1200_Himawari-8_EPSG4326_wv.png']]
 
         # Image with all satellites merged without blending
         self.unblended = \
-            os.path.abspath('data/20161012_1200_EPSG4326_wv_no_blend.png')
+            os.path.abspath('trollduction/tests/data/' +
+                            '20161012_1200_EPSG4326_wv_no_blend.png')
         # Image with two satellites merged with blending, no scaling
         self.blended_not_scaled = \
             os.path.abspath(
-                'data/20161012_1200_EPSG4326_wv_blend_no_scale.png')
+                'trollduction/tests/data/' +
+                '20161012_1200_EPSG4326_wv_blend_no_scale.png')
         # Image with two satellites merged with blending and scaling
         self.blended_scaled = \
             os.path.abspath(
-                'data/20161012_1200_EPSG4326_wv_blend_and_scale.png')
+                'trollduction/tests/data/' +
+                '20161012_1200_EPSG4326_wv_blend_and_scale.png')
         # Empty image
         self.empty_image = \
-            os.path.abspath('data/empty.png')
+            os.path.abspath('trollduction/tests/data/empty.png')
 
     def test_calc_pixel_mask_limits(self):
         """Test calculation of pixel mask limits"""
@@ -163,7 +169,8 @@ class TestGlobalMosaic(unittest.TestCase):
         # Epoch: message sending time
         config = {"topics": ["/test"], "area_def": ADEF,
                   "timeout_epoch": "message", "timeout": 45,
-                  "num_expected": 5, "out_pattern": "data/test_out.png"}
+                  "num_expected": 5,
+                  "out_pattern": "trollduction/tests/data/test_out.png"}
         comp = cgm.WorldCompositeDaemon(config)
 
         # There should be no slots
@@ -207,7 +214,8 @@ class TestGlobalMosaic(unittest.TestCase):
         # Epoch: file nominal time
         config = {"topics": ["/test"], "area_def": ADEF,
                   "timeout_epoch": "nominal_time", "timeout": 45,
-                  "num_expected": 5, "out_pattern": "data/test_out.png"}
+                  "num_expected": 5,
+                  "out_pattern": "trollduction/tests/data/test_out.png"}
         comp = cgm.WorldCompositeDaemon(config)
 
         for i in range(len(self.sat_fnames)):
@@ -243,7 +251,7 @@ class TestGlobalMosaic(unittest.TestCase):
 
 
 def suite():
-    """The suite for test_trollduction
+    """The suite for test_global_mosaic
     """
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()
