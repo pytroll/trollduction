@@ -162,8 +162,63 @@ class WorldCompositeDaemon(object):
 
     def run(self):
         """Listen to messages and make global composites"""
+        self._loop = True
 
+        while self._loop:
+            self._check_timeouts_and_save()
+
+            # Get new messages from the listener
+            msg = None
+            try:
+                msg = self._listener.queue.get(True, 1)
+            except KeyboardInterrupt:
+                self._listener.stop()
+                return
+            except Queue.Empty:
+                continue
+
+            if msg.type == "file":
+                self._handle_message(msg)
+
+    def _handle_message(self, msg):
+        """Insert file from the message to correct time slot and composite"""
+        # Check which time should be used as basis for timeout:
+        # - "message" = time of message sending
+        # - "nominal_time" = time of satellite data, read from message data
+        # - "receive" = current time when message is read from queue
+        # Default to use slot nominal time
+        timeout_epoch = self.config.get("timeout_epoch", "nominal_time")
+
+        self.logger.debug("New message received: %s", str(msg.data))
+        fname = msg.data["uri"]
+        tslot = msg.data["nominal_time"]
+        composite = msg.data["productname"]
+        if tslot not in self.slots:
+            self.slots[tslot] = {}
+            self.logger.debug("Adding new timeslot: %s", str(tslot))
+        if composite not in self.slots[tslot]:
+            if timeout_epoch == "message":
+                epoch = msg.time
+            elif timeout_epoch == "receive":
+                epoch = dt.datetime.utcnow()
+            else:
+                epoch = tslot
+            self.slots[tslot][composite] = \
+                {"fnames": [], "num": 0,
+                 "timeout": epoch +
+                 dt.timedelta(minutes=self.config["timeout"])}
+            self.logger.debug("Adding new composite to slot %s: %s",
+                              str(tslot), composite)
+            self.logger.debug("Adding file to slot %s/%s: %s",
+                              str(tslot), composite, fname)
+            self.slots[tslot][composite]["fnames"].append(fname)
+            self.slots[tslot][composite]["num"] += 1
+
+    def _check_timeouts_and_save(self):
+        """Check timeouts, save completed images and cleanup slots."""
+        # Number of expected images
         num_expected = self.config["num_expected"]
+
         lon_limits = LON_LIMITS.copy()
         try:
             lon_limits.update(self.config["lon_limits"])
@@ -192,95 +247,50 @@ class WorldCompositeDaemon(object):
             gdal_options = None
             blocksize = 0
 
-        # Check which time should be used as basis for timeout:
-        # - "message" = time of message sending
-        # - "nominal_time" = time of satellite data, read from message data
-        # - "receive" = current time when message is read from queue
-        # Default to use slot nominal time
-        timeout_epoch = self.config.get("timeout_epoch", "nominal_time")
+        # Check timeouts and completed composites
+        check_time = dt.datetime.utcnow()
 
-        self._loop = True
-
-        while self._loop:
-
-            # Check timeouts and completed composites
-            check_time = dt.datetime.utcnow()
-
-            empty_slots = []
-            for slot in self.slots:
-                for composite in self.slots[slot].keys():
-                    if (check_time > self.slots[slot][composite]["timeout"] or
-                            self.slots[slot][composite]["num"] == num_expected):
-                        file_parts = {'composite': composite,
-                                      'nominal_time': slot,
-                                      'areaname': self.config["area_def"]}
-                        self.logger.info("Building composite %s for slot %s",
-                                         composite, str(slot))
-                        fnames = self.slots[slot][composite]["fnames"]
-                        fname_out = compose(self.config["out_pattern"],
-                                            file_parts)
-                        # Check if we already have an image with this filename
-                        try:
-                            img = read_image(fname_out, slot,
-                                             self.config["area_def"])
-                        except IOError:
-                            img = None
-                        img = create_world_composite(fnames,
-                                                     slot,
-                                                     self.config["area_def"],
-                                                     lon_limits,
-                                                     blend=blend, img=img)
-                        self.logger.info("Saving %s", fname_out)
-                        img.save(fname_out, compression=compression,
-                                 tags=tags, fformat=fformat,
-                                 gdal_options=gdal_options,
-                                 blocksize=blocksize)
-                        del self.slots[slot][composite]
-                        del img
+        empty_slots = []
+        for slot in self.slots:
+            for composite in self.slots[slot].keys():
+                if (check_time > self.slots[slot][composite]["timeout"] or
+                        self.slots[slot][composite]["num"] == num_expected):
+                    file_parts = {'composite': composite,
+                                  'nominal_time': slot,
+                                  'areaname': self.config["area_def"]}
+                    self.logger.info("Building composite %s for slot %s",
+                                     composite, str(slot))
+                    fnames = self.slots[slot][composite]["fnames"]
+                    fname_out = compose(self.config["out_pattern"],
+                                        file_parts)
+                    # Check if we already have an image with this filename
+                    try:
+                        img = read_image(fname_out, slot,
+                                         self.config["area_def"])
+                    except IOError:
                         img = None
-                # Remove empty slots
-                if len(self.slots[slot]) == 0:
-                    empty_slots.append(slot)
+                    img = create_world_composite(fnames,
+                                                 slot,
+                                                 self.config["area_def"],
+                                                 lon_limits,
+                                                 blend=blend, img=img)
+                    self.logger.info("Saving %s", fname_out)
+                    img.save(fname_out, compression=compression,
+                             tags=tags, fformat=fformat,
+                             gdal_options=gdal_options,
+                             blocksize=blocksize)
+                    del self.slots[slot][composite]
+                    del img
+                    img = None
 
-            for slot in empty_slots:
-                self.logger.debug("Removing empty time slot: %s",
-                                  str(slot))
-                del self.slots[slot]
+            # Collect empty slots
+            if len(self.slots[slot]) == 0:
+                empty_slots.append(slot)
 
-            msg = None
-            try:
-                msg = self._listener.queue.get(True, 1)
-            except KeyboardInterrupt:
-                self._listener.stop()
-                return
-            except Queue.Empty:
-                continue
-
-            if msg.type == "file":
-                self.logger.debug("New message received: %s", str(msg.data))
-                fname = msg.data["uri"]
-                tslot = msg.data["nominal_time"]
-                composite = msg.data["productname"]
-                if tslot not in self.slots:
-                    self.slots[tslot] = {}
-                    self.logger.debug("Adding new timeslot: %s", str(tslot))
-                if composite not in self.slots[tslot]:
-                    if timeout_epoch == "message":
-                        epoch = msg.time
-                    elif timeout_epoch == "receive":
-                        epoch = dt.datetime.utcnow()
-                    else:
-                        epoch = tslot
-                    self.slots[tslot][composite] = \
-                        {"fnames": [], "num": 0,
-                         "timeout": epoch +
-                         dt.timedelta(minutes=self.config["timeout"])}
-                    self.logger.debug("Adding new composite to slot %s: %s",
-                                      str(tslot), composite)
-                self.logger.debug("Adding file to slot %s/%s: %s",
-                                  str(tslot), composite, fname)
-                self.slots[tslot][composite]["fnames"].append(fname)
-                self.slots[tslot][composite]["num"] += 1
+        for slot in empty_slots:
+            self.logger.debug("Removing empty time slot: %s",
+                              str(slot))
+            del self.slots[slot]
 
     def stop(self):
         """Stop"""
