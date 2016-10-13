@@ -23,7 +23,7 @@
 """The tests package.
 """
 
-#from trollduction.tests import test_listener
+# from trollduction.tests import test_listener
 import unittest
 import doctest
 from trollduction.tests import (test_helper_functions,
@@ -31,7 +31,8 @@ from trollduction.tests import (test_helper_functions,
                                 test_xml_read,
                                 test_scisys,
                                 test_trigger,
-                                test_producer)
+                                test_producer,
+                                test_global_mosaic)
 
 
 def suite():
