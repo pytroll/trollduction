@@ -47,5 +47,6 @@ def suite():
     mysuite.addTests(test_scisys.suite())
     mysuite.addTests(test_trigger.suite())
     mysuite.addTests(test_producer.suite())
+    mysuite.addTests(test_global_mosaic.suite())
 
     return mysuite
