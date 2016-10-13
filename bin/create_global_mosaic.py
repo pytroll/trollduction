@@ -51,9 +51,12 @@ def calc_pixel_mask_limits(adef, lon_limits):
 
 def read_image(fname, tslot, adef, lon_limits=None):
     """Read image to numpy array"""
-    print "Reading", fname
     # Convert to float32 to save memory in later steps
-    img = np.array(Image.open(fname)).astype(np.float32)
+    try:
+        img = np.array(Image.open(fname)).astype(np.float32)
+    except IOError:
+        return None
+
     mask = img[:, :, 3]
 
     # Mask overlapping areas away
@@ -75,9 +78,9 @@ def read_image(fname, tslot, adef, lon_limits=None):
                     crange=((0, 1), (0, 1), (0, 1), (0, 1)))
 
 
-def create_world_composite(fnames, tslot, adef_name, sat_limits,
+def create_world_composite(fnames, tslot, adef, sat_limits,
                            blend=None, img=None):
-    adef = get_area_def(adef_name)
+    """Create world composite from files *fnames*"""
     for fname in fnames:
         next_img = read_image(fname, tslot, adef, sat_limits)
 
@@ -264,14 +267,14 @@ class WorldCompositeDaemon(object):
                     fname_out = compose(self.config["out_pattern"],
                                         file_parts)
                     # Check if we already have an image with this filename
-                    try:
-                        img = read_image(fname_out, slot,
-                                         self.config["area_def"])
-                    except IOError:
-                        img = None
+                    img = read_image(fname_out, slot,
+                                     self.config["area_def"])
+                    if img:
+                        self.logger.info("Read existing image: %s", fname_out)
+
                     img = create_world_composite(fnames,
                                                  slot,
-                                                 self.config["area_def"],
+                                                 self.adef,
                                                  lon_limits,
                                                  blend=blend, img=img)
                     self.logger.info("Saving %s", fname_out)
