@@ -161,7 +161,10 @@ class WorldCompositeDaemon(object):
 
         self._listener = ListenerContainer(topics=config["topics"])
         self._loop = False
-        self.adef = get_area_def(config["area_def"])
+        if isinstance(config["area_def"], str):
+            self.adef = get_area_def(config["area_def"])
+        else:
+            self.adef = config["area_def"]
 
     def run(self):
         """Listen to messages and make global composites"""
@@ -212,10 +215,10 @@ class WorldCompositeDaemon(object):
                  dt.timedelta(minutes=self.config["timeout"])}
             self.logger.debug("Adding new composite to slot %s: %s",
                               str(tslot), composite)
-            self.logger.debug("Adding file to slot %s/%s: %s",
-                              str(tslot), composite, fname)
-            self.slots[tslot][composite]["fnames"].append(fname)
-            self.slots[tslot][composite]["num"] += 1
+        self.logger.debug("Adding file to slot %s/%s: %s",
+                          str(tslot), composite, fname)
+        self.slots[tslot][composite]["fnames"].append(fname)
+        self.slots[tslot][composite]["num"] += 1
 
     def _check_timeouts_and_save(self):
         """Check timeouts, save completed images and cleanup slots."""
