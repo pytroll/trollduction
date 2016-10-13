@@ -263,7 +263,7 @@ class WorldCompositeDaemon(object):
                         self.slots[slot][composite]["num"] == num_expected):
                     file_parts = {'composite': composite,
                                   'nominal_time': slot,
-                                  'areaname': self.config["area_def"]}
+                                  'areaname': self.adef.area_id}
                     self.logger.info("Building composite %s for slot %s",
                                      composite, str(slot))
                     fnames = self.slots[slot][composite]["fnames"]
@@ -271,7 +271,7 @@ class WorldCompositeDaemon(object):
                                         file_parts)
                     # Check if we already have an image with this filename
                     img = read_image(fname_out, slot,
-                                     self.config["area_def"])
+                                     self.adef.area_id)
                     if img:
                         self.logger.info("Read existing image: %s", fname_out)
 
