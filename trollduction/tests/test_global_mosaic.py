@@ -29,12 +29,9 @@ from pyresample.utils import _get_proj4_args
 from mpop.imageo.geo_image import GeoImage
 from posttroll import message
 
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-BIN_DIR = os.path.join(os.path.split(os.path.split(THIS_DIR)[0])[0],
-                       "bin")
-sys.path.append(BIN_DIR)
+import trollduction.global_mosaic as gm
 
-import create_global_mosaic as cgm
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 ADEF = AreaDefinition("EPSG4326", "EPSG:4326", "EPSG:4326",
                       _get_proj4_args("init=EPSG:4326"),
@@ -83,24 +80,24 @@ class TestGlobalMosaic(unittest.TestCase):
         """Test calculation of pixel mask limits"""
         # Mask data from edges
         lon_limits = [-25., 25.]
-        result = cgm.calc_pixel_mask_limits(self.adef, lon_limits)
+        result = gm.calc_pixel_mask_limits(self.adef, lon_limits)
         self.assertItemsEqual(result, [[0, 86], [113, 200]])
 
         # Data wraps around 180 lon, mask from the middle of area
         lon_limits = [170., -170.]
-        result = cgm.calc_pixel_mask_limits(self.adef, lon_limits)
+        result = gm.calc_pixel_mask_limits(self.adef, lon_limits)
         self.assertItemsEqual(result, [[5, 194]])
 
     def test_read_image(self):
         """Test reading and masking images"""
         # Non-existent image
-        result = cgm.read_image("asdasd.png", self.tslot, self.adef,
-                                lon_limits=None)
+        result = gm.read_image("asdasd.png", self.tslot, self.adef,
+                               lon_limits=None)
         self.assertIsNone(result)
 
         # Read empty image, check that all channel data and mask values are 0
-        result = cgm.read_image(self.empty_image, self.tslot, self.adef,
-                                lon_limits=None)
+        result = gm.read_image(self.empty_image, self.tslot, self.adef,
+                               lon_limits=None)
         correct = np.zeros((self.adef.y_size, self.adef.x_size),
                            dtype=np.float32)
         for chan in result.channels:
@@ -119,11 +116,11 @@ class TestGlobalMosaic(unittest.TestCase):
                 self.assertTrue(np.all(diff <= min_step))
 
         # All satellites with built-in longitude limits
-        result = cgm.create_world_composite(self.sat_fnames, self.tslot,
-                                            self.adef, cgm.LON_LIMITS,
-                                            blend=None, img=None)
-        correct = cgm.read_image(self.unblended,
-                                 self.tslot, self.adef, lon_limits=None)
+        result = gm.create_world_composite(self.sat_fnames, self.tslot,
+                                           self.adef, gm.LON_LIMITS,
+                                           blend=None, img=None)
+        correct = gm.read_image(self.unblended,
+                                self.tslot, self.adef, lon_limits=None)
 
         # Check that attributes are set correctly
         self.assertEqual(result.area, correct.area)
@@ -132,29 +129,29 @@ class TestGlobalMosaic(unittest.TestCase):
         _compare_images(result, correct)
 
         # All satellites with no longitude limits
-        result = cgm.create_world_composite(self.sat_fnames, self.tslot,
-                                            self.adef, cgm.LON_LIMITS,
-                                            blend=None, img=None)
-        correct = cgm.read_image(self.unblended,
-                                 self.tslot, self.adef, lon_limits=None)
+        result = gm.create_world_composite(self.sat_fnames, self.tslot,
+                                           self.adef, gm.LON_LIMITS,
+                                           blend=None, img=None)
+        correct = gm.read_image(self.unblended,
+                                self.tslot, self.adef, lon_limits=None)
         _compare_images(result, correct)
 
         # Two satellites, erosion and smoothing, no scaling
         blend = {"erosion_width": 40, "smooth_width": 40, "scale": False}
-        result = cgm.create_world_composite(self.sat_fnames[1:3], self.tslot,
-                                            self.adef, None,
-                                            blend=blend, img=None)
-        correct = cgm.read_image(self.blended_not_scaled,
-                                 self.tslot, self.adef, lon_limits=None)
+        result = gm.create_world_composite(self.sat_fnames[1:3], self.tslot,
+                                           self.adef, None,
+                                           blend=blend, img=None)
+        correct = gm.read_image(self.blended_not_scaled,
+                                self.tslot, self.adef, lon_limits=None)
         _compare_images(result, correct)
 
         # Two satellites, erosion, smoothing and scaling
         blend = {"erosion_width": 40, "smooth_width": 40, "scale": True}
-        result = cgm.create_world_composite(self.sat_fnames[1:3], self.tslot,
-                                            self.adef, None,
-                                            blend=blend, img=None)
-        correct = cgm.read_image(self.blended_scaled,
-                                 self.tslot, self.adef, lon_limits=None)
+        result = gm.create_world_composite(self.sat_fnames[1:3], self.tslot,
+                                           self.adef, None,
+                                           blend=blend, img=None)
+        correct = gm.read_image(self.blended_scaled,
+                                self.tslot, self.adef, lon_limits=None)
         _compare_images(result, correct)
 
     def test_WorldCompositeDaemon(self):
@@ -170,7 +167,7 @@ class TestGlobalMosaic(unittest.TestCase):
                                               "test_out.png")
                   }
 
-        comp = cgm.WorldCompositeDaemon(config)
+        comp = gm.WorldCompositeDaemon(config)
 
         # There should be no slots
         self.assertEqual(len(comp.slots), 0)
@@ -218,7 +215,7 @@ class TestGlobalMosaic(unittest.TestCase):
                                               "test_out.png")
                   }
 
-        comp = cgm.WorldCompositeDaemon(config)
+        comp = gm.WorldCompositeDaemon(config)
 
         for i in range(len(self.sat_fnames)):
             msg = message.Message("/test", "file",
