@@ -24,13 +24,17 @@ import os.path
 import datetime as dt
 import numpy as np
 
-sys.path.append(os.path.abspath("bin"))
-import create_global_mosaic as cgm
-
 from pyresample.geometry import AreaDefinition
 from pyresample.utils import _get_proj4_args
 from mpop.imageo.geo_image import GeoImage
 from posttroll import message
+
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+BIN_DIR = os.path.join(os.path.split(os.path.split(THIS_DIR)[0])[0],
+                       "bin")
+sys.path.append(BIN_DIR)
+
+import create_global_mosaic as cgm
 
 ADEF = AreaDefinition("EPSG4326", "EPSG:4326", "EPSG:4326",
                       _get_proj4_args("init=EPSG:4326"),
@@ -54,34 +58,26 @@ class TestGlobalMosaic(unittest.TestCase):
 
         self.tslot = dt.datetime(2016, 10, 12, 12, 0)
         # Images from individual satellites
-        self.sat_fnames = \
-            [os.path.abspath(fname) for fname in
-             ['trollduction/tests/data/20161012_1200_GOES-15_EPSG4326_wv.png',
-              'trollduction/tests/data/20161012_1200_GOES-13_EPSG4326_wv.png',
-              'trollduction/tests/data/' +
-              '20161012_1200_Meteosat-10_EPSG4326_wv.png',
-              'trollduction/tests/data/' +
-              '20161012_1200_Meteosat-8_EPSG4326_wv.png',
-              'trollduction/tests/data/' +
-              '20161012_1200_Himawari-8_EPSG4326_wv.png']]
+        self.sat_fnames = [os.path.join(THIS_DIR, "data", fname) for fname in
+                           ["20161012_1200_GOES-15_EPSG4326_wv.png",
+                            "20161012_1200_GOES-13_EPSG4326_wv.png",
+                            "20161012_1200_Meteosat-10_EPSG4326_wv.png",
+                            "20161012_1200_Meteosat-8_EPSG4326_wv.png",
+                            "20161012_1200_Himawari-8_EPSG4326_wv.png"]]
 
         # Image with all satellites merged without blending
-        self.unblended = \
-            os.path.abspath('trollduction/tests/data/' +
-                            '20161012_1200_EPSG4326_wv_no_blend.png')
+        self.unblended = os.path.join(THIS_DIR, "data",
+                                      "20161012_1200_EPSG4326_wv_no_blend.png")
         # Image with two satellites merged with blending, no scaling
         self.blended_not_scaled = \
-            os.path.abspath(
-                'trollduction/tests/data/' +
-                '20161012_1200_EPSG4326_wv_blend_no_scale.png')
+            os.path.join(THIS_DIR, "data",
+                         "20161012_1200_EPSG4326_wv_blend_no_scale.png")
         # Image with two satellites merged with blending and scaling
         self.blended_scaled = \
-            os.path.abspath(
-                'trollduction/tests/data/' +
-                '20161012_1200_EPSG4326_wv_blend_and_scale.png')
+            os.path.join(THIS_DIR, "data",
+                         "20161012_1200_EPSG4326_wv_blend_and_scale.png")
         # Empty image
-        self.empty_image = \
-            os.path.abspath('trollduction/tests/data/empty.png')
+        self.empty_image = os.path.join(THIS_DIR, "data", "empty.png")
 
     def test_calc_pixel_mask_limits(self):
         """Test calculation of pixel mask limits"""
@@ -170,7 +166,10 @@ class TestGlobalMosaic(unittest.TestCase):
         config = {"topics": ["/test"], "area_def": ADEF,
                   "timeout_epoch": "message", "timeout": 45,
                   "num_expected": 5,
-                  "out_pattern": "trollduction/tests/data/test_out.png"}
+                  "out_pattern": os.path.join(THIS_DIR, "data",
+                                              "test_out.png")
+                  }
+
         comp = cgm.WorldCompositeDaemon(config)
 
         # There should be no slots
@@ -215,7 +214,10 @@ class TestGlobalMosaic(unittest.TestCase):
         config = {"topics": ["/test"], "area_def": ADEF,
                   "timeout_epoch": "nominal_time", "timeout": 45,
                   "num_expected": 5,
-                  "out_pattern": "trollduction/tests/data/test_out.png"}
+                  "out_pattern": os.path.join(THIS_DIR, "data",
+                                              "test_out.png")
+                  }
+
         comp = cgm.WorldCompositeDaemon(config)
 
         for i in range(len(self.sat_fnames)):
