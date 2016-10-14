@@ -18,16 +18,18 @@
 """
 
 import unittest
-import sys
 import os
 import os.path
 import datetime as dt
 import numpy as np
+from threading import Thread
+import time
 
 from pyresample.geometry import AreaDefinition
 from pyresample.utils import _get_proj4_args
 from mpop.imageo.geo_image import GeoImage
 from posttroll import message
+from posttroll.ns import NameServer
 
 import trollduction.global_mosaic as gm
 
@@ -39,42 +41,32 @@ ADEF = AreaDefinition("EPSG4326", "EPSG:4326", "EPSG:4326",
                       (-180., -90., 180., 90.))
 
 
-class ListenerContainer(object):
-
-    """Mockup for listener"""
-
-    def __init__(self, config):
-        self.topics = config["topics"]
-
-
 class TestGlobalMosaic(unittest.TestCase):
 
-    def setUp(self):
-        """Setup testing"""
-        self.adef = ADEF
+    adef = ADEF
 
-        self.tslot = dt.datetime(2016, 10, 12, 12, 0)
-        # Images from individual satellites
-        self.sat_fnames = [os.path.join(THIS_DIR, "data", fname) for fname in
-                           ["20161012_1200_GOES-15_EPSG4326_wv.png",
-                            "20161012_1200_GOES-13_EPSG4326_wv.png",
-                            "20161012_1200_Meteosat-10_EPSG4326_wv.png",
-                            "20161012_1200_Meteosat-8_EPSG4326_wv.png",
-                            "20161012_1200_Himawari-8_EPSG4326_wv.png"]]
+    tslot = dt.datetime(2016, 10, 12, 12, 0)
+    # Images from individual satellites
+    sat_fnames = [os.path.join(THIS_DIR, "data", fname) for fname in
+                  ["20161012_1200_GOES-15_EPSG4326_wv.png",
+                   "20161012_1200_GOES-13_EPSG4326_wv.png",
+                   "20161012_1200_Meteosat-10_EPSG4326_wv.png",
+                   "20161012_1200_Meteosat-8_EPSG4326_wv.png",
+                   "20161012_1200_Himawari-8_EPSG4326_wv.png"]]
 
-        # Image with all satellites merged without blending
-        self.unblended = os.path.join(THIS_DIR, "data",
-                                      "20161012_1200_EPSG4326_wv_no_blend.png")
-        # Image with two satellites merged with blending, no scaling
-        self.blended_not_scaled = \
-            os.path.join(THIS_DIR, "data",
-                         "20161012_1200_EPSG4326_wv_blend_no_scale.png")
-        # Image with two satellites merged with blending and scaling
-        self.blended_scaled = \
-            os.path.join(THIS_DIR, "data",
-                         "20161012_1200_EPSG4326_wv_blend_and_scale.png")
-        # Empty image
-        self.empty_image = os.path.join(THIS_DIR, "data", "empty.png")
+    # Image with all satellites merged without blending
+    unblended = os.path.join(THIS_DIR, "data",
+                             "20161012_1200_EPSG4326_wv_no_blend.png")
+    # Image with two satellites merged with blending, no scaling
+    blended_not_scaled = \
+        os.path.join(THIS_DIR, "data",
+                     "20161012_1200_EPSG4326_wv_blend_no_scale.png")
+    # Image with two satellites merged with blending and scaling
+    blended_scaled = \
+        os.path.join(THIS_DIR, "data",
+                     "20161012_1200_EPSG4326_wv_blend_and_scale.png")
+    # Empty image
+    empty_image = os.path.join(THIS_DIR, "data", "empty.png")
 
     def test_calc_pixel_mask_limits(self):
         """Test calculation of pixel mask limits"""
@@ -106,6 +98,11 @@ class TestGlobalMosaic(unittest.TestCase):
 
     def test_create_world_composite(self):
         """Test world composite creation"""
+
+        # Start a nameserver
+        ns_ = NameServer(max_age=dt.timedelta(seconds=3))
+        thr = Thread(target=ns_.run)
+        thr.start()
 
         def _compare_images(img1, img2):
             """Compare data and masks for each channel"""
@@ -154,8 +151,18 @@ class TestGlobalMosaic(unittest.TestCase):
                                 self.tslot, self.adef, lon_limits=None)
         _compare_images(result, correct)
 
+        # Stop nameserver
+        ns_.stop()
+        thr.join()
+        time.sleep(2)
+
     def test_WorldCompositeDaemon(self):
         """Test WorldCompositeDaemon"""
+
+        # Start a nameserver
+        ns_ = NameServer(max_age=dt.timedelta(seconds=3))
+        thr = Thread(target=ns_.run)
+        thr.start()
 
         # Test incoming message handling and saving
 
@@ -247,6 +254,11 @@ class TestGlobalMosaic(unittest.TestCase):
 
         # Remove the file
         os.remove(config["out_pattern"])
+
+        # Stop nameserver
+        ns_.stop()
+        thr.join()
+        time.sleep(2)
 
 
 def suite():
