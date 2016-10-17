@@ -24,14 +24,14 @@
 timestep, and send them in a bunch as a dataset.
 """
 
-from ConfigParser import RawConfigParser, NoOptionError
-import time
+import datetime as dt
 import logging
 import logging.handlers
 import os.path
 import Queue
-import datetime as dt
+import time
 from collections import OrderedDict
+from ConfigParser import NoOptionError, RawConfigParser
 
 from posttroll import message, publisher
 from trollduction.listener import ListenerContainer
@@ -44,6 +44,7 @@ SLOT_OBSOLETE_TIMEOUT = 3
 
 DO_NOT_COPY_KEYS = ("uid", "uri", "channel_name", "segment")
 
+
 class SegmentGatherer(object):
 
     """Gatherer for geostationary satellite segments and multifile polar
@@ -53,13 +54,13 @@ class SegmentGatherer(object):
         self._config = config
         self._section = section
         topics = config.get(section, 'topics').split()
-        
+
         try:
             nameservers = config.get(section, 'nameservers')
             nameservers = nameservers.split(',')
         except (NoOptionError, ValueError):
             nameservers = []
-        
+
         self._listener = ListenerContainer(topics=topics)
         self._publisher = publisher.NoisyPublisher("segment_gatherer",
                                                    nameservers=nameservers)
@@ -113,7 +114,7 @@ class SegmentGatherer(object):
             critical_segments = self._config.get(self._section,
                                                  "critical_files")
             self.slots[time_slot]['critical_files'] = \
-                    self._compose_filenames(time_slot, critical_segments)
+                self._compose_filenames(time_slot, critical_segments)
         except (NoOptionError, ValueError):
             self.slots[time_slot]['critical_files'] = set([])
 
@@ -158,8 +159,11 @@ class SegmentGatherer(object):
             channel_name, segments = itm.split(':')
             segments = segments.split('-')
             if len(segments) > 1:
-                segments = ['%d' % i for i in range(int(segments[0]),
-                                                    int(segments[-1]) + 1)]
+                format_string = '%d'
+                if len(segments[0]) > 1 and segments[0][0] == '0':
+                    format_string = '%0' + str(len(segments[0])) + 'd'
+                segments = [format_string % i for i in range(int(segments[0]),
+                                                             int(segments[-1]) + 1)]
             meta['channel_name'] = channel_name
             for seg in segments:
                 meta['segment'] = seg
@@ -179,13 +183,16 @@ class SegmentGatherer(object):
             file_str = ''
             for key in delayed_files:
                 file_str += "%s %f seconds, " % (key, delayed_files[key])
-            self.logger.warning("Files received late: %s", file_str.strip(', '))
+            self.logger.warning("Files received late: %s",
+                                file_str.strip(', '))
 
         if missing_files_check:
             # and missing files
-            missing_files = data['all_files'].difference(data['received_files'])
+            missing_files = data['all_files'].difference(
+                data['received_files'])
             if len(missing_files) > 0:
-                self.logger.warning("Missing files: %s", ', '.join(missing_files))
+                self.logger.warning("Missing files: %s",
+                                    ', '.join(missing_files))
 
         msg = message.Message(self._subject, "dataset", data['metadata'])
         self.logger.info("Sending: %s", str(msg))
@@ -404,7 +411,7 @@ def main():
 
     handlers = []
     if args.log:
-        handlers.append(\
+        handlers.append(
             logging.handlers.TimedRotatingFileHandler(args.log,
                                                       "midnight",
                                                       backupCount=7))
@@ -425,7 +432,6 @@ def main():
 
     logging.getLogger("posttroll").setLevel(logging.INFO)
     logger = logging.getLogger("segment_gatherer")
-
 
     gatherer = SegmentGatherer(config, args.config_item)
     gatherer.set_logger(logger)
