@@ -70,3 +70,35 @@ save_settings:
 # - receive = receiving time of the message
 # If not given, default to nominal_time
 timeout_epoch: nominal_time
+
+# Log config dictionary
+log_config:
+  version: 1
+  disable_existing_loggers: true
+  handlers:
+    console:
+      class: logging.StreamHandler
+      level: !!python/name:logging.DEBUG
+      stream: ext://sys.stdout
+      formatter: normal
+    file:
+      class: logging.handlers.TimedRotatingFileHandler
+      filename: /tmp/global_mosaic.log
+      level: !!python/name:logging.DEBUG
+      formatter: normal
+      backupCount: 21
+      when: midnight
+      utc: true
+  formatters:
+    normal:
+      format: "[%(levelname)s: %(asctime)s : %(name)s] %(message)s"
+      datefmt: "%Y-%m-%d %H:%M:%S"
+  loggers:
+    root:
+      handlers: ['console', 'file']
+      level: !!python/name:logging.DEBUG
+      propagate: true
+    WorldComposite:
+      handlers: ['console', 'file']
+      level: !!python/name:logging.DEBUG
+      propagate: true

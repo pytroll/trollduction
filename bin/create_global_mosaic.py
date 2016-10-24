@@ -6,6 +6,7 @@ import os
 import time
 import yaml
 import logging
+import logging.config
 import logging.handlers
 
 from trollduction.global_mosaic import WorldCompositeDaemon
@@ -24,30 +25,10 @@ def main():
     except KeyError:
         pass
 
-    # TODO: move log config to config file
-
-    handlers = []
-    handlers.append(
-        logging.handlers.TimedRotatingFileHandler(config["log_fname"],
-                                                  "midnight",
-                                                  backupCount=21))
-
-    handlers.append(logging.StreamHandler())
-
-    try:
-        loglevel = getattr(logging, config["log_level"])
-    except KeyError:
-        loglevel = logging.INFO
-
-    for handler in handlers:
-        handler.setFormatter(logging.Formatter("[%(levelname)s: %(asctime)s :"
-                                               " %(name)s] %(message)s",
-                                               '%Y-%m-%d %H:%M:%S'))
-        handler.setLevel(loglevel)
-        logging.getLogger('').setLevel(loglevel)
-        logging.getLogger('').addHandler(handler)
-
+    logging.config.dictConfig(config["log_config"])
     logger = logging.getLogger("WorldComposite")
+
+    logger.debug("Logger started")
 
     # Create and start compositor
     compositor = WorldCompositeDaemon(config)
