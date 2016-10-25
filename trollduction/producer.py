@@ -57,15 +57,15 @@ from xml.etree.ElementTree import tostring
 import netifaces
 import numpy as np
 import pyinotify
-from pyresample.utils import AreaNotFound
 
+import mpop.imageo.formats.writer_options as writer_opts
 from mpop.projector import get_area_def
 from mpop.satellites import GenericFactory as GF
 from mpop.satout.cfscene import CFScene
-import mpop.imageo.formats.writer_options as writer_opts
 from posttroll.message import Message
 from posttroll.publisher import Publish
 from pyorbital import astronomy
+from pyresample.utils import AreaNotFound
 from trollduction import helper_functions
 from trollsched.boundary import AreaDefBoundary, Boundary
 from trollsched.satpass import Pass
@@ -443,7 +443,7 @@ class DataProcessor(object):
         time_slot = (mda.get('start_time') or
                      mda.get('nominal_time') or
                      mda.get('end_time'))
-        
+
         scene_time_slot = time_slot
         if 'end_time' in mda:
             scene_time_slot = (scene_time_slot, mda['end_time'])
@@ -1273,7 +1273,7 @@ class DataWriter(Thread):
                                                                   local_params)
 
                             LOGGER.debug("Saving %s", fname)
-                            if not saved or copy.attrib.get("copy","true") == "false":
+                            if not saved or copy.attrib.get("copy", "true") == "false":
                                 try:
                                     obj.save(tempname,
                                              fformat=fformat,
