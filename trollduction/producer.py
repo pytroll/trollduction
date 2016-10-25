@@ -21,6 +21,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+
 '''Trollduction module
 
 TODO:
@@ -36,33 +37,41 @@ TODO:
    (crude/nearest/<something new>)
 '''
 
-from .listener import ListenerContainer
-from mpop.satellites import GenericFactory as GF
-import time
+import errno
 import glob
-from mpop.projector import get_area_def
-from threading import Thread
-from pyorbital import astronomy
-import numpy as np
-import os
-import Queue
 import logging
 import logging.handlers
-from fnmatch import fnmatch
-from trollduction import helper_functions
-from trollsift import compose
-from urlparse import urlparse, urlunsplit
-import socket
+import os
+import Queue
 import shutil
-from mpop.satout.cfscene import CFScene
-from posttroll.publisher import Publish
-from posttroll.message import Message
-from pyresample.utils import AreaNotFound
-from trollsched.satpass import Pass
-from trollsched.boundary import Boundary, AreaDefBoundary
-import errno
-import netifaces
+import socket
 import tempfile
+import time
+from copy import deepcopy
+from fnmatch import fnmatch
+from struct import error as StructError
+from threading import Thread
+from urlparse import urlparse, urlunsplit
+from xml.etree.ElementTree import tostring
+
+import netifaces
+import numpy as np
+import pyinotify
+from pyresample.utils import AreaNotFound
+
+from mpop.projector import get_area_def
+from mpop.satellites import GenericFactory as GF
+from mpop.satout.cfscene import CFScene
+import mpop.imageo.formats.writer_options as writer_opts
+from posttroll.message import Message
+from posttroll.publisher import Publish
+from pyorbital import astronomy
+from trollduction import helper_functions
+from trollsched.boundary import AreaDefBoundary, Boundary
+from trollsched.satpass import Pass
+from trollsift import compose
+
+from .listener import ListenerContainer
 
 try:
     from mipp import DecodeError
@@ -78,8 +87,6 @@ else:
     import gc
     import pprint
 
-from xml.etree.ElementTree import tostring
-from struct import error as StructError
 
 try:
     from dwd_extensions.tools.view_zenith_angle import ViewZenithAngleCacheManager
@@ -90,8 +97,6 @@ except ImportError:
 LOGGER = logging.getLogger(__name__)
 
 # Config watcher stuff
-
-import pyinotify
 
 
 def get_local_ips():
@@ -402,7 +407,8 @@ class DataProcessor(object):
 
     def __init__(self, publish_topic=None, port=0, nameservers=[],
                  viewZenCacheManager=None,
-                 wait_for_channel_cfg={}):
+                 wait_for_channel_cfg={},
+                 process_num=None):
         self.global_data = None
         self.local_data = None
         self.product_config = None
@@ -412,6 +418,7 @@ class DataProcessor(object):
         self.writer = DataWriter(publish_topic=self._publish_topic, port=port,
                                  nameservers=nameservers)
         self.writer.start()
+        self.process_num = process_num
         self.viewZenCacheManager = viewZenCacheManager
 
     def set_publish_topic(self, publish_topic):
@@ -436,6 +443,10 @@ class DataProcessor(object):
         time_slot = (mda.get('start_time') or
                      mda.get('nominal_time') or
                      mda.get('end_time'))
+        
+        scene_time_slot = time_slot
+        if 'end_time' in mda:
+            scene_time_slot = (scene_time_slot, mda['end_time'])
 
         # orbit is not given for GEO satellites, use None
 
@@ -456,7 +467,7 @@ class DataProcessor(object):
         global_data = GF.create_scene(satname=str(platform),
                                       satnumber='',
                                       instrument=str(sensor),
-                                      time_slot=time_slot,
+                                      time_slot=scene_time_slot,
                                       orbit=mda['orbit_number'],
                                       variant=mda.get('variant', ''))
         LOGGER.debug("Creating scene for satellite %s and time %s",
@@ -593,6 +604,19 @@ class DataProcessor(object):
             do_generic_coverage = False
 
             for area_item in group.data:
+
+                if self.process_num is not None \
+                        and 'process_num' in area_item.attrib:
+                    if int(area_item.attrib['process_num']) \
+                            != self.process_num:
+                        LOGGER.info('Skipping area %s, assigned to process '
+                                    'number %s (own num: %s)',
+                                    area_item.attrib['id'],
+                                    area_item.attrib['process_num'],
+                                    self.process_num)
+                        skip.append(area_item)
+                        continue
+
                 try:
                     if not covers(self.global_data.overpass, area_item):
                         skip.append(area_item)
@@ -630,7 +654,7 @@ class DataProcessor(object):
                     keywords["resolution"] = int(group.resolution)
 
                 self.check_ready_to_read(req_channels)
-                
+
                 self.global_data.load(req_channels, **keywords)
                 LOGGER.debug("loaded data: %s", str(self.global_data))
             except (IndexError, IOError, DecodeError, StructError):
@@ -662,7 +686,7 @@ class DataProcessor(object):
                 try:
                     try:
                         actual_srch_radius = \
-                                int(area_item.attrib["srch_radius"])
+                            int(area_item.attrib["srch_radius"])
                         LOGGER.debug("Overriding search radius %s with %s",
                                      str(srch_radius), str(actual_srch_radius))
                     except KeyError:
@@ -786,8 +810,8 @@ class DataProcessor(object):
                 info_dict = self.get_parameters()
                 pattern = compose(wait_for_ch_cfg['pattern'], info_dict)
                 if self.wait_until_exists(pattern,
-                                     wait_for_ch_cfg['timeout'],
-                                     wait_for_ch_cfg['wait_after_found']):
+                                          wait_for_ch_cfg['timeout'],
+                                          wait_for_ch_cfg['wait_after_found']):
                     LOGGER.debug('found %s', pattern)
                 else:
                     LOGGER.error('timeout! did not found %s', pattern)
@@ -840,7 +864,7 @@ class DataProcessor(object):
 
         return True
 
-    def get_parameters(self, item = None):
+    def get_parameters(self, item=None):
         """Get the parameters for filename sifting.
         """
 
@@ -903,11 +927,19 @@ class DataProcessor(object):
                     continue
 
             try:
+                # Collect optional composite parameters from config
+                composite_params = {}
+                cp = product.find('composite_params')
+                if cp is not None:
+                    composite_params = dict(
+                        (item.tag, helper_functions.eval_default(item.text))
+                        for item in cp.getchildren())
+
                 # Check if this combination is defined
                 func = getattr(self.local_data.image, product.attrib['id'])
                 LOGGER.debug("Generating composite \"%s\"",
                              product.attrib['id'])
-                img = func()
+                img = func(**composite_params)
                 img.info.update(self.global_data.info)
                 img.info["product_name"] = \
                     product.attrib.get("name", product.attrib["id"])
@@ -926,7 +958,8 @@ class DataProcessor(object):
                                  product.attrib['name'],
                                  area.attrib['name'])
             else:
-                self.writer.write(img, product, params)
+                file_items = [x for x in product if x.tag == 'file']
+                self.writer.write(img, file_items, params)
 
         # log and publish completion of this area def
         LOGGER.info('Area %s completed', area.attrib['name'])
@@ -1017,7 +1050,7 @@ class DataProcessor(object):
         return True
 
 
-def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
+def _create_message(obj, filename, uri, params, publish_topic=None, uid=None, source_uri=None):
     """Create posttroll message.
     """
     to_send = obj.info.copy()
@@ -1047,6 +1080,8 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None):
     # FIXME: fishy: what if the uri already has a scheme ?
     to_send["uri"] = urlunsplit(("file", "", uri, "", ""))
     to_send["uid"] = uid or os.path.basename(filename)
+    if source_uri is not None:
+        to_send["source_uri"] = source_uri
     # we should have more info on format...
     fformat = os.path.splitext(filename)[1][1:]
     if fformat.startswith("tif"):
@@ -1179,7 +1214,7 @@ class DataWriter(Thread):
 
             while self._loop:
                 try:
-                    obj, file_items, params = self.prod_queue.get(True, 1)
+                    orig_obj, file_items, params = self.prod_queue.get(True, 1)
                 except Queue.Empty:
                     continue
                 local_params = params.copy()
@@ -1192,11 +1227,10 @@ class DataWriter(Thread):
                         for key in ["output_dir",
                                     "thumbnail_name",
                                     "thumbnail_size"]:
-                            if key in attrib:
-                                del attrib[key]
+                            attrib.pop(key, None)
                         if 'format' not in attrib:
                             attrib.setdefault('format',
-                                              os.path.splitext(item.text)[1][1:])
+                                              os.path.splitext(item.text.strip())[1][1:])
 
                         key = tuple(sorted(attrib.items()))
                         sorted_items.setdefault(key, []).append(item)
@@ -1207,6 +1241,7 @@ class DataWriter(Thread):
                             local_params[key] = aliases.get(params[key],
                                                             params[key])
                     for item, copies in sorted_items.items():
+                        obj = deepcopy(orig_obj)
                         attrib = dict(item)
                         if attrib.get("overlay", "").startswith("#"):
                             obj.add_overlay(hash_color(attrib.get("overlay")))
@@ -1221,22 +1256,30 @@ class DataWriter(Thread):
                             output_dir = copy.attrib.get("output_dir",
                                                          params["output_dir"])
 
-                            fname = compose(os.path.join(output_dir, copy.text),
+                            fname = compose(os.path.join(output_dir,
+                                                         copy.text.strip()),
                                             local_params)
-                            tempfd, tempname = tempfile.mkstemp(dir=os.path.dirname(fname))
+                            dir = os.path.dirname(fname)
+                            if not os.path.exists(dir):
+                                os.makedirs(dir)
+                            tempfd, tempname = tempfile.mkstemp(dir=dir)
                             os.chmod(tempname, default_mode)
                             os.close(tempfd)
+
+                            save_params = self.get_save_arguments(copy,
+                                                                  local_params)
+
                             LOGGER.debug("Saving %s", fname)
-                            if not saved:
+                            if not saved or copy.attrib.get("copy","true") == "false":
                                 try:
                                     obj.save(tempname,
                                              fformat=fformat,
-                                             compression=copy.attrib.get("compression", 6))
+                                             **save_params)
                                 except IOError:  # retry once
                                     try:
                                         obj.save(tempname,
                                                  fformat=fformat,
-                                                 compression=copy.attrib.get("compression", 6))
+                                                 **save_params)
                                     except IOError:
                                         LOGGER.exception("Can't save file %s", fname)
                                         continue
@@ -1293,6 +1336,47 @@ class DataWriter(Thread):
                                      local_params)
                 finally:
                     self.prod_queue.task_done()
+
+    def get_save_arguments(self, fileelem, params):
+        writer_options = {}
+
+        # take all parameters of format_params section in file element
+        fp = fileelem.find('format_params')
+        if fp:
+            fpp = dict((item.tag, item.text) for item in fp.getchildren())
+            writer_options.update(fpp)
+
+        # check for special attributes in file element
+        if writer_opts.WR_OPT_COMPRESSION not in writer_options:
+            writer_options[writer_opts.WR_OPT_COMPRESSION] = \
+                fileelem.attrib.get(writer_opts.WR_OPT_COMPRESSION, 6)
+
+        if writer_opts.WR_OPT_BLOCKSIZE not in writer_options:
+            blksz = fileelem.attrib.get(writer_opts.WR_OPT_BLOCKSIZE, None)
+            if blksz:
+                writer_options[writer_opts.WR_OPT_BLOCKSIZE] = blksz
+
+        if writer_opts.WR_OPT_NBITS not in writer_options:
+            nbits = fileelem.attrib.get(writer_opts.WR_OPT_NBITS, None)
+            if nbits:
+                writer_options[writer_opts.WR_OPT_NBITS] = nbits
+
+        # default parameter from <common> section of product config
+        if writer_opts.WR_OPT_NBITS not in writer_options \
+                and writer_opts.WR_OPT_NBITS in params:
+            writer_options[writer_opts.WR_OPT_NBITS] = \
+                params[writer_opts.WR_OPT_NBITS]
+
+        # default parameters of format_params section in <common>
+        # section of product config
+        fp = params.get('format_params', None)
+        if fp:
+            for key in fp.keys():
+                if key not in writer_options:
+                    writer_options[key] = fp[key]
+
+        save_kwords = {'writer_options': writer_options}
+        return save_kwords
 
     def write(self, obj, item, params):
         """Write to queue."""
@@ -1359,6 +1443,7 @@ class Trollduction(object):
             DataProcessor(publish_topic=self.td_config.get('publish_topic'),
                           port=int(self.td_config.get('port', 0)),
                           nameservers=nameservers,
+                          process_num=config["process_num"],
                           wait_for_channel_cfg=self.wait_for_channel_cfg,
                           viewZenCacheManager=self.viewZenCacheManager)
 
@@ -1384,7 +1469,7 @@ class Trollduction(object):
             #            self.listener.restart_listener('file')
             self.listener.restart_listener(self.td_config['topics'].split(','))
             LOGGER.info("Listener restarted")
-        
+
         self.set_wait_for_channel_cfg()
 
         try:
@@ -1429,7 +1514,7 @@ class Trollduction(object):
         self.wait_for_channel_cfg = wait_for_channel_cfg
         if self.data_processor is not None:
             self.data_processor.set_wait_for_channel_cfg(wait_for_channel_cfg)
-            
+
     def cleanup(self):
         '''Cleanup Trollduction before shutdown.
         '''
@@ -1443,7 +1528,7 @@ class Trollduction(object):
                 self.config_watcher.stop()
             if self.listener is not None:
                 self.listener.stop()
-                
+
             if self.viewZenCacheManager is not None:
                 self.viewZenCacheManager.shutdown()
                 self.viewZenCacheManager = None

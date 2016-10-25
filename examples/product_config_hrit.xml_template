@@ -10,14 +10,27 @@
         <!-- <check_coverage>False</check_coverage> -->
         <!-- number of processor used for parallel work -->
         <nprocs>1</nprocs>
-	<!-- Set default maximum search radius for all the areas, in
+        <!-- Set default maximum search radius for all the areas, in
 	     meters.  Can be overridden for each area, see the "eurol"
 	     area below.  Comment out if default (radius=None) is
 	     sufficient. -->
-	<srch_radius>20000</srch_radius>
-	<!-- Define the interpolation method.  Defaults to "nearest"
+        <srch_radius>20000</srch_radius>
+        <!-- Define the interpolation method.  Defaults to "nearest"
 	     if omitted.-->
-	<proj_method>nearest</proj_method>
+        <proj_method>nearest</proj_method>
+
+        <!-- Default parameters for the file writers.
+            All items listed in <format_params> will be as well forwarded
+            to custom writers (like NinJoTiff)
+            as a dictionary named "writer_options".
+            Example:
+            
+        <format_params>
+            <nbits>8</nbits>
+            <fill_value_subst>1</fill_value_subst>
+        </format_params>
+        -->
+
     </common>
 
     <variables>
@@ -60,6 +73,96 @@
                 <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
             </product>
         </area>
+        
+        <!-- 
+        Example on how to use same product_config.xml with multiple parellel running l2processor instances:
+            1. Start l2processor with additional argument "-N <PROCNUM>" (PROCNUM should be an int value).
+            2. Add attribute "process_num" to <area> elements in product_config.xml to assign l2processor instance to an area
+               that it should process.
+            3. If the logger.ini should be shared between l2processor instances, use "%PROCNUM%" in configured log filenames. 
+               It will be replaced by the assigned PROCNUM at runtime when l2processor starts.    
+        -->
+        <!-- area should only processed by l2processor instance 1 (started with arg "-N 1") -->
+        <area id="euron1" name="North europe, 1km/pixel" process_num="1">
+            <product id="ir108" name="ir108">
+                <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
+            </product>
+        </area>
+        <!-- area should only processed by l2processor instance 2 (started with arg "-N 2") -->
+        <area id="euron1" name="North europe, 1km/pixel" process_num="1">
+            <product id="ir108" name="ir108">
+                <file output_dir="path2">{platform_name}_{time:%Y%m%d_%H%M}_{areaname}_{productname}.png</file>
+            </product>
+        </area>
+        
+        <!-- it is possible to build parametrized composites -->
+        <!-- 
+        <product id="sample_comp" name="my_sample">
+            <composite_params>
+                <param1>[0.0, 0.3, 0.0]</param1>
+                <paramX>None</paramX>
+                ..
+            </composite_params>
+            <file>sample.tif</file>
+        </product>
+        -->
+        
+        <!--it is also possible to define additional parameters for
+            the file format specified with the attribute "format" of the file
+            node. A new xml node "format_params" has to be inserted after the
+            file name.
+            
+            All items listed in <format_params> will be forwarded to custom writers (like NinJoTiff)
+            as a dictionary named "writer_options".
+  
+            Example:
+        <product id="sample_comp" name="my_sample">
+            <file format="mpop.imageo.formats.ninjotiff">
+                METEOSAT_EUROPA_GESAMT_RGB-Staub_nqeuro3km_{time:%Y%m%d%H%M}_ninjo.tif
+                <format_params>
+                    <ninjo_product_name>abc</ninjo_product_name>
+                    ...
+                    <nbits>16</nbits>
+                </format_params>
+            </file>
+        </product>
+        -->
+        
+        <!--
+            Additionally, the following format parameters can be used as attributes
+            of the <file> element: compression, nbits, blocksize   
+            Example:
+            
+        <product id="sample_comp" name="my_sample">
+             <file compression="5" nbits="16" blocksize="256">geotiff-sample.tif</file>
+        </product>
+        
+        -->
+        
+        <!-- to save the same product in different output formats, it is necessary to 
+            add the attribute copy="false". Otherwise all further files are only 
+            copies/links of file created by the first <file> tag. 
+            Example:
+            
+        <product id="sample_comp" name="my_sample">
+            <file copy="false" compression="5" nbits="8" blocksize="256">geotiff-sample.tif</file>
+        
+            <file copy="false" format="mpop.imageo.formats.ninjotiff">
+                ninjotiff-sample.tif
+                <format_params>
+                  <nbits>8</nbits>
+                  <compression>5</compression>
+                  <ninjo_product_name>msg_rgb-12-12-9i-n</ninjo_product_name>
+                  <sat_id>6300014</sat_id>
+                  <chan_id>9900015</chan_id>
+                  <data_cat>GORN</data_cat>
+                </format_params>
+            </file>
+         </product>  
+         
+         -->
+                 
+        
     </product_list>
 </product_config>
 

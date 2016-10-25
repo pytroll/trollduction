@@ -139,7 +139,11 @@ class ProductList(object):
                 self.prodlist = item
             elif item.tag == "common":
                 for citem in item:
-                    self.attrib[citem.tag] = citem.text
+                    citem_dict = dict((el.tag, el.text) for el in citem)
+                    if citem_dict:
+                        self.attrib[citem.tag] = citem_dict
+                    else:
+                        self.attrib[citem.tag] = citem.text
             elif item.tag == "groups":
                 for group in item:
                     self.groups.append(Dataset(group.text.split(","),
