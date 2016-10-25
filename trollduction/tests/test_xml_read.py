@@ -40,8 +40,8 @@ xmlstuff = """<?xml version="1.0" encoding='utf-8'?>
     <output_dir>/tmp</output_dir>
     <proj_method>nearest</proj_method>
     <format_params>
-        <nbits>8</nbits>
-        <fill_value_subst>1</fill_value_subst>
+      <nbits>8</nbits>
+      <fill_value_subst>1</fill_value_subst>
     </format_params>
   </common>
 
@@ -131,3 +131,6 @@ def suite():
     mysuite.addTest(loader.loadTestsFromTestCase(TestProductList))
 
     return mysuite
+
+if __name__ == '__main__':
+    unittest.main()
