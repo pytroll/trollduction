@@ -135,6 +135,11 @@ def is_uri_on_server(uri, strict=False):
                 return False
         elif url_ip not in get_local_ips():
             return False
+        else:
+            try:
+                os.stat(url.path)
+            except OSError:
+                return False
     return True
 
 
