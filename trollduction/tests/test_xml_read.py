@@ -91,6 +91,19 @@ xmlstuff = """<?xml version="1.0" encoding='utf-8'?>
       </product>
 
     </area>
+
+    <!-- same area but with different product list -->
+    <area id="nsea" name="North_Baltic_Sea">
+        <product id="night_fog" name="night_fog" sunzen_night_minimum="90" sunzen_lonlat="25, 60">
+            <file>{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+          </product>
+    </area>
+    <area id="nsea" name="North_Baltic_Sea">
+        <product id="night_overview" name="night_overview" sunzen_night_minimum="90" sunzen_lonlat="25, 60">
+            <file format="png">{time:%Y%m%d_%H%M}_{platform}{satnumber}_{areaname}_{composite}.png</file>
+        </product>
+    </area>
+
   </product_list>
 </product_config>
 """
@@ -121,6 +134,18 @@ class TestProductList(unittest.TestCase):
                            'format_params': {'nbits': '8',
                                              'fill_value_subst': '1'}
                            })
+
+    def test_duplicate_areas(self):
+        group = self.pconfig.groups[0]
+        self.assertEquals(len(group.data), 3)
+        self.assertEquals(group.data[0].attrib.get('id'), 'eurol')
+        self.assertEquals(group.data[1].attrib.get('id'), 'nsea')
+        self.assertEquals(group.data[1].find('product').attrib.get('id'),
+                          'night_fog')
+        self.assertEquals(group.data[2].attrib.get('id'), 'nsea')
+        self.assertEquals(group.data[2].find('product').attrib.get('id'),
+                          'night_overview')
+        group.data[0]
 
 
 def suite():

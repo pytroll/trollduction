@@ -34,16 +34,17 @@ Outputs messages with the following metadata:
 - [instrument, number]
 
 """
+import logging
 import os
+import socket
+import xml.etree.ElementTree as etree
 from datetime import datetime, timedelta
 from time import sleep
-from urlparse import urlsplit, urlunsplit, SplitResult
-from trollduction.producer import is_uri_on_server
-from posttroll.publisher import Publish
+from urlparse import SplitResult, urlsplit, urlunsplit
+
 from posttroll.message import Message
-import xml.etree.ElementTree as etree
-import logging
-import socket
+from posttroll.publisher import Publish
+from trollduction.producer import is_uri_on_server
 
 LOGGER = logging.getLogger(__name__)
 

@@ -24,12 +24,14 @@
 """
 
 
-from trollduction.producer import coverage, get_polygons_positions
-from trollduction.producer import check_uri
-import numpy as np
 import unittest
+
+import numpy as np
 from mock import MagicMock
+
 from pyresample.geometry import AreaDefinition
+from trollduction.producer import (check_uri, coverage, get_local_ips,
+                                   get_polygons_positions, is_uri_on_server)
 
 
 class TestPolygonCoverage(unittest.TestCase):
@@ -130,7 +132,7 @@ class TestPolygonCoverage(unittest.TestCase):
         self.assertEquals(0.44009280754700542, coverage(scene, mali))
 
 
-class TestCheckUri(unittest.TestCase):
+class TestUriTools(unittest.TestCase):
 
     def test_check_uri(self):
 
@@ -143,6 +145,75 @@ class TestCheckUri(unittest.TestCase):
         self.assertEqual(
             retv, "/san1/pps/import/PPS_data/source/metop01_20151016_1007_15964/hrpt_metop01_20151016_1007_15964.l1b")
 
+    def test_is_url_on_server(self):
+
+        pathname = "/san1/pps/import/PPS_data/source/metop01_20151016_1007_15964/hrpt_metop01_20151016_1007_15964.l1b"
+        hostname = "mytestserver.myhost.xx"
+        URI = "ssh://{hostname}{pathname}".format(hostname=hostname,
+                                                  pathname=pathname)
+        self.assertFalse(is_uri_on_server(URI),
+                         "{pathname} found on {hostname}".format(
+            pathname=pathname, hostname=hostname))
+        self.assertFalse(is_uri_on_server(URI, strict=True),
+                         "{pathname} found on {hostname}".format(
+            pathname=pathname, hostname=hostname))
+
+        hostname = 'localhost'
+        URI = "ssh://{hostname}{pathname}".format(hostname=hostname,
+                                                  pathname=pathname)
+        self.assertFalse(is_uri_on_server(URI),
+                         "{pathname} found on {hostname}".format(
+            pathname=pathname, hostname=hostname))
+        self.assertFalse(is_uri_on_server(URI, strict=True),
+                         "{pathname} found on {hostname}".format(
+            pathname=pathname, hostname=hostname))
+
+        import tempfile
+        import os
+
+        handle, pathname = tempfile.mkstemp(dir='/tmp')
+        os.close(handle)
+        try:
+            hostname = 'localhost'
+            URI = "ssh://{hostname}{pathname}".format(
+                hostname=hostname, pathname=pathname)
+            self.assertTrue(is_uri_on_server(URI),
+                            "{pathname} not found on {hostname}".format(
+                pathname=pathname, hostname=hostname))
+            self.assertTrue(is_uri_on_server(URI, strict=True),
+                            "{pathname} not found on {hostname}".format(
+                pathname=pathname, hostname=hostname))
+
+            URI = pathname
+            self.assertTrue(is_uri_on_server(URI),
+                            "{pathname} not found on {hostname}".format(
+                pathname=pathname, hostname=hostname))
+            self.assertFalse(is_uri_on_server(URI, strict=True),
+                             "{pathname} found on {hostname}".format(
+                pathname=pathname, hostname=hostname))
+
+            import socket
+
+            hostname = socket.gethostname()
+
+            URI = "ssh://{hostname}{pathname}".format(
+                hostname=hostname, pathname=pathname)
+
+            self.assertTrue(is_uri_on_server(URI),
+                            "{pathname} not found on {hostname}".format(
+                pathname=pathname, hostname=hostname))
+            self.assertTrue(is_uri_on_server(URI, strict=True),
+                            "{pathname} not found on {hostname}".format(
+                pathname=pathname, hostname=hostname))
+        finally:
+            os.remove(pathname)
+
+    def test_get_local_ips(self):
+        local_ips = get_local_ips()
+        self.assertTrue('127.0.0.1' in local_ips)
+        self.assertTrue(len(local_ips) > 1,
+                        "Local ips are not valid: {0}".format(str(local_ips)))
+
 
 def suite():
     """The suite for test_xml_read
@@ -150,6 +221,6 @@ def suite():
     loader = unittest.TestLoader()
     mysuite = unittest.TestSuite()
     mysuite.addTest(loader.loadTestsFromTestCase(TestPolygonCoverage))
-    mysuite.addTest(loader.loadTestsFromTestCase(TestCheckUri))
+    mysuite.addTest(loader.loadTestsFromTestCase(TestUriTools))
 
     return mysuite
