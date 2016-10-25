@@ -194,7 +194,11 @@ class TestUriTools(unittest.TestCase):
 
             import socket
 
-            hostname = socket.gethostname()
+            if os.environ.get('TRAVIS', False) == 'true':
+                # gethostbyname doesn't work on travis nodes
+                hostname = 'localhost'
+            else:
+                hostname = socket.gethostname()
 
             URI = "ssh://{hostname}{pathname}".format(
                 hostname=hostname, pathname=pathname)
