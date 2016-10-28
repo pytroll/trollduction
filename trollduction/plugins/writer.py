@@ -10,6 +10,7 @@ from posttroll.publisher import Publish
 from posttroll.message import Message
 from trollsift import compose
 
+
 class DataWriterContainer(object):
 
     '''Container for DataWriter instance
@@ -64,7 +65,9 @@ class DataWriterContainer(object):
         self.logger.debug("Writer stopped.")
         self.thread = None
 
+
 class DataWriter(Thread):
+
     """Writes data to disk.
     """
 
@@ -113,15 +116,18 @@ class DataWriter(Thread):
                                         "proj_id": area.proj_id,
                                         "proj4": area.proj4_string,
                                         "shape": (area.x_size, area.y_size)
-                               },
+                                        },
                                "productname": productname
-                    }
+                               }
                     # if self._topic is not None:
                     if self._topic is not None:
                         msg = Message(self._topic, "file", to_send)
                         pub.send(str(msg))
                         self.logger.debug("Sent message: %s", str(msg))
                     self.logger.info("Saved %s", fname)
+
+                    del obj
+                    obj = None
                 else:
                     time.sleep(1)
 

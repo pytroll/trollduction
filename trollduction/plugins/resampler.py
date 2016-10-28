@@ -5,6 +5,7 @@ import logging
 from trollflow.workflow_component import AbstractWorkflowComponent
 from trollduction.xml_read import ProductList
 
+
 class Resampler(AbstractWorkflowComponent):
 
     """Creates resampled local area scenes."""
@@ -44,7 +45,8 @@ class Resampler(AbstractWorkflowComponent):
             if radius is None:
                 self.logger.debug("Using default search radius.")
             else:
-                self.logger.debug("Using search radius %d meters.", int(radius))
+                self.logger.debug("Using search radius %d meters.",
+                                  int(radius))
         except KeyError:
             radius = None
 
@@ -58,10 +60,13 @@ class Resampler(AbstractWorkflowComponent):
             lcl.info["areaname"] = area_name
             lcl.info["products"] = glbl.info["product_list"][area_name]
             context["output_queue"].put(lcl)
+            del lcl
+            lcl = None
 
     def post_invoke(self):
         """Post-invoke"""
         pass
+
 
 def get_prerequisites_xml(global_data, product_config, area_name):
     """Get composite prerequisite channels for a group"""
@@ -72,9 +77,9 @@ def get_prerequisites_xml(global_data, product_config, area_name):
                 continue
             for product in area:
                 try:
-                    composite = getattr(global_data.image, product.attrib['id'])
+                    composite = getattr(global_data.image,
+                                        product.attrib['id'])
                 except AttributeError:
                     continue
                 reqs |= composite.prerequisites
     return reqs
-

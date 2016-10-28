@@ -6,6 +6,7 @@ from mpop.satellites import GenericFactory as GF
 from trollduction.xml_read import ProductList
 import logging
 
+
 class SceneLoader(AbstractWorkflowComponent):
 
     """Creates a scene object from a message and loads the required channels."""
@@ -36,16 +37,24 @@ class SceneLoader(AbstractWorkflowComponent):
                                   for item in group.data
                                   if item.tag == "area"]
             reqs = get_prerequisites_xml(global_data, group.data)
+            prev_reqs = {itm.name for itm in global_data.loaded_channels()}
+            reqs_to_unload = prev_reqs - reqs
+            if len(reqs_to_unload) > 0:
+                self.logger.debug("Unloading unnecessary channels: %s",
+                                  str(sorted(reqs_to_unload)))
+                global_data.unload(reqs_to_unload)
             self.logger.info("Loading required channels for this group: %s",
                              str(sorted(reqs)))
             global_data.load(reqs, area_def_names=grp_area_def_names,
                              use_extern_calib=use_extern_calib)
             for area_item in group.data:
                 global_data.info["product_list"][area_item.attrib['id']] = \
-                        [item.attrib["id"] for \
-                         item in area_item if item.tag == "product"]
+                    [item.attrib["id"] for
+                     item in area_item if item.tag == "product"]
 
             context["output_queue"].put(global_data)
+        del global_data
+        global_data = None
 
     def post_invoke(self):
         """Post-invoke"""
@@ -93,6 +102,7 @@ class SceneLoader(AbstractWorkflowComponent):
         global_data.info['time'] = time_slot
 
         return global_data
+
 
 def get_prerequisites_xml(global_data, grp_config):
     """Get composite prerequisite channels for a group"""

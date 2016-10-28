@@ -7,6 +7,7 @@ from trollflow.workflow_component import AbstractWorkflowComponent
 from trollduction.xml_read import ProductList
 from trollsift import compose
 
+
 class CompositeGenerator(AbstractWorkflowComponent):
 
     """Creates composites from a product config."""
@@ -44,10 +45,13 @@ class CompositeGenerator(AbstractWorkflowComponent):
                                   "product not saved!")
             else:
                 context["output_queue"].put((img, fname, productname))
+            del img
+            img = None
 
     def post_invoke(self):
         """Post-invoke"""
         pass
+
 
 def create_fname(info, prod_list, prod_name):
     """Create filename for product *prod*"""
@@ -61,6 +65,7 @@ def create_fname(info, prod_list, prod_name):
         return (compose(pattern, info), prod_name)
     else:
         return (None, prod_name)
+
 
 def _get_pattern_and_prodname_xml(prod_list, area_name, prod_name):
     """Get filepattern for area *area* and product *prod*"""
