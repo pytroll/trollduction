@@ -1,6 +1,332 @@
 Changelog
 =========
 
+v1.1.0 (2016-11-01)
+-------------------
+
+- Update changelog. [Panu Lahtinen]
+
+- Bump version: 1.0.1 → 1.1.0. [Panu Lahtinen]
+
+- Allow Travis to fail with Python 2.6. [Panu Lahtinen]
+
+- Merge branch 'develop' of https://github.com/pytroll/trollduction into
+  develop. [Panu Lahtinen]
+
+- Add bump and changelog config files. [Martin Raspaud]
+
+- Add bumversion config. [Panu Lahtinen]
+
+- Fix version string. [Panu Lahtinen]
+
+- Use actual files for scisys testing. [Martin Raspaud]
+
+- Use localhost for network tests on travis. [Martin Raspaud]
+
+- Add unittests for producer's url tools, and fix associated bug.
+  [Martin Raspaud]
+
+- Beautify producer.py. [Martin Raspaud]
+
+- Fix scisys receiver tests. [Martin Raspaud]
+
+- Reorganize imports. [Martin Raspaud]
+
+- Allow leading zeros on segment numbers. [Martin Raspaud]
+
+- Merge pull request #20 from pytroll/smhiprod. [Panu Lahtinen]
+
+  changes to aapp and pps running
+
+- Merge branch 'develop' into smhiprod. [Adam.Dybbroe]
+
+- Merge pull request #19 from khunger/feature-muliple-area-elements-
+  same-id. [Panu Lahtinen]
+
+  Allow muliple area elements with same id in config
+
+- Unit test for duplicate areas in product config. [Christian Kliche]
+
+- Allow muliple area elements with same id in config. [Christian Kliche]
+
+  To support products within same areas assigned to different
+  l2processor instances, it must be possible to use area elements
+  with same id but different process_number attribute.
+
+
+- Fix "test_requires" to "tests_require" [Panu Lahtinen]
+
+- Merge pull request #18 from khunger/feature-write-options. [Panu
+  Lahtinen]
+
+  Feature write options
+
+- Product config with subnodes in common section. [Christian Kliche]
+
+  ```
+      <common>
+  	...
+          <!-- Default parameters for the file writers.
+              All items listed in <format_params> will be as well forwarded
+              to custom writers (like NinJoTiff)
+              as a dictionary named "writer_options".
+             -->
+          <format_params>
+              <nbits>8</nbits>
+              <fill_value_subst>1</fill_value_subst>
+          </format_params>
+
+      </common>
+  ```
+
+
+- Fixed python 2.6 compatibility and formatting. [Christian Kliche]
+
+- Added example for format-options in product config. [Christian Kliche]
+
+- Fixed indention bug. [Christian Kliche]
+
+- Use writer_options dict parameter for saving. [Christian Kliche]
+
+  Uses new functionality as implented in mpop feature-writer-options
+
+
+- Merge pull request #17 from khunger/feature-create-scene-with-end-
+  time. [Panu Lahtinen]
+
+  Use end_time if available for creating scene
+
+- Use end_time if available for creating scene. [Christian Kliche]
+
+  If "end_time" was found in posttroll message (created by trollstalker),
+  the tuple (time, end_time) is used to create the scene. This is necessary
+  to read all segments of an Himawari8 dataset.
+
+
+- Do not block reprocessing of same scene if failed in AAPP.
+  [Adam.Dybbroe]
+
+- Run pps with date and time arguments for all satellites, not only
+  Terra/Aqua. [Adam.Dybbroe]
+
+- Merge branch 'develop' into smhiprod. [Adam.Dybbroe]
+
+  Conflicts:
+  	trollduction/producer.py
+
+- Bump up version number. [Adam.Dybbroe]
+
+- Pep8. [Adam.Dybbroe]
+
+- Merge branch 'develop' of github.com:pytroll/trollduction into
+  develop. [Adam.Dybbroe]
+
+- Make a copy of object before manipulating it in producer. [Martin
+  Raspaud]
+
+- Cleanup producer.py. [Martin Raspaud]
+
+- Fix save retry to pass the same parameters as the first time. [Martin
+  Raspaud]
+
+- Adapt to new EUMETCast SST file names with less info. [Adam.Dybbroe]
+
+- In log files print platform and orbit number to idnetify scene.
+  [Adam.Dybbroe]
+
+  Passing the job-dict and the key to the worker was needed.
+
+
+- Merge pull request #16 from khunger/feature-file-format-params. [Panu
+  Lahtinen]
+
+  Support for format parameters in file config
+
+- Support for format parameters in file config. [Christian Kliche]
+
+  The DataWriter was modified to support additional parameters for
+  the file format specified with the attribute "format" of the file
+  node. A new xml node "format_params" has to be inserted after the
+  file name.
+  Example:
+  <file format="mpop.imageo.formats.ninjotiff">
+      METEOSAT_EUROPA_GESAMT_RGB-Staub_nqeuro3km_{time:%Y%m%d%H%M}_ninjo.tif
+      <format_params>
+          <ninjo_product_name>abc</ninjo_product_name>
+          ...
+          <nbits>16</nbits>
+      </format_params>
+  </file
+
+
+- Merge pull request #15 from khunger/feature-composite-with-params.
+  [Panu Lahtinen]
+
+  Feature composite with params
+
+- Add example for parametrized composites. [Christian Kliche]
+
+- Support for parametrized composites. [Christian Kliche]
+
+  The product configuration can be modified to allow
+  parametrized composites:
+  <product id="sample_comp" name="my_sample">
+    <composite_params>
+      <param1>[0.0, 0.3, 0.0]</param1>
+      <paramX>None</paramX>
+      ..
+    </composite_params>
+    <file>sample.tif</file>
+  </product>
+
+
+- Merge pull request #14 from khunger/fix-sourceuri-and-create-dir.
+  [Panu Lahtinen]
+
+  Added missing arg. source_uri, ensure dir exists
+
+- Added missing arg. source_uri, ensure dir exists. [Christian Kliche]
+
+- Merge pull request #13 from khunger/feature-l2proc-area-processnum.
+  [Panu Lahtinen]
+
+  Share product_config between multiple l2processors
+
+- Share product_config between multiple l2processors. [Christian Kliche]
+
+  Allows to assign certain areas in product_config.xml to parallel running l2processor instances.
+
+  Configuration steps:
+  1. Start l2processor with additional argument "-N <PROCNUM>" (PROCNUM should be an int value, i.e. 0, 1,...).
+  2. Add attribute "process_num" to <area> elements in product_config.xml to assign l2processor instance to an area that it should process.
+  3. If the logger.ini should be shared between l2processor instances, use "%PROCNUM%" in configured log filenames. It will be replaced by the assigned PROCNUM at runtime when l2processor starts.
+
+
+- Merge pull request #12 from khunger/feature-wait-for-channel. [Panu
+  Lahtinen]
+
+  Feature wait for channel
+
+- Added example for "wait_for_channel" [Christian Kliche]
+
+- Waiting for existence of file before loading chan. [Christian Kliche]
+
+  for example:
+
+  [l2processor]
+  ...
+  wait_for_channel_CloudType = /data/IN/NWCSAF/SAFNWC_MSG3*{time:%Y%m%d%H%M}*|120|10
+  ...
+
+  Before loading channel "CloudType", l2processor waits until a file matching the pattern exists. "120" denotes an timeout in seconds after that an error is thrown. "10" means, wait for another 10 seconds when file was found.
+
+
+- Merge pull request #11 from khunger/feature-dwd-vza. [Panu Lahtinen]
+
+  Added binding for DWD ViewZenithAngleManager
+
+- Added binding for DWD ViewZenithAngleManager. [Christian Kliche]
+
+- Merge pull request #10 from khunger/feature-nameserver-definition.
+  [Panu Lahtinen]
+
+  Another fix for handling missing nameservers param
+
+- Another fix for handling missing nameservers param. [Christian Kliche]
+
+- Merge pull request #9 from khunger/feature-nameserver-definition.
+  [Panu Lahtinen]
+
+  Nameserver definition for stalker, segment_gatherer + l2processor
+
+- Fixed NoOpt handling for nameservers param. [Christian Kliche]
+
+- Nameserver definition for stalker, seggath + l2pro. [Christian Kliche]
+
+  New parameter in configuration file. i.e.:
+
+  nameservers=localhost
+
+  It defines the nameserver hosts to register publishers of trollstalker, segment_gatherer and l2processorWARNING:
+  If nameservers option is set, address broadcasting via multicasting is not used any longer.
+  The corresponding nameserver has to be started with command line option "--no-multicast".
+
+
+- Merge pull request #8 from khunger/feature-trollstalker-temporal-
+  align. [Panu Lahtinen]
+
+  Stalker support for custom variables
+
+- Stalker support for custom variables. [Christian Kliche]
+
+  especially for Datetime format spec with temporal alignment
+
+  Support for format specifications like {start_time:%Y%m%d%H%M%S|align(5)}
+  to ceil/round a datetime to a multiple of a timedelta.
+  Useful to equalize small time differences in name of files belonging to the same timeslot
+  The first parameter represents the difference between timeslots in minutes.
+
+  Example config:
+
+  [trollstalker]
+  ...
+  var_gatherer_time={time:%Y%m%d%H%M|align(15)}
+  ...
+  This creates a new posttroll message dict entry "gatherer_time" with a datetime object ceiled
+  to 15 minutes intervals.
+
+  align(5):
+  17:10:58 -> 17:10:00
+  17:03:00 -> 17:00:00
+  16:59:00 -> 16:55:00
+
+  align(15):
+  16:59:00 -> 16:45:00
+
+  When called with two arguments, the second denote a kind of offset subtracted before ceiling (default: 0).
+
+  align(15,-2):
+  16:59:00 -> 17:00:00
+
+  align(15,2):
+  17:16:00 -> 17:00:00
+
+  When called with three arguments, the specified number of intervals (defined by argument 1) will be added to
+  the result.
+
+  align(15,0,1):
+  16:59:00 -> 17:00:00
+
+  align(15,0,2):
+  16:59:00 -> 17:15:00
+
+  align(15,0,-1):
+  16:59:00 -> 16:30:00
+
+
+- Merge branch 'master' into develop. [Martin Raspaud]
+
+- Merge branch 'develop' [Martin Raspaud]
+
+- Merge pull request #3 from mraspaud/revert-2-zero_coverage. [Panu
+  Lahtinen]
+
+  Revert "Zero coverage"
+
+- Revert "Zero coverage" [Panu Lahtinen]
+
+- Merge pull request #2 from mraspaud/zero_coverage. [Panu Lahtinen]
+
+  Merging zero coverage functionality to develop branch
+
+- Bump version to provoke upgrade of buggy 1.0.0 releases at smhi.
+  [Adam.Dybbroe]
+
+v1.0.1 (2016-06-18)
+-------------------
+
+- Cosmetics only. [Adam.Dybbroe]
+
 v1.0.0 (2016-06-15)
 -------------------
 
