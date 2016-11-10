@@ -8,7 +8,7 @@ matrix:
 before_install:
  - sudo apt-get install libhdf5-serial-dev netcdf-bin libnetcdf-dev python-scipy
  - pip install git+https://github.com/pytroll/mpop.git@pre-master
- - pip install git+https://github.com/pytroll/trollflow.git
+ - pip install git+https://github.com/pytroll/posttroll.git@develop
 install:
   - pip install .
   - pip install mock
