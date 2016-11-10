@@ -71,7 +71,7 @@ from trollsched.boundary import AreaDefBoundary, Boundary
 from trollsched.satpass import Pass
 from trollsift import compose
 
-from .listener import ListenerContainer
+from posttroll.listener import ListenerContainer
 
 try:
     from mipp import DecodeError

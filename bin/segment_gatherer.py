@@ -34,7 +34,7 @@ from collections import OrderedDict
 from ConfigParser import NoOptionError, RawConfigParser
 
 from posttroll import message, publisher
-from trollduction.listener import ListenerContainer
+from posttroll.listener import ListenerContainer
 from trollsift import Parser, compose
 
 SLOT_NOT_READY = 0

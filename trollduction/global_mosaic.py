@@ -15,7 +15,7 @@ except ImportError:
 from trollsift import compose
 from mpop.imageo.geo_image import GeoImage
 from mpop.projector import get_area_def
-from trollduction.listener import ListenerContainer
+from posttroll.listener import ListenerContainer
 
 # These longitudinally valid ranges are mid-way points calculated from
 # satellite locations assuming the given satellites are in use

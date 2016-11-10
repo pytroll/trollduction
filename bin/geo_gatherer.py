@@ -33,7 +33,7 @@ import datetime as dt
 from collections import OrderedDict
 
 from posttroll import message, publisher
-from trollduction.listener import ListenerContainer
+from posttroll.listener import ListenerContainer
 from trollsift import Parser, compose
 
 
@@ -112,7 +112,7 @@ class GeoGatherer(object):
             segments = segments.split('-')
             if len(segments) > 1:
                 segments = ['%06d' % i for i in range(int(segments[0]),
-                                                          int(segments[-1])+1)]
+                                                      int(segments[-1]) + 1)]
             meta['channel_name'] = channel_name
             for seg in segments:
                 meta['segment'] = seg
@@ -129,7 +129,8 @@ class GeoGatherer(object):
             file_str = ''
             for key in self.delayed_files:
                 file_str += "%s %f seconds, " % (key, self.delayed_files[key])
-            self.logger.warning("Files received late: %s", file_str.strip(', '))
+            self.logger.warning(
+                "Files received late: %s", file_str.strip(', '))
         # and missing files
         missing_files = self.all_files.difference(self.received_files)
         if len(missing_files) > 0:
@@ -151,7 +152,7 @@ class GeoGatherer(object):
         if len(self.received_files) == 0:
             return False
         # If all wanted files have been received, return True
-        if self.wanted_files.union(self.critical_files).issubset(\
+        if self.wanted_files.union(self.critical_files).issubset(
                 self.received_files):
             return True
         # If all critical files have been received ...
@@ -244,7 +245,6 @@ class GeoGatherer(object):
         self.received_files.add(msg.data['uid'])
 
 
-
 def arg_parse():
     '''Handle input arguments.
     '''
@@ -292,7 +292,6 @@ def main():
     logging.getLogger('').addHandler(handler)
     logging.getLogger("posttroll").setLevel(logging.INFO)
     logger = logging.getLogger("geo_gatherer")
-
 
     gatherer = GeoGatherer(config, args.config_item)
     gatherer.set_logger(logger)
