@@ -29,10 +29,7 @@ import doctest
 from trollduction.tests import (test_helper_functions,
                                 test_trollduction,
                                 test_xml_read,
-                                test_scisys,
-                                test_trigger,
-                                test_producer,
-                                test_global_mosaic)
+                                test_producer)
 
 
 def suite():
@@ -45,9 +42,6 @@ def suite():
     mysuite.addTests(test_helper_functions.suite())
     mysuite.addTests(test_trollduction.suite())
     mysuite.addTests(test_xml_read.suite())
-    mysuite.addTests(test_scisys.suite())
-    mysuite.addTests(test_trigger.suite())
     mysuite.addTests(test_producer.suite())
-    mysuite.addTests(test_global_mosaic.suite())
 
     return mysuite
