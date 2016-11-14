@@ -1,2 +1,2 @@
-git+https://github.com/mraspaud/posttroll.git@feature_service
+git+https://github.com/pytroll/posttroll.git
 

@@ -1,3 +1,9 @@
+Usage
+=====
+
+To run *trollduction*, several different scripts needs to be run. Below you can find the order and commands that need to be issued. These commands show how to run the batch processing in testing. For clarity, open a new terminal window for each part. For operational use a more robust start-up system, eg. supervisord_, is preferable.
+
+.. _supervisord: http://supervisord.org/
 
 ======================================================
  Description and operation of the different processes
@@ -11,26 +17,18 @@ Before any message-based processing, start the *posttroll* nameserver::
 This script handles the connections between different message publishers and subscribers.
 
 
-Trollstalker
-============
+pytroll-collectors/bin/trollstalker.py
+======================================
 
 Trollstalker is a script that monitors the arrival of given files in the
 specified directories. When such a file is detected, a pytroll message is sent
 on the network to notify other interested processes.
 
-An example configuration file for trollstalker is provided in
-`trollduction/examples/trollstalker_config.ini_template`:
-
-.. literalinclude:: /../../examples/trollstalker_config.ini_template
-   :language: ini
-
-Of course, other sections can be added to the file for other files to be
-watched.
-
+Note that *trollstalker* is part of the pytroll-collectors_ package.
 
 In order to start *trollstalker*::
 
-  $ cd trollduction/bin/
+  $ cd pytroll-collectors/bin/
   $ ./trollstalker.py -c ../examples/trollstalker_config.ini -C noaa_hrpt
 
 Now you can test if the messaging works by copying a data file to your input
@@ -40,8 +38,8 @@ check the configuration files that the input directory and file pattern are set
 correctly.
 
 
-l2processor
-===========
+trollduction/bin/l2processor.py
+===============================
 
 *l2processor* is the process that reads satellite data and generates composites
  from it. It is triggered by messages fullfilling a given topic, reads the data
@@ -61,7 +59,6 @@ An example configuration file for l2processor is provided in
 
 .. literalinclude:: /../../examples/l2processor_config.ini_template
    :language: ini
-
 
 Start *l2processor* by::
 
@@ -124,8 +121,8 @@ Data dumps
 ~~~~~~~~~~
 An alternative to the *<product>* tag is the *<dump>* tag that saves the resampled data to the given filename (pattern). It can also be inserted at the previous layer to do a data dump of the unprojected data.
 
-gatherer
-========
+pytroll-collectors/bin/gatherer.py
+==================================
 
 Watches files or messages and gathers satellite granules in "collections",
 sending then the collection of files in a message for further processing.
@@ -235,39 +232,3 @@ Provide a gatherer configuration file.
 
 
 Start nameserver if it's not already running.
-
-
-scisys_receiver
-===============
-
-Receive and translates scisys ground-station message to pytroll messages.
-
-To be written
-
-aapp_runner
-===========
-
-Run aapp
-
-To be written
-
-pps_runner
-==========
-
-Run pps
-
-To be written
-
-viirs_dr_runner
-===============
-
-Run viirs l0 -> l1 processor
-
-To be written
-
-modis_dr_runner
-===============
-
-Run modis l0 -> l1 processor
-
-To be written
