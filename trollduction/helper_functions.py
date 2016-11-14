@@ -174,7 +174,7 @@ def get_area_boundaries(area_def):
 
 def get_indices_from_boundaries(boundary_lons, boundary_lats,
                                 lons, lats, radius_of_influence):
-    """Find relevant indices from grid boundaries using the 
+    """Find relevant indices from grid boundaries using the
     winding number theorem"""
 
     valid_index = _get_valid_index(boundary_lons.side1, boundary_lons.side2,
@@ -190,7 +190,7 @@ def get_angle_sum(lons_side1, lons_side2, lons_side3, lons_side4):
     '''Calculate angle sum for winding number theorem.  Note that all
     the sides need to be connected, that is:
 
-    lons_side[-1] == lons_side2[0], 
+    lons_side[-1] == lons_side2[0],
     ...
     lons_side4[-1] == lons_side1[0]
     '''
@@ -209,7 +209,7 @@ def get_angle_sum(lons_side1, lons_side2, lons_side3, lons_side4):
 def _get_valid_index(lons_side1, lons_side2, lons_side3, lons_side4,
                      lats_side1, lats_side2, lats_side3, lats_side4,
                      lons, lats, radius_of_influence):
-    """Find relevant indices from grid boundaries using the 
+    """Find relevant indices from grid boundaries using the
     winding number theorem"""
 
     earth_radius = 6370997.0
@@ -337,19 +337,19 @@ def create_aligned_datetime_var(var_pattern, info_dict):
     mtch = re.match(
         '{(.*?)(!(.*?))?(\\:(.*?))?(\\|(.*?))?}',
         var_pattern)
-    
+
     if mtch is None:
         return None
-        
+
     # parse date format pattern
     key = mtch.groups()[0]
     format_spec = mtch.groups()[4]
     transform = mtch.groups()[6]
     date_val = info_dict[key]
-    
+
     if not isinstance(date_val, dt.datetime):
         return None
-    
+
     # only for datetime types
     res = date_val
     if transform:
@@ -360,11 +360,11 @@ def create_aligned_datetime_var(var_pattern, info_dict):
                 dt.timedelta(minutes=align_params[0]),
                 dt.timedelta(minutes=align_params[1]),
                 align_params[2])
-    
+
     if res is None:
         # fallback to default compose when no special handling needed
-        res = compose(var_val, self.info) 
-                
+        res = compose(var_val, self.info)
+
     return res
 
 
@@ -397,7 +397,12 @@ def align_time(input_val, steps=dt.timedelta(minutes=5),
     Useful to equalize small time differences in name of files
     belonging to the same timeslot
     """
-    stepss = steps.total_seconds()
+    try:
+        stepss = steps.total_seconds()
+    # Python 2.6 compatibility hack
+    except AttributeError:
+        stepss = steps.days * 86400. + \
+            steps.seconds + steps.microseconds * 1e-6
     val = input_val - offset
     vals = (val - val.min).seconds
     result = val - dt.timedelta(seconds=(vals - (vals // stepss) * stepss))
