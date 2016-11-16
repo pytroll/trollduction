@@ -60,8 +60,8 @@ def create_instance_log_config(orig_log_config, process_num):
     return temp_file
 
 
-if __name__ == '__main__':
-
+def parse_args():
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config_file", dest="config_file",
                         type=str,
@@ -90,11 +90,13 @@ if __name__ == '__main__':
         print "Template file given as master config, aborting!"
         sys.exit()
 
-    config = ConfigParser()
-    config.read(args.config_file)
+    return args
 
+
+def setup_logging(config, config_item, process_num=None):
+    """Setup logging"""
     try:
-        log_config = config.get(args.config_item, "td_log_config")
+        log_config = config.get(config_item, "td_log_config")
         if 'template' in log_config:
             print "Template file given as Trollduction logging config," \
                 " aborting!"
@@ -103,16 +105,27 @@ if __name__ == '__main__':
     except NoOptionError:
         logging.basicConfig()
     else:
-        if args.process_num is None:
+        if process_num is None:
             logging.config.fileConfig(log_config,
                                       disable_existing_loggers=False)
         else:
             inst_log_config = create_instance_log_config(log_config,
-                                                         args.process_num)
+                                                         process_num)
             logging.config.fileConfig(inst_log_config,
                                       disable_existing_loggers=False)
             if os.path.exists(inst_log_config):
                 os.remove(inst_log_config)
+
+
+def main():
+    """Main()"""
+
+    args = parse_args()
+
+    config = ConfigParser()
+    config.read(args.config_file)
+
+    setup_logging(config, args.config_item, args.process_num)
 
     logger = logging.getLogger("trollduction")
 
@@ -133,6 +146,7 @@ if __name__ == '__main__':
     if "template" in cfg["product_config_file"]:
         print "Template file given as trollstalker product config, " \
             "aborting!"
+        sys.exit()
 
     trd = Trollduction(cfg)
 
@@ -156,3 +170,6 @@ if __name__ == '__main__':
 
     print "Thank you for using pytroll/l2processor!" \
         "See you soon on pytroll.org."
+
+if __name__ == '__main__':
+    main()
