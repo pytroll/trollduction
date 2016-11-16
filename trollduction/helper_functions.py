@@ -447,3 +447,28 @@ def eval_default(expression, default_res=None):
     except:
         pass
     return default_res
+
+
+def get_uri_from_message(msg, area_def_names=None):
+    """Get URI from posttroll message."""
+    if msg.type == "file":
+        uri = msg.data['uri']
+    elif msg.type == "dataset":
+        uri = [mda['uri'] for mda in msg.data['dataset']]
+    elif msg.type == 'collection':
+        if not msg.data['collection_area_id'] in area_def_names:
+            LOGGER.info('Collection does not contain data for '
+                        'current areas. Skipping.')
+            return None
+        if 'dataset' in msg.data['collection'][0]:
+            uri = []
+            for dataset in msg.data['collection']:
+                uri.extend([mda['uri'] for mda in dataset['dataset']])
+        else:
+            uri = [mda['uri'] for mda in msg.data['collection']]
+    else:
+        LOGGER.warning("Can't run on %s messages", msg.type)
+        return None
+    # TODO collections and collections of datasets
+
+    return uri
