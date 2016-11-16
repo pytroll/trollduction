@@ -33,6 +33,7 @@ from mpop.projector import get_area_def
 from pyresample.geometry import Boundary
 import logging
 from ConfigParser import ConfigParser
+from trollsift import compose
 
 LOGGER = logging.getLogger(__name__)
 
@@ -343,7 +344,7 @@ def create_aligned_datetime_var(var_pattern, info_dict):
 
     # parse date format pattern
     key = mtch.groups()[0]
-    format_spec = mtch.groups()[4]
+    # format_spec = mtch.groups()[4]
     transform = mtch.groups()[6]
     date_val = info_dict[key]
 
@@ -363,7 +364,7 @@ def create_aligned_datetime_var(var_pattern, info_dict):
 
     if res is None:
         # fallback to default compose when no special handling needed
-        res = compose(var_val, self.info)
+        res = compose(var_pattern, info_dict)
 
     return res
 
