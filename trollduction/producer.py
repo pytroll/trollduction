@@ -48,7 +48,6 @@ import socket
 import tempfile
 import time
 from copy import deepcopy
-from fnmatch import fnmatch
 from struct import error as StructError
 from threading import Thread
 from urlparse import urlparse, urlunsplit
