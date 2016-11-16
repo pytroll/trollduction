@@ -447,32 +447,158 @@ class DataProcessor(object):
     def set_wait_for_channel_cfg(self, wait_for_channel_cfg):
         self.wait_for_channel_cfg = wait_for_channel_cfg
 
+    def collect_products_from_group(self, group):
+        """Collect products and those that will be skipped from the given
+        group."""
+        products = []
+        skip = []
+        skip_group = True
+        do_generic_coverage = False
+
+        for area_item in group.data:
+            if self.process_num is not None \
+               and 'process_num' in area_item.attrib:
+                if int(area_item.attrib['process_num']) \
+                   != self.process_num:
+                    LOGGER.info('Skipping area %s, assigned to process '
+                                'number %s (own num: %s)',
+                                area_item.attrib['id'],
+                                area_item.attrib['process_num'],
+                                self.process_num)
+                    skip.append(area_item)
+                    continue
+
+            try:
+                if not covers(self.global_data.overpass, area_item):
+                    skip.append(area_item)
+                    continue
+                else:
+                    skip_group = False
+            except AttributeError:
+                LOGGER.exception("Can't compute coverage from "
+                                 "unloaded data, continuing")
+                do_generic_coverage = True
+                skip_group = False
+            for product in area_item:
+                products.append(product)
+
+        return (products, skip, skip_group, do_generic_coverage)
+
+    def save_areas_to_netcdf(self, filename, keywords):
+        """Save data from areas having "dump" tag to netcdf"""
+        for area_item in self.product_config.prodlist:
+            if area_item.tag == "dump":
+                try:
+                    self.global_data.load(filename=filename, **keywords)
+                    self.save_to_netcdf(self.global_data,
+                                        area_item,
+                                        self.get_parameters(area_item))
+                except (IndexError, IOError, DecodeError, StructError):
+                    LOGGER.exception("Incomplete or corrupted input data.")
+
+    def _unload_data(self, group):
+        """Unload data if such is defined for the given group"""
+        if group.get("unload", "").lower() in ["yes", "true", "1"]:
+            loaded_channels = [chn.name for chn
+                               in self.global_data.loaded_channels()]
+            self.global_data.unload(*loaded_channels)
+            LOGGER.debug("unloading all channels before group %s",
+                         group.id)
+
+    def process_group(self, msg, group, skip, do_generic_coverage):
+        """Reproject and generate images for the given area group."""
+        # Get config options
+        try:
+            srch_radius = int(self.product_config.attrib["srch_radius"])
+        except KeyError:
+            srch_radius = None
+
+        nprocs = int(self.product_config.attrib.get("nprocs", 1))
+        proj_method = self.product_config.attrib.get("proj_method", "nearest")
+        LOGGER.info("Using %d CPUs for reprojecting with method %s.",
+                    nprocs, proj_method)
+
+        precompute = \
+            self.product_config.attrib.get("precompute", "").lower() in \
+            ["true", "yes", "1"]
+        if precompute:
+            LOGGER.debug("Saving projection mapping for re-use")
+
+        for area_item in group.data:
+            if area_item in skip:
+                continue
+            elif (do_generic_coverage and
+                  not generic_covers(self.global_data, area_item)):
+                continue
+
+            if self.viewZenCacheManager is not None:
+                # retrieve the satellite zenith angles for the
+                # corresponding area
+                self.viewZenCacheManager.prepare(msg,
+                                                 area_item.attrib['id'],
+                                                 self.global_data.info['time'])
+
+                # update viewZenCacheManager with loaded channels to
+                # notify about satellite position infos
+                self.viewZenCacheManager.notify_channels_loaded(
+                    self.global_data.loaded_channels())
+
+            # reproject to local domain
+            LOGGER.debug("Projecting data to area %s",
+                         area_item.attrib['name'])
+            try:
+                try:
+                    actual_srch_radius = int(area_item.attrib["srch_radius"])
+                    LOGGER.debug("Overriding search radius %s with %s",
+                                 str(srch_radius), str(actual_srch_radius))
+                except KeyError:
+                    LOGGER.debug("Using search radius %s", str(srch_radius))
+                    actual_srch_radius = srch_radius
+
+                self.local_data = \
+                    self.global_data.project(
+                        area_item.attrib["id"],
+                        channels=self.get_req_channels(area_item),
+                        mode=proj_method, nprocs=nprocs,
+                        precompute=precompute,
+                        radius=actual_srch_radius)
+            except ValueError:
+                LOGGER.warning("No data in this area")
+                continue
+            except AreaNotFound:
+                LOGGER.warning("Area %s not defined, skipping!",
+                               area_item.attrib['id'])
+                continue
+
+            LOGGER.info('Data reprojected for area: %s',
+                        area_item.attrib['name'])
+
+            # create a shallow copy of the info dictionary in local_data
+            # to provide information which should be local only
+            # independent from the global_data object
+            self.local_data.info = self.local_data.info.copy()
+            # do the same for each channel in local_data
+            for chn in self.local_data.channels:
+                chn.info = chn.info.copy()
+
+            if self.viewZenCacheManager is not None:
+                # wait for the satellite zenith angle calculation process
+                vza_chn = self.viewZenCacheManager.waitForViewZenithChannel()
+                self.local_data.channels.append(vza_chn)
+
+            # Draw requested images for this area.
+            self.draw_images(area_item)
+            del self.local_data
+            self.local_data = None
+
     def run(self, product_config, msg):
         """Process the data
         """
 
         self.product_config = product_config
 
-        if msg.type == "file":
-            uri = msg.data['uri']
-        elif msg.type == "dataset":
-            uri = [mda['uri'] for mda in msg.data['dataset']]
-        elif msg.type == 'collection':
-            all_areas = self.get_area_def_names()
-            if not msg.data['collection_area_id'] in all_areas:
-                LOGGER.info('Collection does not contain data for '
-                            'current areas. Skipping.')
-                return
-            if 'dataset' in msg.data['collection'][0]:
-                uri = []
-                for dataset in msg.data['collection']:
-                    uri.extend([mda['uri'] for mda in dataset['dataset']])
-            else:
-                uri = [mda['uri'] for mda in msg.data['collection']]
-        else:
-            LOGGER.warning("Can't run on %s messages", msg.type)
-            return
-        # TODO collections and collections of datasets
+        uri = helper_functions.get_uri_from_message(msg,
+                                                    self.get_area_def_names())
 
         LOGGER.info('New data available: %s', uri)
         t1a = time.time()
@@ -488,35 +614,15 @@ class DataProcessor(object):
         self.global_data = self.create_scene_from_message(msg)
         self._data_ok = True
 
-        nprocs = int(self.product_config.attrib.get("nprocs", 1))
-        proj_method = self.product_config.attrib.get("proj_method", "nearest")
-        LOGGER.info("Using %d CPUs for reprojecting with method %s.",
-                    nprocs, proj_method)
-        try:
-            srch_radius = int(self.product_config.attrib["srch_radius"])
-        except KeyError:
-            srch_radius = None
-
-        precompute = \
-            self.product_config.attrib.get("precompute", "").lower() in \
-            ["true", "yes", "1"]
-        if precompute:
-            LOGGER.debug("Saving projection mapping for re-use")
         use_extern_calib = \
             self.product_config.attrib.get("use_extern_calib", "").lower() in \
             ["true", "yes", "1"]
         keywords = {"use_extern_calib": use_extern_calib}
 
-        for area_item in self.product_config.prodlist:
-            if area_item.tag == "dump":
-                try:
-                    self.global_data.load(filename=filename, **keywords)
-                    self.save_to_netcdf(self.global_data,
-                                        area_item,
-                                        self.get_parameters(area_item))
-                except (IndexError, IOError, DecodeError, StructError):
-                    LOGGER.exception("Incomplete or corrupted input data.")
+        # Save data dumps to netcdf
+        self.save_areas_to_netcdf(filename, keywords)
 
+        # Process each area group
         for group in self.product_config.groups:
             LOGGER.debug("processing %s", group.info['id'])
             area_def_names = self.get_area_def_names(group.data)
@@ -526,47 +632,16 @@ class DataProcessor(object):
                             'Skipping.')
                 continue
 
-            products = []
-            skip = []
-            skip_group = True
-            do_generic_coverage = False
+            # Get the areas
+            products, skip, skip_group, do_generic_coverage = \
+                self.collect_products_from_group(group)
 
-            for area_item in group.data:
-
-                if self.process_num is not None \
-                        and 'process_num' in area_item.attrib:
-                    if int(area_item.attrib['process_num']) \
-                            != self.process_num:
-                        LOGGER.info('Skipping area %s, assigned to process '
-                                    'number %s (own num: %s)',
-                                    area_item.attrib['id'],
-                                    area_item.attrib['process_num'],
-                                    self.process_num)
-                        skip.append(area_item)
-                        continue
-
-                try:
-                    if not covers(self.global_data.overpass, area_item):
-                        skip.append(area_item)
-                        continue
-                    else:
-                        skip_group = False
-                except AttributeError:
-                    LOGGER.exception("Can't compute coverage from "
-                                     "unloaded data, continuing")
-                    do_generic_coverage = True
-                    skip_group = False
-                for product in area_item:
-                    products.append(product)
             if not products or skip_group:
                 continue
 
-            if group.get("unload", "").lower() in ["yes", "true", "1"]:
-                loaded_channels = [chn.name for chn
-                                   in self.global_data.loaded_channels()]
-                self.global_data.unload(*loaded_channels)
-                LOGGER.debug("unloading all channels before group %s",
-                             group.id)
+            self._unload_data(group)
+
+            # Load data
             try:
                 req_channels = self.get_req_channels(products)
                 LOGGER.debug("loading channels: %s", str(req_channels))
@@ -584,87 +659,19 @@ class DataProcessor(object):
                 self.check_ready_to_read(req_channels)
 
                 self.global_data.load(req_channels, **keywords)
-                LOGGER.debug("loaded data: %s", str(self.global_data))
+                LOGGER.debug("Loaded data: %s", str(self.global_data))
             except (IndexError, IOError, DecodeError, StructError):
                 LOGGER.exception("Incomplete or corrupted input data.")
                 self._data_ok = False
                 break
 
-            for area_item in group.data:
-                if area_item in skip:
-                    continue
-                elif (do_generic_coverage and
-                      not generic_covers(self.global_data, area_item)):
-                    continue
-
-                if self.viewZenCacheManager is not None:
-                    # retrieve the satellite zenith angles for the
-                    # corresponding area
-                    self.viewZenCacheManager.prepare(msg,
-                                                     area_item.attrib['id'],
-                                                     self.global_data.info['time'])
-
-                    # update viewZenCacheManager with loaded channels to notify about
-                    # satellite position infos
-                    self.viewZenCacheManager.notify_channels_loaded(
-                        self.global_data.loaded_channels())
-
-                # reproject to local domain
-                LOGGER.debug("Projecting data to area %s",
-                             area_item.attrib['name'])
-                try:
-                    try:
-                        actual_srch_radius = int(
-                            area_item.attrib["srch_radius"])
-                        LOGGER.debug("Overriding search radius %s with %s",
-                                     str(srch_radius), str(actual_srch_radius))
-                    except KeyError:
-                        LOGGER.debug(
-                            "Using search radius %s", str(srch_radius))
-                        actual_srch_radius = srch_radius
-
-                    self.local_data = \
-                        self.global_data.project(
-                            area_item.attrib["id"],
-                            channels=self.get_req_channels(area_item),
-                            mode=proj_method, nprocs=nprocs,
-                            precompute=precompute,
-                            radius=actual_srch_radius)
-                except ValueError:
-                    LOGGER.warning("No data in this area")
-                    continue
-                except AreaNotFound:
-                    LOGGER.warning("Area %s not defined, skipping!",
-                                   area_item.attrib['id'])
-                    continue
-
-                LOGGER.info('Data reprojected for area: %s',
-                            area_item.attrib['name'])
-
-                # create a shallow copy of the info dictionary in local_data
-                # to provide information which should be local only
-                # independent from the global_data object
-                self.local_data.info = self.local_data.info.copy()
-                # do the same for each channel in local_data
-                for chn in self.local_data.channels:
-                    chn.info = chn.info.copy()
-
-                if self.viewZenCacheManager is not None:
-                    # wait for the satellite zenith angle calculation process
-                    vza_chn = \
-                        self.viewZenCacheManager.waitForViewZenithChannel()
-                    self.local_data.channels.append(vza_chn)
-
-                # Draw requested images for this area.
-                self.draw_images(area_item)
-                del self.local_data
-                self.local_data = None
+            self.process_group(msg, group, skip, do_generic_coverage)
 
             if group.get("unload", "").lower() in ["yes", "true", "1"]:
                 loaded_channels = [chn.name for chn
                                    in self.global_data.loaded_channels()]
                 self.global_data.unload(*loaded_channels)
-                LOGGER.debug("unloading all channels after group %s",
+                LOGGER.debug("Unloading all channels after group %s",
                              group.id)
 
         # Wait for the writer to finish
