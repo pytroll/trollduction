@@ -1478,6 +1478,8 @@ class Trollduction(object):
             while self._loop:
                 # wait for new messages
                 try:
+                    msg = self.listener.output_queue.get(True, 5)
+                except AttributeError:
                     msg = self.listener.queue.get(True, 5)
                 except KeyboardInterrupt:
                     self.stop()
