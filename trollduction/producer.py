@@ -328,10 +328,15 @@ class DataProcessor(object):
     """Process the data.
     """
 
-    def __init__(self, publish_topic=None, port=0, nameservers=[],
+    def __init__(self, publish_topic=None, port=0, nameservers=None,
                  viewZenCacheManager=None,
-                 wait_for_channel_cfg={},
+                 wait_for_channel_cfg=None,
                  process_num=None):
+        if nameservers is None:
+            nameservers = []
+        if wait_for_channel_cfg is None:
+            wait_for_channel_cfg = {}
+
         self.global_data = None
         self.local_data = None
         self.product_config = None
@@ -1118,11 +1123,13 @@ class DataWriter(Thread):
     we don't want to block processing.
     """
 
-    def __init__(self, publish_topic=None, port=0, nameservers=[]):
+    def __init__(self, publish_topic=None, port=0, nameservers=None):
         Thread.__init__(self)
         self.prod_queue = Queue.Queue()
         self._publish_topic = publish_topic
         self._port = port
+        if nameservers is None:
+            nameservers = []
         self._nameservers = nameservers
         self._loop = True
 
@@ -1185,10 +1192,10 @@ class DataWriter(Thread):
                             fname = compose(os.path.join(output_dir,
                                                          copy.text.strip()),
                                             local_params)
-                            dir = os.path.dirname(fname)
-                            if not os.path.exists(dir):
-                                os.makedirs(dir)
-                            tempfd, tempname = tempfile.mkstemp(dir=dir)
+                            file_dir = os.path.dirname(fname)
+                            if not os.path.exists(file_dir):
+                                os.makedirs(file_dir)
+                            tempfd, tempname = tempfile.mkstemp(dir=file_dir)
                             os.chmod(tempname, default_mode)
                             os.close(tempfd)
 
