@@ -815,6 +815,26 @@ class DataProcessor(object):
 
         return params
 
+    def _draw_image(self, product):
+        """Inner worker for draw_images()"""
+        # Collect optional composite parameters from config
+        composite_params = {}
+        cp = product.find('composite_params')
+        if cp is not None:
+            composite_params = dict(
+                (item.tag, helper_functions.eval_default(item.text))
+                for item in cp.getchildren())
+
+        # Check if this combination is defined
+        func = getattr(self.local_data.image, product.attrib['id'])
+        LOGGER.debug("Generating composite \"%s\"", product.attrib['id'])
+        img = func(**composite_params)
+        img.info.update(self.global_data.info)
+        img.info["product_name"] = \
+            product.attrib.get("name", product.attrib["id"])
+
+        return img
+
     def draw_images(self, area):
         '''Generate images from local data using given area name and
         product definitions.
@@ -862,22 +882,7 @@ class DataProcessor(object):
                     continue
 
             try:
-                # Collect optional composite parameters from config
-                composite_params = {}
-                cp = product.find('composite_params')
-                if cp is not None:
-                    composite_params = dict(
-                        (item.tag, helper_functions.eval_default(item.text))
-                        for item in cp.getchildren())
-
-                # Check if this combination is defined
-                func = getattr(self.local_data.image, product.attrib['id'])
-                LOGGER.debug("Generating composite \"%s\"",
-                             product.attrib['id'])
-                img = func(**composite_params)
-                img.info.update(self.global_data.info)
-                img.info["product_name"] = \
-                    product.attrib.get("name", product.attrib["id"])
+                img = self._draw_image(product)
             except AttributeError as err:
                 # Log incorrect product funcion name
                 LOGGER.error('Incorrect product id: %s for area %s (%s)',
@@ -1416,6 +1421,29 @@ class Trollduction(object):
         '''
         self.stop()
 
+    def _get_sensors(self, msg_data):
+        """Get sensors from the message data"""
+        if isinstance(msg_data['sensor'], (list, tuple, set)):
+            sensors = set(msg_data['sensor'])
+        else:
+            sensors = set((msg_data['sensor'], ))
+
+        return sensors
+
+    def _is_overpass_processed(self, msg_data):
+        """Check if the data has """
+        process_only_once = self.td_config.get('process_only_once',
+                                               "false").lower() in \
+            ["true", "yes", "1"]
+        platforms_match = self._previous_pass["platform_name"] == \
+            msg_data["platform_name"]
+        start_times_match = self._previous_pass["start_time"] == \
+            msg_data["start_time"]
+
+        if process_only_once and platforms_match and start_times_match:
+            return True
+        return False
+
     def run_single(self):
         """Run trollduction.
         """
@@ -1425,6 +1453,7 @@ class Trollduction(object):
                 try:
                     msg = self.listener.output_queue.get(True, 5)
                 except AttributeError:
+                    # Maybe the queue has a different name
                     msg = self.listener.queue.get(True, 5)
                 except KeyboardInterrupt:
                     self.stop()
@@ -1432,23 +1461,15 @@ class Trollduction(object):
                 except Queue.Empty:
                     continue
                 LOGGER.debug(str(msg))
-                if isinstance(msg.data['sensor'], (list, tuple, set)):
-                    sensors = set(msg.data['sensor'])
-                else:
-                    sensors = set((msg.data['sensor'], ))
+
+                sensors = self._get_sensors(msg.data)
 
                 prev_pass = self._previous_pass
                 if (msg.type in ["file", 'collection', 'dataset'] and
                     sensors.intersection(
                         self.td_config['instruments'].split(','))):
                     try:
-                        if self.td_config.get('process_only_once',
-                                              "false").lower() in \
-                           ["true", "yes", "1"] and \
-                           self._previous_pass["platform_name"] == \
-                           msg.data["platform_name"] and \
-                           self._previous_pass["start_time"] == \
-                           msg.data["start_time"]:
+                        if self._is_overpass_processed(msg.data):
                             LOGGER.info(
                                 "File was already processed. Skipping.")
                             continue
