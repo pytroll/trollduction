@@ -32,8 +32,10 @@ LOGGER = logging.getLogger(__name__)
 
 
 class InfoObject(object):
+
     """InfoObject class.
     """
+
     def __init__(self, **attributes):
         self.info = attributes
 
@@ -50,8 +52,10 @@ class InfoObject(object):
 
 
 class Dataset(InfoObject):
+
     """Dataset class.
     """
+
     def __init__(self, data, **attributes):
         InfoObject.__init__(self, **attributes)
         self.data = data
@@ -73,8 +77,10 @@ class Dataset(InfoObject):
 
 
 class ProductList(object):
+
     """Class for reading and storing product lists.
     """
+
     def __init__(self, fname):
         self.fname = fname
 
@@ -136,38 +142,55 @@ class ProductList(object):
     def parse(self):
         """Parse product list XML file.
         """
+        def _common(item):
+            """Handle section *common*"""
+            for citem in item:
+                citem_dict = dict((el.tag, el.text) for el in citem)
+                if citem_dict:
+                    self.attrib[citem.tag] = citem_dict
+                else:
+                    self.attrib[citem.tag] = citem.text
+
+        def _groups(item):
+            """Handle section *groups*"""
+            for group in item:
+                self.groups.append(Dataset(group.text.split(","),
+                                           **group.attrib))
+
+        def _variables(item):
+            """Handle section *variables*"""
+            if item.attrib:
+                try:
+                    res = [os.environ[env] != val
+                           for env, val in item.attrib.items()]
+                except KeyError:
+                    LOGGER.warning("Environment variable %s not defined, "
+                                   "skipping section in xml file", env)
+                    return
+                if any(res):
+                    return
+            for var in item:
+                self.vars.setdefault(
+                    var.tag, {})[var.attrib["id"]] = var.text
+
+        def _aliases(item):
+            """Handle section *aliases*"""
+            for alias in item:
+                self.aliases.setdefault(
+                    alias.tag,
+                    {})[alias.attrib["src"]] = alias.attrib['dst']
+
         for item in self._xml:
             if item.tag == "product_list":
                 self.prodlist = item
             elif item.tag == "common":
-                for citem in item:
-                    citem_dict = dict((el.tag, el.text) for el in citem)
-                    if citem_dict:
-                        self.attrib[citem.tag] = citem_dict
-                    else:
-                        self.attrib[citem.tag] = citem.text
+                _common(item)
             elif item.tag == "groups":
-                for group in item:
-                    self.groups.append(Dataset(group.text.split(","),
-                                               **group.attrib))
+                _groups(item)
             elif item.tag == "variables":
-                if item.attrib:
-                    try:
-                        res = [os.environ[env] != val
-                               for env, val in item.attrib.items()]
-                    except KeyError:
-                        LOGGER.warning("Environment variable %s not defined, skipping section in xml file", env)
-                        continue
-                    if any(res):
-                        continue
-                for var in item:
-                    self.vars.setdefault(
-                        var.tag, {})[var.attrib["id"]] = var.text
+                _variables(item)
             elif item.tag == "aliases":
-                for alias in item:
-                    self.aliases.setdefault(
-                        alias.tag,
-                        {})[alias.attrib["src"]] = alias.attrib['dst']
+                _aliases(item)
         self.insert_vars()
         self.check_groups()
 
