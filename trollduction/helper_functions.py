@@ -29,10 +29,13 @@ import os
 import xml_read
 import datetime as dt
 import re
-from mpop.projector import get_area_def
-from pyresample.geometry import Boundary
 import logging
 from ConfigParser import ConfigParser
+import errno
+import shutil
+
+from mpop.projector import get_area_def
+from pyresample.geometry import Boundary
 
 LOGGER = logging.getLogger(__name__)
 
@@ -472,3 +475,95 @@ def get_uri_from_message(msg, area_def_names=None):
     # TODO collections and collections of datasets
 
     return uri
+
+
+def get_file_format(fname):
+    """Get fileformat from the filename ending"""
+    # we should have more info on format...
+    fformat = os.path.splitext(fname)[1][1:]
+    if fformat.startswith("tif"):
+        fformat = "TIFF"
+    elif fformat.startswith("png"):
+        fformat = "PNG"
+    elif fformat.startswith("jp"):
+        fformat = "JPEG"
+    elif fformat.startswith("nc"):
+        fformat = "NetCDF4"
+    elif fformat in ["hdf", "h5"]:
+        fformat = "HDF5"
+
+    return fformat
+
+
+def add_fformat_metadata(info, fformat, obj_info):
+    """Add metadata to *info* dict based on the file format *fformat*"""
+    if fformat not in ["NetCDF4", "HDF5", "TIFF"]:
+        info["format"] = "raster"
+        info["data_processing_level"] = "2"
+        info["product_name"] = obj_info["product_name"]
+    elif fformat == "TIFF":
+        info["format"] = "GeoTIFF"
+        info["data_processing_level"] = "2"
+        info["product_name"] = obj_info["product_name"]
+    elif fformat == "NetCDF4":
+        info["format"] = "CF"
+        info["data_processing_level"] = "1b"
+        info["product_name"] = "dump"
+    elif fformat == "HDF5":
+        info["format"] = "PPS"
+        info["data_processing_level"] = "3"
+        info["product_name"] = "cloudproduct"
+
+    return info
+
+
+def link_or_copy(src, dst, tmpdst=None, retry=1):
+    """Create a hardlink from *src* to *dst*, or if that fails, copy.
+    """
+    if src == dst:
+        LOGGER.warning("Trying to copy a file over itself: %s", src)
+        return
+    try:
+        os.link(src, dst)
+        if tmpdst is not None:
+            os.remove(tmpdst)
+    except OSError as err:
+        if err.errno not in [errno.EXDEV]:
+            LOGGER.exception("Could not link: %s -> %s", src, dst)
+            return
+        try:
+            if tmpdst is not None:
+                shutil.copy(src, tmpdst)
+                os.rename(tmpdst, dst)
+            else:
+                shutil.copy(src, dst)
+        except shutil.Error:
+            LOGGER.exception("Something went wrong in copying a file")
+        except IOError as err:
+            LOGGER.info("Error copying file: %s", str(err))
+            if retry:
+                LOGGER.info("Retrying...")
+                link_or_copy(src, dst, tmpdst, retry - 1)
+            else:
+                LOGGER.exception("Could not copy: %s -> %s", src, dst)
+
+
+def thumbnail(filename, thname, size, fformat):
+    """Create a thumbnail image and save it.
+    """
+    from PIL import Image
+    img = Image.open(filename)
+    img.thumbnail(size, Image.ANTIALIAS)
+    img.save(thname, fformat)
+
+
+def hash_color(colorstring):
+    """ convert #RRGGBB to an (R, G, B) tuple """
+    colorstring = colorstring.strip()
+    if colorstring[0] == '#':
+        colorstring = colorstring[1:]
+    if len(colorstring) != 6:
+        raise ValueError("input #%s is not in #RRGGBB format" % colorstring)
+    r_col, g_col, b_col = colorstring[:2], colorstring[2:4], colorstring[4:]
+    r_col, g_col, b_col = [int(n, 16) for n in (r_col, g_col, b_col)]
+    return (r_col, g_col, b_col)

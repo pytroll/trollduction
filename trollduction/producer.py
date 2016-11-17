@@ -37,13 +37,11 @@ TODO:
    (crude/nearest/<something new>)
 '''
 
-import errno
 import glob
 import logging
 import logging.handlers
 import os
 import Queue
-import shutil
 import socket
 import tempfile
 import time
@@ -987,7 +985,8 @@ class DataProcessor(object):
         return True
 
 
-def _create_message(obj, filename, uri, params, publish_topic=None, uid=None, source_uri=None):
+def _create_message(obj, filename, uri, params, publish_topic=None, uid=None,
+                    source_uri=None):
     """Create posttroll message.
     """
     to_send = obj.info.copy()
@@ -1019,35 +1018,12 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None, so
     to_send["uid"] = uid or os.path.basename(filename)
     if source_uri is not None:
         to_send["source_uri"] = source_uri
-    # we should have more info on format...
-    fformat = os.path.splitext(filename)[1][1:]
-    if fformat.startswith("tif"):
-        fformat = "TIFF"
-    elif fformat.startswith("png"):
-        fformat = "PNG"
-    elif fformat.startswith("jp"):
-        fformat = "JPEG"
-    elif fformat.startswith("nc"):
-        fformat = "NetCDF4"
-    elif fformat in ["hdf", "h5"]:
-        fformat = "HDF5"
+
+    fformat = helper_functions.get_file_format(filename)
     to_send["type"] = fformat
-    if fformat not in ["NetCDF4", "HDF5", "TIFF"]:
-        to_send["format"] = "raster"
-        to_send["data_processing_level"] = "2"
-        to_send["product_name"] = obj.info["product_name"]
-    elif fformat == "TIFF":
-        to_send["format"] = "GeoTIFF"
-        to_send["data_processing_level"] = "2"
-        to_send["product_name"] = obj.info["product_name"]
-    elif fformat == "NetCDF4":
-        to_send["format"] = "CF"
-        to_send["data_processing_level"] = "1b"
-        to_send["product_name"] = "dump"
-    elif fformat == "HDF5":
-        to_send["format"] = "PPS"
-        to_send["data_processing_level"] = "3"
-        to_send["product_name"] = "cloudproduct"
+
+    to_send = helper_functions.add_fformat_metadata(to_send, fformat,
+                                                    obj.info)
 
     if publish_topic is None:
         subject = "/".join(("",
@@ -1068,58 +1044,6 @@ def _create_message(obj, filename, uri, params, publish_topic=None, uid=None, so
     msg = Message(subject, "file", to_send)
 
     return msg
-
-
-def link_or_copy(src, dst, tmpdst=None, retry=1):
-    """Create a hardlink from *src* to *dst*, or if that fails, copy.
-    """
-    if src == dst:
-        LOGGER.warning("Trying to copy a file over itself: %s", src)
-        return
-    try:
-        os.link(src, dst)
-        if tmpdst is not None:
-            os.remove(tmpdst)
-    except OSError as err:
-        if err.errno not in [errno.EXDEV]:
-            LOGGER.exception("Could not link: %s -> %s", src, dst)
-            return
-        try:
-            if tmpdst is not None:
-                shutil.copy(src, tmpdst)
-                os.rename(tmpdst, dst)
-            else:
-                shutil.copy(src, dst)
-        except shutil.Error:
-            LOGGER.exception("Something went wrong in copying a file")
-        except IOError as err:
-            LOGGER.info("Error copying file: %s", str(err))
-            if retry:
-                LOGGER.info("Retrying...")
-                link_or_copy(src, dst, tmpdst, retry - 1)
-            else:
-                LOGGER.exception("Could not copy: %s -> %s", src, dst)
-
-
-def thumbnail(filename, thname, size, fformat):
-    """Create a thumbnail image and save it.
-    """
-    from PIL import Image
-    img = Image.open(filename)
-    img.thumbnail(size, Image.ANTIALIAS)
-    img.save(thname, fformat)
-
-
-def hash_color(colorstring):
-    """ convert #RRGGBB to an (R, G, B) tuple """
-    colorstring = colorstring.strip()
-    if colorstring[0] == '#':
-        colorstring = colorstring[1:]
-    if len(colorstring) != 6:
-        raise ValueError("input #%s is not in #RRGGBB format" % colorstring)
-    r_col, g_col, b_col = colorstring[:2], colorstring[2:4], colorstring[4:]
-    r_col, g_col, b_col = [int(n, 16) for n in (r_col, g_col, b_col)]
-    return (r_col, g_col, b_col)
 
 
 class DataWriter(Thread):
@@ -1144,126 +1068,134 @@ class DataWriter(Thread):
         """Set published topic."""
         self._publish_topic = publish_topic
 
+    def _sort_file_items(self, file_items):
+        """Sort the file items in categories to allow copying similar ones"""
+        sorted_items = {}
+        for item in file_items:
+            attrib = item.attrib.copy()
+            for key in ["output_dir",
+                        "thumbnail_name",
+                        "thumbnail_size"]:
+                attrib.pop(key, None)
+            if 'format' not in attrib:
+                attrib.setdefault('format',
+                                  os.path.splitext(item.text.strip())[1][1:])
+
+            key = tuple(sorted(attrib.items()))
+            sorted_items.setdefault(key, []).append(item)
+
+        return sorted_items
+
+    def save(self, pub, obj, copies, params, fformat):
+        """Save image *obj*"""
+        umask = os.umask(0)
+        os.umask(umask)
+        default_mode = int('666', 8) - umask
+
+        local_params = params.copy()
+        local_aliases = local_params['aliases']
+        for key, aliases in local_aliases.items():
+            if key in local_params:
+                local_params[key] = aliases.get(params[key],
+                                                params[key])
+
+        saved = False
+        for copy in copies:
+            output_dir = copy.attrib.get("output_dir",
+                                         params["output_dir"])
+
+            fname = compose(os.path.join(output_dir,
+                                         copy.text.strip()),
+                            local_params)
+            file_dir = os.path.dirname(fname)
+            if not os.path.exists(file_dir):
+                os.makedirs(file_dir)
+            tempfd, tempname = tempfile.mkstemp(dir=file_dir)
+            os.chmod(tempname, default_mode)
+            os.close(tempfd)
+
+            save_params = self.get_save_arguments(copy, local_params)
+
+            LOGGER.debug("Saving %s", fname)
+            if not saved or copy.attrib.get("copy", "true") == "false":
+                try:
+                    obj.save(tempname, fformat=fformat, **save_params)
+                except IOError:  # retry once
+                    try:
+                        obj.save(tempname, fformat=fformat, **save_params)
+                    except IOError:
+                        LOGGER.exception("Can't save file %s", fname)
+                        continue
+                os.rename(tempname, fname)
+
+                LOGGER.info("Saved %s to %s", str(obj), fname)
+                saved = fname
+                uid = os.path.basename(fname)
+            else:
+                LOGGER.info("Copied/Linked %s to %s", saved, fname)
+                helper_functions.link_or_copy(saved, fname, tempname)
+                saved = fname
+
+            if ("thumbnail_name" in copy.attrib and
+                    "thumbnail_size" in copy.attrib):
+                thsize = [int(val) for val in
+                          copy.attrib["thumbnail_size"].split("x")]
+                copy.attrib["thumbnail_size"] = thsize
+                thname = compose(os.path.join(output_dir,
+                                              copy.attrib["thumbnail_name"]),
+                                 local_params)
+                copy.attrib["thumbnail_name"] = thname
+                helper_functions.thumbnail(fname, thname, thsize, fformat)
+
+            if 'uri' in params:
+                source_uri = [params['uri']]
+            elif 'dataset' in params:
+                source_uri = [e['uri'] for e in params['dataset']
+                              if 'uri' in e]
+            else:
+                source_uri = None
+
+            msg = _create_message(obj, os.path.basename(fname),
+                                  fname, params,
+                                  publish_topic=self._publish_topic,
+                                  uid=uid,
+                                  source_uri=source_uri)
+            pub.send(str(msg))
+            LOGGER.debug("Sent message %s", str(msg))
+
+        return local_params
+
     def run(self):
         """Run the thread."""
         with Publish("l2producer", port=self._port,
                      nameservers=self._nameservers) as pub:
-            umask = os.umask(0)
-            os.umask(umask)
-            default_mode = int('666', 8) - umask
-
+            # local_params = ''
             while self._loop:
                 try:
                     orig_obj, file_items, params = self.prod_queue.get(True, 1)
                 except Queue.Empty:
                     continue
-                local_params = params.copy()
+
                 try:
                     # Sort the file items in categories, to allow copying
                     # similar ones.
-                    sorted_items = {}
-                    for item in file_items:
-                        attrib = item.attrib.copy()
-                        for key in ["output_dir",
-                                    "thumbnail_name",
-                                    "thumbnail_size"]:
-                            attrib.pop(key, None)
-                        if 'format' not in attrib:
-                            attrib.setdefault('format',
-                                              os.path.splitext(item.text.strip())[1][1:])
+                    sorted_items = self._sort_file_items(file_items)
 
-                        key = tuple(sorted(attrib.items()))
-                        sorted_items.setdefault(key, []).append(item)
-
-                    local_aliases = local_params['aliases']
-                    for key, aliases in local_aliases.items():
-                        if key in local_params:
-                            local_params[key] = aliases.get(params[key],
-                                                            params[key])
                     for item, copies in sorted_items.items():
                         obj = deepcopy(orig_obj)
                         attrib = dict(item)
                         if attrib.get("overlay", "").startswith("#"):
-                            obj.add_overlay(hash_color(attrib.get("overlay")))
+                            obj.add_overlay(
+                                helper_functions.hash_color(
+                                    attrib.get("overlay")))
                         elif len(attrib.get("overlay", "")) > 0:
                             LOGGER.debug("Adding overlay from config file")
                             obj.add_overlay_config(attrib["overlay"])
                         fformat = attrib.get("format")
 
-                        # Actually save the data to disk.
-                        saved = False
-                        for copy in copies:
-                            output_dir = copy.attrib.get("output_dir",
-                                                         params["output_dir"])
+                        local_params = self.save(pub, obj, copies,
+                                                 params, fformat)
 
-                            fname = compose(os.path.join(output_dir,
-                                                         copy.text.strip()),
-                                            local_params)
-                            file_dir = os.path.dirname(fname)
-                            if not os.path.exists(file_dir):
-                                os.makedirs(file_dir)
-                            tempfd, tempname = tempfile.mkstemp(dir=file_dir)
-                            os.chmod(tempname, default_mode)
-                            os.close(tempfd)
-
-                            save_params = self.get_save_arguments(copy,
-                                                                  local_params)
-
-                            LOGGER.debug("Saving %s", fname)
-                            if not saved or copy.attrib.get("copy", "true") == "false":
-                                try:
-                                    obj.save(tempname,
-                                             fformat=fformat,
-                                             **save_params)
-                                except IOError:  # retry once
-                                    try:
-                                        obj.save(tempname,
-                                                 fformat=fformat,
-                                                 **save_params)
-                                    except IOError:
-                                        LOGGER.exception(
-                                            "Can't save file %s", fname)
-                                        continue
-                                os.rename(tempname, fname)
-
-                                LOGGER.info("Saved %s to %s", str(obj), fname)
-                                saved = fname
-                                uid = os.path.basename(fname)
-                            else:
-                                LOGGER.info(
-                                    "Copied/Linked %s to %s", saved, fname)
-                                link_or_copy(saved, fname, tempname)
-                                saved = fname
-                            if ("thumbnail_name" in copy.attrib and
-                                    "thumbnail_size" in copy.attrib):
-                                thsize = [int(val) for val
-                                          in copy.attrib[
-                                    "thumbnail_size"].split("x")]
-                                copy.attrib["thumbnail_size"] = thsize
-                                thname = \
-                                    compose(os.path.join(
-                                        output_dir,
-                                        copy.attrib["thumbnail_name"]),
-                                        local_params)
-                                copy.attrib["thumbnail_name"] = thname
-                                thumbnail(fname, thname, thsize, fformat)
-
-                            if 'uri' in params:
-                                source_uri = [params['uri']]
-                            elif 'dataset' in params:
-                                source_uri = \
-                                    [e['uri'] for e in params['dataset']
-                                     if 'uri' in e]
-                            else:
-                                source_uri = None
-
-                            msg = _create_message(obj, os.path.basename(fname),
-                                                  fname, params,
-                                                  publish_topic=self._publish_topic,
-                                                  uid=uid,
-                                                  source_uri=source_uri)
-                            pub.send(str(msg))
-                            LOGGER.debug("Sent message %s", str(msg))
                 except Exception as e:
                     for item in file_items:
                         if "thumbnail_size" in item.attrib:
