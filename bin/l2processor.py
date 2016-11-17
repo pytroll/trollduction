@@ -115,6 +115,7 @@ def setup_logging(config, config_item, process_num=None):
                                       disable_existing_loggers=False)
             if os.path.exists(inst_log_config):
                 os.remove(inst_log_config)
+    logging.debug("Logging setup completed.")
 
 
 def main():
