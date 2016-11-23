@@ -1,6 +1,331 @@
 Changelog
 =========
 
+v1.2.0 (2016-11-23)
+-------------------
+
+- Update changelog. [Panu Lahtinen]
+
+- Bump version: 1.1.0 → 1.2.0. [Panu Lahtinen]
+
+- Clean Trollduction.run_single() and DataProcessor.save_images() [Panu
+  Lahtinen]
+
+- Split parse() to sub functions. [Panu Lahtinen]
+
+- Clean and reorganize code. [Panu Lahtinen]
+
+- Add log message for completed log configuration. [Panu Lahtinen]
+
+- Restructure run() to use several separate functions. [Panu Lahtinen]
+
+- Move get_uri_from_message from producer.py. [Panu Lahtinen]
+
+- Remove unnecessary fallback and unused import. [Panu Lahtinen]
+
+- Change default values from `[]` and `{}` to `None`, change variable
+  name `dir` to `file_dir` [Panu Lahtinen]
+
+- Comment unused row, fix variable names. [Panu Lahtinen]
+
+- Add main(), split `if __name__ == "__main__":` to functions. [Panu
+  Lahtinen]
+
+- Remove unused import. [Panu Lahtinen]
+
+- Merge branch 'feature_reorganize' into develop. [Panu Lahtinen]
+
+- Add check for listener's queue name. [Panu Lahtinen]
+
+- Python 2.6 compatibility and autopep8. [Panu Lahtinen]
+
+- Add pytroll-collectors. [Panu Lahtinen]
+
+- Update to reflect changes in packages, update repository addresses.
+  [Panu Lahtinen]
+
+- Remove, a duplicate of configuration.rst. [Panu Lahtinen]
+
+- Move EventHandler and ConfigWatcher to pytroll-collectors, add
+  dependency to it, adjust imports. [Panu Lahtinen]
+
+- Remove scripts that were moved to pytroll-collectors. [Panu Lahtinen]
+
+- Remove files moved to pytroll-collectors. [Panu Lahtinen]
+
+- Remove tests for modules moved to pytroll-collectors. [Panu Lahtinen]
+
+- Remove trollduction.commits, remove unnecessary scipy requirement.
+  [Panu Lahtinen]
+
+- Add documentation, remove completed parts. [Panu Lahtinen]
+
+- Add a note about failing test_scipy. [Panu Lahtinen]
+
+- Install posttroll develop version. [Panu Lahtinen]
+
+- Remove scripts and packages that were moved to other repositories.
+  [Panu Lahtinen]
+
+- Moved to their own respective repositories. [Panu Lahtinen]
+
+- Add runner configs, remove runners. [Panu Lahtinen]
+
+- Moved to their own repositories. [Panu Lahtinen]
+
+- Add checks for listener's output queue name. [Panu Lahtinen]
+
+- Moved to trollflow-sat. [Panu Lahtinen]
+
+- Initial commit. [Panu Lahtinen]
+
+- Moved to trollflow-sat. [Panu Lahtinen]
+
+- Moved to trollflow. [Panu Lahtinen]
+
+- Adjust imports to use posttroll.listener.ListenerContainer. [Panu
+  Lahtinen]
+
+- Moved to posttroll. [Panu Lahtinen]
+
+- Merge branch 'master' into feature_trollflow. [Panu Lahtinen]
+
+- Merge branch 'develop' into feature_trollflow. [Panu Lahtinen]
+
+- Add some memory management, unload channels that are not needed. [Panu
+  Lahtinen]
+
+- Merge branch 'develop' into feature_trollflow. [Martin Raspaud]
+
+  Conflicts:
+  	trollduction/tests/test_scisys.py
+
+- Merge branch 'develop' into feature_trollflow. [Martin Raspaud]
+
+  Conflicts:
+  	trollduction/tests/test_scisys.py
+
+- Allow failures with Python 2.6. [Panu Lahtinen]
+
+- Set hostname to 'localhost', adjust line wrapping. [Panu Lahtinen]
+
+- Install mpop from git, not pypi. [Panu Lahtinen]
+
+- Add possibility to run test directly. [Panu Lahtinen]
+
+- Merge branch 'develop' into feature_trollflow. [Panu Lahtinen]
+
+- Move logging configuration to config file. [Panu Lahtinen]
+
+- Add scipy as requirement. [Panu Lahtinen]
+
+- Add nameserver, remove setUp() and tearDown() [Panu Lahtinen]
+
+- Split global composite to library and main() parts. [Panu Lahtinen]
+
+- Fix relative paths to absolute paths. [Panu Lahtinen]
+
+- Fix data paths, fix import path. [Panu Lahtinen]
+
+- Add import of global mosaic test. [Panu Lahtinen]
+
+- Add global mosaic testing to test suite. [Panu Lahtinen]
+
+- Add trollflow installation from git. [Panu Lahtinen]
+
+- Add unit testing for global composite. [Panu Lahtinen]
+
+- Fix typo. [Panu Lahtinen]
+
+- Fix intendation, make it possible to give area definition instead of
+  name of one. [Panu Lahtinen]
+
+- Move IOError handling to read_image(), use self.adef instead of
+  reading the area definition every time. [Panu Lahtinen]
+
+- Refactor for easier testing. [Panu Lahtinen]
+
+- Autopep8 the file. [Panu Lahtinen]
+
+- Adjust PIL import. [Panu Lahtinen]
+
+- Add config item for defining epoch for timeouts. [Panu Lahtinen]
+
+- Fix masking when there's pre-existing data. [Panu Lahtinen]
+
+- Add file save parameters. [Panu Lahtinen]
+
+- Add more debug messages. [Panu Lahtinen]
+
+- Set lon_limits to None when reading existing composite. [Panu
+  Lahtinen]
+
+- Try to read existing image before creating composite so late-coming
+  image(s) won't overwrite the existing composite. [Panu Lahtinen]
+
+- Add create_global_composite to installed scripts. [Panu Lahtinen]
+
+- Add smoothing and remove obsolete functions. [Panu Lahtinen]
+
+- Clarify satellite limits and that the satellite name needs to be in
+  the filename. [Panu Lahtinen]
+
+- Add global mosaic generator with an example config.  Tested only with
+  flow_processor. [Panu Lahtinen]
+
+- Add message sending, add relevant information to img.info dictionary.
+  [Panu Lahtinen]
+
+- Revert to original queue attribute name. [Panu Lahtinen]
+
+- Add missing package trollduction.plugins to installation list. [Panu
+  Lahtinen]
+
+- Add trollflow to required packages, add flow_processor and plugins to
+  installed scripts and packages, update url to point to pytroll repo.
+  [Panu Lahtinen]
+
+- Add a check for output queue name when linking queues, workaround for
+  segment_gatherer.py. [Panu Lahtinen]
+
+- Revert queue name back to original. [Panu Lahtinen]
+
+- Skip empty images, workaround for multiple similarly named composite
+  functions. [Panu Lahtinen]
+
+- Add fault tolerance for incompatible composites. [Panu Lahtinen]
+
+- Add log message for completed saving. [Panu Lahtinen]
+
+- Change queue name to output_queue for flow_processor. [Panu Lahtinen]
+
+- Fix usage of external calibration coefficients. [Panu Lahtinen]
+
+- Update class names for scene loader and segment gatherer. [Panu
+  Lahtinen]
+
+- Renamed files. [Panu Lahtinen]
+
+- Clarify filename, change class name. [Panu Lahtinen]
+
+- Clarify filename, fix typos in comments. [Panu Lahtinen]
+
+- Fix class doc string. [Panu Lahtinen]
+
+- Add logging template for flow_processor. [Panu Lahtinen]
+
+- Rewrite with functions, add clean shutdown for keyboard interrupt.
+  [Panu Lahtinen]
+
+- Moved YAML config example from trollflow and renamed as template.
+  [Panu Lahtinen]
+
+- Change segment gatherer to use yaml config. [Panu Lahtinen]
+
+- Add SegmentGatherer (.ini variant) [Panu Lahtinen]
+
+- Expose more arguments as config options. [Panu Lahtinen]
+
+- Add log config, add writer. [Panu Lahtinen]
+
+- Add configuration for pansharpener, give better names for workflows.
+  [Panu Lahtinen]
+
+- Add all working trollduction plugins. [Panu Lahtinen]
+
+- Work on workflowstreamer. [Martin Raspaud]
+
+- Add first draft of trollduction flow. [Martin Raspaud]
+
+- Add execute bit. [Panu Lahtinen]
+
+- Moved generate_process.py from trollflow and renamed to
+  flow_processor.py. [Panu Lahtinen]
+
+- Fix logging from daemon threads. [Panu Lahtinen]
+
+- Add logging and log config. [Panu Lahtinen]
+
+- Move queue initial value to correct place. [Panu Lahtinen]
+
+- Work on workflowstreamer. [Martin Raspaud]
+
+- Rename template.py to plugin_template.py. [Panu Lahtinen]
+
+- Add _template to filename. [Panu Lahtinen]
+
+- Add _template to filename. [Panu Lahtinen]
+
+- Add example YAML config for segment gatherer plugin for EARS-VIIRS.
+  [Panu Lahtinen]
+
+- Remove excessive logging. [Panu Lahtinen]
+
+- Example YAML config for Meteosat-10 segment gatherer plugin. [Panu
+  Lahtinen]
+
+- Convert to use yaml config file. [Panu Lahtinen]
+
+- Fix config use, check if input_queue is set, insert plain message to
+  output_queue without str() [Panu Lahtinen]
+
+- Rename restart_writer() to restart() for genericity. [Panu Lahtinen]
+
+- Fix "queue" to input and output queues, fix couple of typos, add
+  do_stuff() [Panu Lahtinen]
+
+- Template for a trollflow daemon. [Panu Lahtinen]
+
+- Add more logging. [Panu Lahtinen]
+
+- Add logger to listener, log new messages. [Panu Lahtinen]
+
+- Expose more arguments to config file. [Panu Lahtinen]
+
+- Clarify log message. [Panu Lahtinen]
+
+- Move loggers inside the classes. [Panu Lahtinen]
+
+- Update logging. [Panu Lahtinen]
+
+- Add more config file options, add logging. [Panu Lahtinen]
+
+- Remove references to listener, fix setting the writer queue. [Panu
+  Lahtinen]
+
+- Add pansharpening plugin for trollflow. [Panu Lahtinen]
+
+- Update template. [Panu Lahtinen]
+
+- Initial, non-workin, version. [Panu Lahtinen]
+
+- First working versions. [Panu Lahtinen]
+
+- Merge branch 'feature_trollflow' of
+  https://github.com/pytroll/trollduction into feature_trollflow. [Panu
+  Lahtinen]
+
+- Rename queue to output_queue. [Martin Raspaud]
+
+- Merge branch 'feature_trollflow' of
+  https://github.com/pytroll/trollduction into feature_trollflow. [Panu
+  Lahtinen]
+
+- Add setstate to listener container. [Martin Raspaud]
+
+- Compositer class. [Panu Lahtinen]
+
+- Template for plugins. [Panu Lahtinen]
+
+- Initialize the super class. [Panu Lahtinen]
+
+- Make invoke() a static method, make create_scene_from_message a
+  function. [Panu Lahtinen]
+
+- Add MessageLoader. [Panu Lahtinen]
+
+- Add init. [Panu Lahtinen]
+
 v1.1.0 (2016-11-01)
 -------------------
 
