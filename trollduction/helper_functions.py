@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2014, 2015
+# Copyright (c) 2014, 2015, 2017
 #
 # Author(s):
 #
@@ -454,14 +454,15 @@ def eval_default(expression, default_res=None):
 
 def get_uri_from_message(msg, area_def_names=None):
     """Get URI from posttroll message."""
+
     if msg.type == "file":
         uri = msg.data['uri']
     elif msg.type == "dataset":
         uri = [mda['uri'] for mda in msg.data['dataset']]
     elif msg.type == 'collection':
         if not msg.data['collection_area_id'] in area_def_names:
-            LOGGER.info('Collection does not contain data for '
-                        'current areas. Skipping.')
+            LOGGER.warning('Collection does not contain data for '
+                           'current areas: %s', str(area_def_names))
             return None
         if 'dataset' in msg.data['collection'][0]:
             uri = []

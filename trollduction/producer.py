@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2014-2016
+# Copyright (c) 2014-2017
 #
 # Author(s):
 #
@@ -597,6 +597,9 @@ class DataProcessor(object):
 
         uri = helper_functions.get_uri_from_message(msg,
                                                     self.get_area_def_names())
+        if not uri:
+            LOGGER.info("Skipping...")
+            return
 
         LOGGER.info('New data available: %s', uri)
         t1a = time.time()
