@@ -476,6 +476,11 @@ class DataProcessor(object):
                                  "unloaded data, continuing")
                 do_generic_coverage = True
                 skip_group = False
+            except AreaNotFound:
+                if area_item.attrib['id'] == 'satproj':
+                    skip_group = False
+                else:
+                    raise
             for product in area_item:
                 products.append(product)
 
