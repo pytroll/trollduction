@@ -53,22 +53,21 @@ from xml.etree.ElementTree import tostring
 
 import netifaces
 import numpy as np
+from pyresample.utils import AreaNotFound
 
 import mpop.imageo.formats.writer_options as writer_opts
 from mpop.projector import get_area_def
 from mpop.satellites import GenericFactory as GF
 from mpop.satout.cfscene import CFScene
+from posttroll.listener import ListenerContainer
 from posttroll.message import Message
 from posttroll.publisher import Publish
 from pyorbital import astronomy
-from pyresample.utils import AreaNotFound
-from trollduction import helper_functions
-from trollduction import xml_read
+from pytroll_collectors.file_notifiers import ConfigWatcher
+from trollduction import helper_functions, xml_read
 from trollsched.boundary import AreaDefBoundary, Boundary
 from trollsched.satpass import Pass
 from trollsift import compose
-from pytroll_collectors.file_notifiers import ConfigWatcher
-from posttroll.listener import ListenerContainer
 
 try:
     from mipp import DecodeError
@@ -541,35 +540,39 @@ class DataProcessor(object):
                 self.viewZenCacheManager.notify_channels_loaded(
                     self.global_data.loaded_channels())
 
-            # reproject to local domain
-            LOGGER.debug("Projecting data to area %s",
-                         area_item.attrib['name'])
-            try:
+            if area_item.attrib['id'] == 'satproj':
+                self.local_data = deepcopy(self.global_data)
+            else:
+                # reproject to local domain
+                LOGGER.debug("Projecting data to area %s",
+                             area_item.attrib['name'])
                 try:
-                    actual_srch_radius = int(area_item.attrib["srch_radius"])
-                    LOGGER.debug("Overriding search radius %s with %s",
-                                 str(srch_radius), str(actual_srch_radius))
-                except KeyError:
-                    LOGGER.debug("Using search radius %s", str(srch_radius))
-                    actual_srch_radius = srch_radius
+                    try:
+                        actual_srch_radius = int(
+                            area_item.attrib["srch_radius"])
+                        LOGGER.debug("Overriding search radius %s with %s",
+                                     str(srch_radius), str(actual_srch_radius))
+                    except KeyError:
+                        LOGGER.debug("Using search radius %s", str(srch_radius))
+                        actual_srch_radius = srch_radius
 
-                self.local_data = \
-                    self.global_data.project(
-                        area_item.attrib["id"],
-                        channels=self.get_req_channels(area_item),
-                        mode=proj_method, nprocs=nprocs,
-                        precompute=precompute,
-                        radius=actual_srch_radius)
-            except ValueError:
-                LOGGER.warning("No data in this area")
-                continue
-            except AreaNotFound:
-                LOGGER.warning("Area %s not defined, skipping!",
-                               area_item.attrib['id'])
-                continue
+                    self.local_data = \
+                        self.global_data.project(
+                            area_item.attrib["id"],
+                            channels=self.get_req_channels(area_item),
+                            mode=proj_method, nprocs=nprocs,
+                            precompute=precompute,
+                            radius=actual_srch_radius)
+                except ValueError:
+                    LOGGER.warning("No data in this area")
+                    continue
+                except AreaNotFound:
+                    LOGGER.warning("Area %s not defined, skipping!",
+                                   area_item.attrib['id'])
+                    continue
 
-            LOGGER.info('Data reprojected for area: %s',
-                        area_item.attrib['name'])
+                LOGGER.info('Data reprojected for area: %s',
+                            area_item.attrib['name'])
 
             # create a shallow copy of the info dictionary in local_data
             # to provide information which should be local only
