@@ -650,8 +650,9 @@ class DataProcessor(object):
                 req_channels = self.get_req_channels(products)
                 LOGGER.debug("loading channels: %s", str(req_channels))
                 keywords = {"filename": filename,
-                            "area_def_names": area_def_names,
                             "use_extern_calib": use_extern_calib}
+                if 'satproj' not in area_def_names:
+                    keywords["area_def_names"] = area_def_names
                 try:
                     keywords["time_interval"] = (msg.data["start_time"],
                                                  msg.data["end_time"])
