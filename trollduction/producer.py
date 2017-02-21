@@ -546,7 +546,7 @@ class DataProcessor(object):
                     self.global_data.loaded_channels())
 
             if area_item.attrib['id'] == 'satproj':
-                self.local_data = deepcopy(self.global_data)
+                self.local_data = self.global_data
             else:
                 # reproject to local domain
                 LOGGER.debug("Projecting data to area %s",
