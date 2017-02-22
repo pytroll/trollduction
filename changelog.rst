@@ -1,6 +1,31 @@
 Changelog
 =========
 
+v1.3.0 (2017-02-22)
+-------------------
+
+Fix
+~~~
+
+- Bugfix: Continue without doing anything when a collection is ready for
+  an area not configured. [Adam.Dybbroe]
+
+Other
+~~~~~
+
+- Update changelog. [Panu Lahtinen]
+
+- Bump version: 1.2.0 → 1.3.0. [Panu Lahtinen]
+
+- Do not use deepcopy for satproj. [Martin Raspaud]
+
+- Do not check coverage for satproj area. [Martin Raspaud]
+
+- Load the entire dataset if satproj is the area. [Martin Raspaud]
+
+- Add support for unprojected image generation with area 'satproj'
+  [Martin Raspaud]
+
 v1.2.0 (2016-11-23)
 -------------------
 
