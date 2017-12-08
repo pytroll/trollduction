@@ -53,7 +53,6 @@ from xml.etree.ElementTree import tostring
 
 import netifaces
 import numpy as np
-from pyresample.utils import AreaNotFound
 
 import mpop.imageo.formats.writer_options as writer_opts
 from mpop.projector import get_area_def
@@ -63,6 +62,7 @@ from posttroll.listener import ListenerContainer
 from posttroll.message import Message
 from posttroll.publisher import Publish
 from pyorbital import astronomy
+from pyresample.utils import AreaNotFound
 from pytroll_collectors.file_notifiers import ConfigWatcher
 from trollduction import helper_functions, xml_read
 from trollsched.boundary import AreaDefBoundary, Boundary
@@ -1186,13 +1186,13 @@ class DataWriter(Thread):
         """Run the thread."""
         with Publish("l2producer", port=self._port,
                      nameservers=self._nameservers) as pub:
-            # local_params = ''
             while self._loop:
                 try:
                     orig_obj, file_items, params = self.prod_queue.get(True, 1)
                 except Queue.Empty:
                     continue
 
+                local_params = str(params)
                 try:
                     # Sort the file items in categories, to allow copying
                     # similar ones.
