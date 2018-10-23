@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (c) 2014-2017
+# Copyright (c) 2014-2018
 #
 # Author(s):
 #
@@ -65,7 +65,8 @@ from pyorbital import astronomy
 from pyresample.utils import AreaNotFound
 from pytroll_collectors.file_notifiers import ConfigWatcher
 from trollduction import helper_functions, xml_read
-from trollsched.boundary import AreaDefBoundary, Boundary
+#from trollsched.boundary import AreaDefBoundary, Boundary
+from pyresample.boundary import AreaDefBoundary, Boundary
 from trollsched.satpass import Pass
 from trollsift import compose
 
